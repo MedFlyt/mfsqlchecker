@@ -1,0 +1,25 @@
+{
+    "migrationsDir": "migrations",
+    "uniqueTableColumnTypes": [
+        {
+            "typeScriptTypeName": "DepartmentId",
+            "tableName": "department",
+            "columnName": "id"
+        },
+        {
+            "typeScriptTypeName": "CarId",
+            "tableName": "car",
+            "columnName": "id"
+        },
+        {
+            "typeScriptTypeName": "CustomerId",
+            "tableName": "customer",
+            "columnName": "id"
+        },
+        {
+            "typeScriptTypeName": "EmployeeId",
+            "tableName": "employee",
+            "columnName": "id"
+        }
+    ]
+}

@@ -1,0 +1,59 @@
+{
+  "name": "mfsqlchecker",
+  "version": "0.0.1",
+  "description": "Statically validate correctness of all your SQL queries. TypeScript, PostgreSQL",
+  "main": "index.js",
+  "bin": "./mfsqlchecker.js",
+  "scripts": {
+    "build": "rm -rf build && tsc --project mfsqlchecker",
+    "ts-watch": "tsc --project mfsqlchecker --watch",
+    "check-demo": "node ./mfsqlchecker.js -p demo -c demo/mfsqlchecker.json",
+    "lint": "tslint --project ./mfsqlchecker/tsconfig.json --format stylish",
+    "lint-fix": "tslint --project ./mfsqlchecker/tsconfig.json --format stylish --fix"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MedFlyt/mfsqlchecker.git"
+  },
+  "keywords": [
+    "TypeScript",
+    "SQL",
+    "PostgreSQL",
+    "ORM"
+  ],
+  "author": "MedFlyt LLC.",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/MedFlyt/mfsqlchecker/issues"
+  },
+  "homepage": "https://github.com/MedFlyt/mfsqlchecker#readme",
+  "dependencies": {
+    "@types/adm-zip": "0.4.32",
+    "@types/cli-progress": "1.8.1",
+    "@types/node": "12.7.2",
+    "@types/pg": "7.11.0",
+    "@types/request": "2.48.2",
+    "@types/rimraf": "2.0.2",
+    "@types/stack-trace": "0.0.29",
+    "@types/tar": "4.0.3",
+    "adm-zip": "0.4.13",
+    "ajv": "6.10.2",
+    "assert-never": "1.2.0",
+    "chalk": "2.4.2",
+    "cli-progress": "3.0.0",
+    "commander": "3.0.0",
+    "env-paths": "2.2.0",
+    "make-dir": "3.0.0",
+    "npm-check-updates": "3.1.21",
+    "pg": "7.12.1",
+    "pg-connection-string": "2.1.0",
+    "promisify-child-process": "3.1.1",
+    "request": "2.88.0",
+    "rimraf": "3.0.0",
+    "source-map-support": "0.5.13",
+    "stack-trace": "0.0.10",
+    "tar": "4.4.10",
+    "tslint": "5.18.0",
+    "typescript": "3.5.3"
+  }
+}

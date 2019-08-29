@@ -1,0 +1,55 @@
+Static Checker:
+
+[V] progress bar for pg queries
+[V] "commander" command line parsing
+[V] command line one-shot usage
+[V] fix view caching/checking
+[V] store query col-types as TypeScript types (instead of sql types)
+[ ] change view exceptions to ErrorDiagnostic
+[V] "hold" system for blocking/releasing updates when promise is running async
+[/] Integrate into VSCode (custom plugin, or figure out how to integrate command line --watch program to highlight errors; problem matchers: <https://code.visualstudio.com/docs/editor/tasks>)
+[ ] Query parsing return errors instead of "null"
+[ ] Type-safe read JSON values
+[ ] Type-safe write JSON values (might be too complex)
+[ ] mess with pg_cast table to prevent liberal assignments of any value to TEXT columns
+
+Run-time Library:
+
+[V] Connection wrapper object (conn.query, conn.queryOne, conn.queryOneOrNone)
+[ ] insert DSL (This is needed to validate that all non-default columns are present)
+      conn.insertOne("employee",
+          {
+              fname: sql`${"alice"}`,
+              lname: sql`fname || ${"johnson"}`
+          }, sql`RETURNING id`);
+
+      conn.insertMany("employee",
+          [{
+              id: sql`${}`,
+              fname: sql`${}`,
+              lname: sql`${fname} || fname`
+          }], sql`RETURNING id`);
+[ ] update DSL (This is needed to validate that assignments to TEXT columns have an expression of type TEXT (sadly postgresql implicitly casts any type to TEXT)) [NOTE! This issue might not be needed if "pg_cast" above technique works!]
+[ ] migrations runner (algorithm:
+    no un-applied migration files? just "CREATE OR REPLACE" all of the views (for performance: maybe all concatenated together as one huge string?)
+    otherwise: try applying un-applied migration(s) file. did it work? great!
+      otherwise, did we get error "2BP01" or "0A000"?
+        yes: regex match "view xxxx" from "detail" and "DROP VEW xxxx CASCADE" (very carefully verifying via "pg_class" that xxxx is a view, not a table!). then try the migration(s) again (recursively if necessary)
+        no: drop all of our views (view_foo_yyyyyy), then try again
+    finally: "CREATE OR REPLACE" all of the views.
+
+Nice-to-have:
+
+[ ] static checker: Save migrations minus-last-one to a "template" database, for faster migrations running when only the latest migration file has changed
+[V] automatically launch temporary postgres server
+[ ] Emit error when an unnamed column ("?column?") is returned
+[ ] Detect UPDATE and DELETE statements that don't have a WHERE clause (regex?)
+[ ] static checker: maybe "cancellation token" system (for prematurely stopping currently running async task -- don't stop migrations or views, only stop queries)
+
+Create temporary database:
+
+$ initdb -D /tmp/test_sql -N -U test -W
+$ postgres -F -D /tmp/test_sql -p 6432 -s
+
+$ psql -h localhost -p 6432 -U test postgres
+postgres=# CREATE DATABASE test WITH OWNER=test TEMPLATE=template0 ENCODING='UTF8' LC_COLLATE='en_US.utf8' LC_CTYPE='en_US.utf8';
