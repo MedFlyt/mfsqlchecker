@@ -3,6 +3,7 @@ import "source-map-support/register"; // tslint:disable-line:no-import-side-effe
 import { assertNever } from "assert-never";
 import * as commander from "commander";
 import * as fs from "fs";
+import * as path from "path";
 import { loadConfigFile } from "./ConfigFile";
 import { DbConnector } from "./DbConnector";
 import { ErrorDiagnostic } from "./ErrorDiagnostic";
@@ -151,7 +152,11 @@ async function main(): Promise<void> {
                 return process.exit(1);
             case "Right":
                 if (config.value.migrationsDir !== undefined) {
-                    migrationsDir = config.value.migrationsDir;
+                    if (path.isAbsolute(config.value.migrationsDir)) {
+                        migrationsDir = config.value.migrationsDir;
+                    } else {
+                        migrationsDir = path.join(path.dirname(options.configFile), config.value.migrationsDir);
+                    }
                 }
                 break;
             default:
