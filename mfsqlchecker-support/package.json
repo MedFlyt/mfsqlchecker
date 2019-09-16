@@ -2,7 +2,7 @@
 	"name": "mfsqlchecker-support",
 	"displayName": "mfsqlchecker-support",
 	"description": "mfsqlchecker integration for Visual Studio Code",
-	"version": "0.0.1",
+	"version": "0.0.2",
 	"engines": {
 		"vscode": "^1.36.0"
 	},
@@ -10,16 +10,10 @@
 		"Other"
 	],
 	"activationEvents": [
-		"onCommand:extension.helloWorld"
+		"workspaceContains:**/mfsqlchecker.json"
 	],
 	"main": "./out/extension.js",
 	"contributes": {
-		"commands": [
-			{
-				"command": "extension.helloWorld",
-				"title": "Hello World"
-			}
-		]
 	},
 	"scripts": {
 		"vscode:prepublish": "npm run compile",
