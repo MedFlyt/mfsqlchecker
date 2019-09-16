@@ -367,15 +367,37 @@ function queryAnswerToErrorDiagnostics(query: ResolvedQuery, queryAnswer: QueryA
                 fileContents: query.fileContents,
                 span: querySourceStart(query.fileContents, query.sourceMap),
                 messages: [`Query return row contains duplicate column names:\n${JSON.stringify(queryAnswer.duplicateResultColumns, null, 2)}`],
-                epilogue: chalk.bold("hint") + ": Specify a different name for the column using the Sql \"AS\" keyword"
+                epilogue: chalk.bold("hint") + ": Specify a different name for the column using the Sql \"AS\" keyword",
+                quickFix: null
             }];
         case "WrongColumnTypes":
+            let replacementText: string;
+            switch (query.colTypeSpan.type) {
+                case "File":
+                    throw new Error("The Impossible Happened");
+                case "LineAndCol":
+                    // This is a bit of a hack. We are assuming that if the
+                    // SrcSpan is a single character, then the type argument is
+                    // completely missing
+                    replacementText = "<" + queryAnswer.renderedColTypes + ">";
+                    break;
+                case "LineAndColRange":
+                    replacementText = queryAnswer.renderedColTypes;
+                    break;
+                default:
+                    return assertNever(query.colTypeSpan);
+            }
+
             return [{
                 fileName: query.fileName,
                 fileContents: query.fileContents,
                 span: query.colTypeSpan,
                 messages: ["Wrong Column Types"],
-                epilogue: chalk.bold("Fix it to:") + "\n" + queryAnswer.renderedColTypes
+                epilogue: chalk.bold("Fix it to:") + "\n" + queryAnswer.renderedColTypes,
+                quickFix: {
+                    name: "Fix Column Types",
+                    replacementText: replacementText
+                }
             }];
         default:
             return assertNever(queryAnswer);

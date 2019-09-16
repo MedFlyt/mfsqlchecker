@@ -97,7 +97,10 @@ export class SqlCheckerEngine {
     }
 }
 
-export async function typeScriptSingleRunCheck(projectDir: string, observer: SqlCheckerEngine, formatter: (errorDiagnostic: ErrorDiagnostic) => string): Promise<boolean> {
+/**
+ * @returns true if there no errors were detected
+ */
+export async function typeScriptSingleRunCheck(projectDir: string, observer: SqlCheckerEngine, formatter: (errorDiagnostics: ErrorDiagnostic[]) => string): Promise<boolean> {
     const configPath = ts.findConfigFile(
         /*searchPath*/ projectDir,
         ts.sys.fileExists, // tslint:disable-line:no-unbound-method
@@ -148,15 +151,13 @@ export async function typeScriptSingleRunCheck(projectDir: string, observer: Sql
     const progSourceFiles = program.getSourceFiles().filter(s => !s.isDeclarationFile);
 
     const errors = await observer.checkChangedSourceFiles(projectDir, program, program.getTypeChecker(), progSourceFiles.map(s => s.fileName));
-    for (const error of errors) {
-        console.log(formatter(error));
-    }
+    console.log(formatter(errors));
 
     return errors.length === 0;
 }
 
 export class TypeScriptWatcher {
-    constructor(observer: SqlCheckerEngine, private readonly formatter: (errorDiagnostic: ErrorDiagnostic) => string) {
+    constructor(observer: SqlCheckerEngine, private readonly formatter: (errorDiagnostics: ErrorDiagnostic[]) => string) {
         this.observer = observer;
     }
 
@@ -288,9 +289,7 @@ export class TypeScriptWatcher {
         } else {
             this.currentlyRunning = false;
 
-            for (const error of errors) {
-                console.log(this.formatter(error));
-            }
+            console.log(this.formatter(errors));
             console.log("[DIAGNOSTICS END]");
         }
     }

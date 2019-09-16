@@ -71,7 +71,8 @@ export function loadConfigFile(fileName: string): Either<ErrorDiagnostic, Config
                     type: "File"
                 },
                 messages: [`Error opening file ${fileName}`, err.message],
-                epilogue: null
+                epilogue: null,
+                quickFix: null
             }
         };
     }
@@ -92,7 +93,8 @@ export function parseConfigFile(fileName: string, fileContents: string): Either<
                     type: "File"
                 },
                 messages: messages,
-                epilogue: null
+                epilogue: null,
+                quickFix: null
             }
         };
     }

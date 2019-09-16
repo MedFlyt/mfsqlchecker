@@ -7,6 +7,7 @@ import { loadConfigFile } from "./ConfigFile";
 import { DbConnector } from "./DbConnector";
 import { ErrorDiagnostic } from "./ErrorDiagnostic";
 import { codeFrameFormatter } from "./formatters/codeFrameFormatter";
+import { jsonFormatter } from "./formatters/jsonFormatter";
 import { vscodeFormatter } from "./formatters/vscodeFormatter";
 import { PostgresServer } from "./launch_postgres";
 import { parsePostgreSqlError } from "./pg_extra";
@@ -20,6 +21,7 @@ interface PostgresConnection {
 
 enum Format {
     CODE_FRAME,
+    JSON,
     VSCODE
 }
 
@@ -42,6 +44,8 @@ function parseFormat(value: string): Format {
     switch (value) {
         case "code-frame":
             return Format.CODE_FRAME;
+        case "json":
+            return Format.JSON;
         case "vscode":
             return Format.VSCODE;
         default:
@@ -114,12 +118,14 @@ function parseOptions(): Options {
     return options;
 }
 
-function formatFunction(format: Format): (errorDiagnostic: ErrorDiagnostic) => string {
+function formatFunction(format: Format): (errorDiagnostics: ErrorDiagnostic[]) => string {
     switch (format) {
         case Format.CODE_FRAME:
-            return codeFrameFormatter;
+            return e => e.map(codeFrameFormatter).join("\n");
+        case Format.JSON:
+            return jsonFormatter;
         case Format.VSCODE:
-            return vscodeFormatter;
+            return e => e.map(vscodeFormatter).join("\n");
         default:
             return assertNever(format);
     }

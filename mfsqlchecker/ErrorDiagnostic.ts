@@ -2,12 +2,22 @@ import chalk from "chalk";
 import * as ts from "typescript";
 import { PostgreSqlError } from "./pg_extra";
 
+export interface QuickFix {
+    name: string;
+    replacementText: string;
+}
+
 export interface ErrorDiagnostic {
     fileName: string;
     fileContents: string;
     span: SrcSpan;
     messages: string[];
     epilogue: string | null;
+
+    /**
+     * Replace the `span` with this text
+     */
+    quickFix: QuickFix | null;
 }
 
 export function fileLineCol(fileContents: string, position: number): SrcSpan.LineAndCol {
@@ -43,7 +53,8 @@ export function postgresqlErrorDiagnostic(fileName: string, fileContents: string
             chalk.bold(err.message),
             chalk.bold("code:") + " " + err.code
         ]).concat(err.detail !== null && err.detail !== err.message ? chalk.bold("detail:") + " " + err.detail : []),
-        epilogue: err.hint !== null ? chalk.bold("hint:") + " " + err.hint : null
+        epilogue: err.hint !== null ? chalk.bold("hint:") + " " + err.hint : null,
+        quickFix: null
     };
 }
 
@@ -54,7 +65,8 @@ export function nodeErrorDiagnostic(node: ts.Node, message: string): ErrorDiagno
         fileContents: sourceFile.text,
         span: nodeSourceSpan(node),
         messages: [chalk.bold(message)],
-        epilogue: null
+        epilogue: null,
+        quickFix: null
     };
 }
 
