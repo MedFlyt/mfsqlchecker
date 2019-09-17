@@ -106,7 +106,9 @@ export class Connection<T> {
     }
 
     async queryOne<Row extends object = any>(query: SqlQueryExpr<T>): Promise<ResultRow<Row>> {
-        const rows = await this.query(query);
+        // Cast away the type of "this" so that "mfsqlchecker" doesn't detect
+        // this line of code as query that should be analyzed
+        const rows: ResultRow<any>[] = await (<any>this).query(query);
         if (rows.length !== 1) {
             throw new Error(`Expected query to return 1 row. Got ${rows.length} rows`);
         }
@@ -114,7 +116,9 @@ export class Connection<T> {
     }
 
     async queryOneOrNone<Row extends object = any>(query: SqlQueryExpr<T>): Promise<ResultRow<Row> | null> {
-        const rows = await this.query(query);
+        // Cast away the type of "this" so that "mfsqlchecker" doesn't detect
+        // this line of code as query that should be analyzed
+        const rows: ResultRow<any>[] = await (<any>this).query(query);
         if (rows.length === 0) {
             return null;
         } else if (rows.length === 1) {

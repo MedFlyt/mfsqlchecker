@@ -52,9 +52,13 @@ export class SqlCheckerEngine {
 
         const sqlViews = resolveAllViewDefinitions(this.viewLibrary);
 
+        let errorDiagnostics: ErrorDiagnostic[] = [];
+
         let queries: QueryCallExpression[] = [];
         for (const sourceFile of progSourceFiles) {
-            queries = queries.concat(findAllQueryCalls(checker, sourceFile));
+            const [es, qs] = findAllQueryCalls(checker, sourceFile);
+            queries = queries.concat(es);
+            errorDiagnostics = errorDiagnostics.concat(qs);
         }
 
         const lookupViewName = (qualifiedSqlViewName: QualifiedSqlViewName): string | undefined => {
@@ -93,6 +97,8 @@ export class SqlCheckerEngine {
             queries: resolvedQueries,
             viewLibrary: sqlViews,
             uniqueTableColumnTypes: uniqueTableColumnTypes
+        }).then(errs => {
+            return errorDiagnostics.concat(errs);
         });
     }
 }

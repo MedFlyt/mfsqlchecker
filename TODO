@@ -8,7 +8,7 @@ Static Checker:
 [ ] change view exceptions to ErrorDiagnostic
 [V] "hold" system for blocking/releasing updates when promise is running async
 [/] Integrate into VSCode (custom plugin, or figure out how to integrate command line --watch program to highlight errors; problem matchers: <https://code.visualstudio.com/docs/editor/tasks>)
-[ ] Query parsing return errors instead of "null"
+[V] Query parsing return errors instead of "null"
 [ ] Type-safe read JSON values
 [ ] Type-safe write JSON values (might be too complex)
 [ ] mess with pg_cast table to prevent liberal assignments of any value to TEXT columns

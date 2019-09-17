@@ -51,7 +51,7 @@ export interface ResolvedQuery {
  * @param node Must be a call expression to the "query" function (from the sql
  * checker lib)
  */
-function buildQueryCallExpression(node: ts.CallExpression): QueryCallExpression | null {
+function buildQueryCallExpression(node: ts.CallExpression): Either<ErrorDiagnostic[], QueryCallExpression> {
     // TODO This function should return an error instead of null (so that we
     // catch invalid uses of "query" that still happen to compile, ex. passing
     // "sql" through stored variable)
@@ -85,35 +85,40 @@ function buildQueryCallExpression(node: ts.CallExpression): QueryCallExpression 
         })();
 
     if (node.arguments.length < 1) {
-        return null;
+        // The TypeScript typechecker will catch this error, so we don't need
+        // to emit our own error message
+        return {
+            type: "Left",
+            value: []
+        };
     }
 
     const sqlExp: ts.Expression = node.arguments[0];
     if (!ts.isTaggedTemplateExpression(sqlExp)) {
-        return null;
+        return {
+            type: "Left",
+            value: [
+                nodeErrorDiagnostic(sqlExp, "Argument must be a Tagged Template Expression")
+            ]
+        };
     }
-
-    // if (!ts.isIdentifier(sqlExp.tag)) {
-    //     return null;
-    // }
-
-    // if (!isIdentifierFromModule(sqlExp.tag, "sql", "./lib/sql_linter")) {
-    //     return null;
-    // }
 
     const sourceFile = node.getSourceFile();
 
     if (ts.isNoSubstitutionTemplateLiteral(sqlExp.template)) {
         return {
-            fileName: sourceFile.fileName,
-            fileContents: sourceFile.text,
-            typeArgument: typeArgument,
-            typeArgumentSpan: typeArgumentSpan,
-            queryFragments: [{
-                type: "StringFragment",
-                text: sqlExp.template.text,
-                sourcePosStart: sqlExp.template.pos
-            }]
+            type: "Right",
+            value: {
+                fileName: sourceFile.fileName,
+                fileContents: sourceFile.text,
+                typeArgument: typeArgument,
+                typeArgumentSpan: typeArgumentSpan,
+                queryFragments: [{
+                    type: "StringFragment",
+                    text: sqlExp.template.text,
+                    sourcePosStart: sqlExp.template.pos
+                }]
+            }
         };
     } else if (ts.isTemplateExpression(sqlExp.template)) {
         const fragments: QueryCallExpression.QueryFragment[] = [];
@@ -137,19 +142,23 @@ function buildQueryCallExpression(node: ts.CallExpression): QueryCallExpression 
         }
 
         return {
-            fileName: sourceFile.fileName,
-            fileContents: sourceFile.text,
-            typeArgument: typeArgument,
-            typeArgumentSpan: typeArgumentSpan,
-            queryFragments: fragments
+            type: "Right",
+            value: {
+                fileName: sourceFile.fileName,
+                fileContents: sourceFile.text,
+                typeArgument: typeArgument,
+                typeArgumentSpan: typeArgumentSpan,
+                queryFragments: fragments
+            }
         };
     } else {
         return assertNever(sqlExp.template);
     }
 }
 
-export function findAllQueryCalls(checker: ts.TypeChecker, sourceFile: ts.SourceFile): QueryCallExpression[] {
-    const result: QueryCallExpression[] = [];
+export function findAllQueryCalls(checker: ts.TypeChecker, sourceFile: ts.SourceFile): [QueryCallExpression[], ErrorDiagnostic[]] {
+    const queryCallExpresions: QueryCallExpression[] = [];
+    const errorDiagnostics: ErrorDiagnostic[] = [];
 
     const queryMethodNames = ["query", "queryOne", "queryOneOrNone"];
 
@@ -161,8 +170,17 @@ export function findAllQueryCalls(checker: ts.TypeChecker, sourceFile: ts.Source
                         const type = checker.getTypeAtLocation(node.expression.expression);
                         if (type.getProperty("MfConnectionTypeTag") !== undefined) {
                             const query = buildQueryCallExpression(node);
-                            if (query !== null) {
-                                result.push(query);
+                            switch (query.type) {
+                                case "Left":
+                                    for (const e of query.value) {
+                                        errorDiagnostics.push(e);
+                                    }
+                                    break;
+                                case "Right":
+                                    queryCallExpresions.push(query.value);
+                                    break;
+                                default:
+                                    assertNever(query);
                             }
                         }
                     }
@@ -175,7 +193,7 @@ export function findAllQueryCalls(checker: ts.TypeChecker, sourceFile: ts.Source
 
     ts.forEachChild(sourceFile, visit);
 
-    return result;
+    return [queryCallExpresions, errorDiagnostics];
 }
 
 function isTypeSqlView(type: ts.Type): boolean {
