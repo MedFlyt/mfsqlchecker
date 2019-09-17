@@ -57,8 +57,8 @@ export class Connection<T> {
 
         for (let i = 0; i < placeholders.length; ++i) {
             const placeholder = placeholders[i];
-            if (placeholder instanceof SqlView) {
-                if (!placeholder.isResolved()) {
+            if (isSqlView(placeholder)) {
+                if (!sqlViewPrivate(placeholder).isResolved()) {
                     throw new Error(`View "${placeholder.getViewName()}" has not been created. Views are only allowed to be defined at module-level scope`);
                 }
                 text += `"${placeholder.getViewName()}"`;
@@ -249,7 +249,28 @@ function stringifyRealValRow(obj: any): string {
     return JSON.stringify(obj2);
 }
 
-class SqlView {
+export abstract class SqlView {
+    private constructor() { }
+
+    abstract getViewName(): string;
+
+    protected dummy: SqlView[];
+}
+
+function isSqlView(obj: any): obj is SqlView {
+    return obj instanceof SqlViewPrivate;
+}
+
+function newSqlView(viewName: string): SqlView {
+    const view = new SqlViewPrivate(viewName);
+    return <any>view;
+}
+
+function sqlViewPrivate(view: SqlView): SqlViewPrivate {
+    return <any>view;
+}
+
+class SqlViewPrivate {
     constructor(viewName: string) {
         this.viewName = viewName;
     }
@@ -319,7 +340,7 @@ export function defineSqlView(x: TemplateStringsArray, ...placeholders: SqlView[
             `
     });
 
-    return new SqlView(viewName);
+    return newSqlView(viewName);
 }
 
 export async function dbExecute(_conn: pg.Client, _query: string): Promise<void> {
