@@ -190,10 +190,6 @@ export class DbConnector {
         }
         return finalErrors.concat(queryErrors);
     }
-
-    resetViews(): Promise<void> {
-        throw new Error("TODO");
-    }
 }
 
 async function dropView(client: pg.Client, viewName: string): Promise<void> {
