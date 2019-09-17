@@ -20,12 +20,15 @@ export class SqlCheckerEngine {
     checkChangedSourceFiles(projectDir: string, program: ts.Program, checker: ts.TypeChecker, sourceFiles: string[]): Promise<ErrorDiagnostic[]> {
         const progSourceFiles = program.getSourceFiles().filter(s => !s.isDeclarationFile);
 
+        let errorDiagnostics: ErrorDiagnostic[] = [];
+
         for (const sourceFile of sourceFiles) {
             const sf = progSourceFiles.find(s => s.fileName === sourceFile);
             if (sf === undefined) {
                 throw new Error("SourceFile not found: " + sourceFile);
             }
-            const views = sqlViewsLibraryAddFromSourceFile(projectDir, sf);
+            const [views, errs] = sqlViewsLibraryAddFromSourceFile(projectDir, sf);
+            errorDiagnostics = errorDiagnostics.concat(errs);
             for (const key of this.viewLibrary.keys()) {
                 if (QualifiedSqlViewName.moduleId(key) === sourceFileModuleName(projectDir, sf)) {
                     const newView = views.get(key);
@@ -50,9 +53,8 @@ export class SqlCheckerEngine {
             });
         }
 
-        const sqlViews = resolveAllViewDefinitions(this.viewLibrary);
-
-        let errorDiagnostics: ErrorDiagnostic[] = [];
+        const [sqlViews, viewErrors] = resolveAllViewDefinitions(this.viewLibrary);
+        errorDiagnostics = errorDiagnostics.concat(viewErrors);
 
         let queries: QueryCallExpression[] = [];
         for (const sourceFile of progSourceFiles) {

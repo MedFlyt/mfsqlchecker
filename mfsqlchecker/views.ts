@@ -2,7 +2,7 @@ import { assertNever } from "assert-never";
 import * as path from "path";
 import * as ts from "typescript";
 import { Either } from "./either";
-import { ErrorDiagnostic, nodeErrorDiagnostic } from "./ErrorDiagnostic";
+import { ErrorDiagnostic, fileLineCol, nodeErrorDiagnostic } from "./ErrorDiagnostic";
 import { identifierImportedFrom, isIdentifierFromModule, ModuleId } from "./ts_extra";
 import { calcViewName } from "./view_names";
 
@@ -214,33 +214,52 @@ export interface SqlCreateView {
     readonly sourceMap: [number, number][];
 }
 
-function fullyResolveSqlViewDefinition(v: SqlViewDefinition, myName: QualifiedSqlViewName, library: Map<QualifiedSqlViewName, SqlViewDefinition>): void {
+function fullyResolveSqlViewDefinition(v: SqlViewDefinition, myName: QualifiedSqlViewName, library: Map<QualifiedSqlViewName, SqlViewDefinition>): ErrorDiagnostic[] {
     if (v.isFullyResolved()) {
-        return;
+        return [];
     }
 
     for (const depName of v.getDependencies()) {
         // Make sure we don't get stuck in infinite recursion!
         if (depName === myName) {
-            throw new Error(`View depends on itself: ${myName}`);
+            return [{
+                fileName: v.getFileName(),
+                fileContents: v.getFileContents(),
+                span: fileLineCol(v.getFileContents(), v.getSourceMap()[0][1]),
+                messages: [`View depends on itself: "${QualifiedSqlViewName.viewName(myName)}"`],
+                epilogue: null,
+                quickFix: null
+            }];
         }
 
         const dep = library.get(depName);
         if (dep === undefined) {
-            throw new Error(`Missing dependency in view ${myName}: ${depName}`);
+            return [{
+                fileName: v.getFileName(),
+                fileContents: v.getFileContents(),
+                span: fileLineCol(v.getFileContents(), v.getSourceMap()[0][1]),
+                messages: [`Missing dependency in view "${QualifiedSqlViewName.viewName(myName)}": "${QualifiedSqlViewName.viewName(depName)}" (from module "${QualifiedSqlViewName.moduleId(depName)}"`],
+                epilogue: null,
+                quickFix: null
+            }];
         }
         if (!dep.isFullyResolved()) {
             fullyResolveSqlViewDefinition(dep, depName, library);
         }
         v.inject(depName, dep.getName());
     }
+
+    return [];
 }
 
-export function resolveAllViewDefinitions(library: Map<QualifiedSqlViewName, SqlViewDefinition>): SqlCreateView[] {
+export function resolveAllViewDefinitions(library: Map<QualifiedSqlViewName, SqlViewDefinition>): [SqlCreateView[], ErrorDiagnostic[]] {
+    let errorDiagnostics: ErrorDiagnostic[] = [];
+
     // Fully resolve all of the views (using the above recursive algorithm)
 
     library.forEach((value, key) => {
-        fullyResolveSqlViewDefinition(value, key, library);
+        const errors = fullyResolveSqlViewDefinition(value, key, library);
+        errorDiagnostics = errorDiagnostics.concat(errors);
     });
 
     // Topological sort of the views, so that they are created in
@@ -278,15 +297,12 @@ export function resolveAllViewDefinitions(library: Map<QualifiedSqlViewName, Sql
     }
 
     library.forEach((value, key) => {
-        addView(key, value);
+        if (value.isFullyResolved()) {
+            addView(key, value);
+        }
     });
 
-    // Sanity check
-    if (result.length !== library.size) {
-        throw new Error(`The Impossible Happened: ${result.length} != ${library.size}`);
-    }
-
-    return result;
+    return [result, errorDiagnostics];
 }
 
 /**
@@ -308,18 +324,6 @@ export class QualifiedSqlViewName {
     protected _dummy: QualifiedSqlViewName[];
 }
 
-export class ValidationError extends Error {
-    constructor(sourceFile: ts.SourceFile, node: ts.Node, public readonly message: string) {
-        super(message);
-
-        this.filename = sourceFile.fileName;
-        this.loc = ts.getLineAndCharacterOfPosition(sourceFile, node.pos);
-    }
-
-    public readonly filename: string;
-    public readonly loc: ts.LineAndCharacter;
-}
-
 export function sourceFileModuleName(projectDir: string, sourceFile: ts.SourceFile): ModuleId {
     const relFile = path.relative(projectDir, sourceFile.fileName);
 
@@ -332,8 +336,9 @@ function importedModuleName(projectDir: string, sourceFile: ts.SourceFile, impor
     return ModuleId.wrap(path.join(path.dirname(ModuleId.unwrap(sourceFileModuleName(projectDir, sourceFile))), importedModule));
 }
 
-export function sqlViewsLibraryAddFromSourceFile(projectDir: string, sourceFile: ts.SourceFile): Map<QualifiedSqlViewName, SqlViewDefinition> {
+export function sqlViewsLibraryAddFromSourceFile(projectDir: string, sourceFile: ts.SourceFile): [Map<QualifiedSqlViewName, SqlViewDefinition>, ErrorDiagnostic[]] {
     const viewLibrary = new Map<QualifiedSqlViewName, SqlViewDefinition>();
+    const errorDiagnostics: ErrorDiagnostic[] = [];
 
     function visit(sf: ts.SourceFile, node: ts.Node) {
         if (ts.isVariableStatement(node)) {
@@ -342,23 +347,26 @@ export function sqlViewsLibraryAddFromSourceFile(projectDir: string, sourceFile:
                     if (ts.isTaggedTemplateExpression(decl.initializer)) {
                         if (ts.isIdentifier(decl.initializer.tag) && isIdentifierFromModule(decl.initializer.tag, "defineSqlView", "./lib/sql_linter")) {
                             if (!ts.isIdentifier(decl.name)) {
-                                throw new ValidationError(sf, decl.name, "defineSqlView not assigned to a variable");
-                            }
-                            // tslint:disable-next-line:no-bitwise
-                            if ((node.declarationList.flags & ts.NodeFlags.Const) === 0) {
-                                throw new ValidationError(sf, decl.name, "defineSqlView assigned to a non-const variable");
-                            }
-                            const viewName = decl.name.text;
-                            const qualifiedSqlViewName = QualifiedSqlViewName.create(sourceFileModuleName(projectDir, sf), viewName);
-                            const sqlViewDefinition = SqlViewDefinition.parseFromTemplateExpression(projectDir, sf, viewName, decl.initializer.template);
-                            switch (sqlViewDefinition.type) {
-                                case "Left":
-                                    throw new ValidationError(sf, decl.name, "TODO XXXX");
-                                case "Right":
-                                    viewLibrary.set(qualifiedSqlViewName, sqlViewDefinition.value);
-                                    break;
-                                default:
-                                    assertNever(sqlViewDefinition);
+                                errorDiagnostics.push(nodeErrorDiagnostic(decl.name, "defineSqlView not assigned to a variable"));
+                            } else {
+                                // tslint:disable-next-line:no-bitwise
+                                if ((node.declarationList.flags & ts.NodeFlags.Const) === 0) {
+                                    errorDiagnostics.push(nodeErrorDiagnostic(decl.name, "defineSqlView assigned to a non-const variable"));
+                                } else {
+                                    const viewName = decl.name.text;
+                                    const qualifiedSqlViewName = QualifiedSqlViewName.create(sourceFileModuleName(projectDir, sf), viewName);
+                                    const sqlViewDefinition = SqlViewDefinition.parseFromTemplateExpression(projectDir, sf, viewName, decl.initializer.template);
+                                    switch (sqlViewDefinition.type) {
+                                        case "Left":
+                                            errorDiagnostics.push(sqlViewDefinition.value);
+                                            break;
+                                        case "Right":
+                                            viewLibrary.set(qualifiedSqlViewName, sqlViewDefinition.value);
+                                            break;
+                                        default:
+                                            assertNever(sqlViewDefinition);
+                                    }
+                                }
                             }
                         }
                     }
@@ -369,7 +377,7 @@ export function sqlViewsLibraryAddFromSourceFile(projectDir: string, sourceFile:
 
     ts.forEachChild(sourceFile, (node: ts.Node) => visit(sourceFile, node));
 
-    return viewLibrary;
+    return [viewLibrary, errorDiagnostics];
 }
 
 export function sqlViewLibraryResetToInitialFragmentsIncludingDeps(viewName: QualifiedSqlViewName, viewLibrary: Map<QualifiedSqlViewName, SqlViewDefinition>): void {
