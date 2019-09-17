@@ -9,9 +9,12 @@ Static Checker:
 [V] "hold" system for blocking/releasing updates when promise is running async
 [/] Integrate into VSCode (custom plugin, or figure out how to integrate command line --watch program to highlight errors; problem matchers: <https://code.visualstudio.com/docs/editor/tasks>)
 [V] Query parsing return errors instead of "null"
+[ ] Allow type aliases and/or interfaces for query result type
 [ ] Type-safe read JSON values
 [ ] Type-safe write JSON values (might be too complex)
 [ ] mess with pg_cast table to prevent liberal assignments of any value to TEXT columns
+[ ] When query type arg is missing, use error span that has range over entire "query" word
+[ ] Right click menu: copy full (expanded) query to clipboard
 
 Run-time Library:
 
@@ -30,6 +33,7 @@ Run-time Library:
               lname: sql`${fname} || fname`
           }], sql`RETURNING id`);
 [ ] update DSL (This is needed to validate that assignments to TEXT columns have an expression of type TEXT (sadly postgresql implicitly casts any type to TEXT)) [NOTE! This issue might not be needed if "pg_cast" above technique works!]
+[ ] Allow embedding rawish SQL fragments into queries
 [ ] migrations runner (algorithm:
     no un-applied migration files? just "CREATE OR REPLACE" all of the views (for performance: maybe all concatenated together as one huge string?)
     otherwise: try applying un-applied migration(s) file. did it work? great!
