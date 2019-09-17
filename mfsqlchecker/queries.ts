@@ -280,7 +280,12 @@ function isUnionOfStringLiterals(type: ts.Type): boolean {
  * @returns Empty string means SQL "NULL" literal. `null` means an error
  */
 function typescriptTypeToSqlType(typeScriptUniqueColumnTypes: Map<TypeScriptType, SqlType>, type: ts.Type): SqlType | null {
-    if (type.flags === ts.TypeFlags.Null) {
+    if (type.flags === ts.TypeFlags.Any) {
+        // TODO Would be better to return some special value here, in order to
+        // give a nicer error message (instead of getting the error from
+        // postgresql 'type "ts_any" does not exist)
+        return SqlType.wrap("ts_any");
+    } else if (type.flags === ts.TypeFlags.Null) {
         return SqlType.wrap("");
     } else if ((type.flags & ts.TypeFlags.Never) !== 0) { // tslint:disable-line:no-bitwise
         return null;
