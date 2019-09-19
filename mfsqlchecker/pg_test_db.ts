@@ -5,8 +5,10 @@ import * as pg from "pg";
 import { parse } from "pg-connection-string";
 import { closePg, connectPg } from "./pg_extra";
 
-export function isMigrationFile(fileName: string) {
-    return fileName.charAt(0) === "V" && fileName.endsWith(".sql");
+const migrationsRegex = /^V\d+__.*\.sql$/;
+
+export function isMigrationFile(fileName: string): boolean {
+    return migrationsRegex.test(fileName);
 }
 
 export async function calcDbMigrationsHash(migrationsDir: string): Promise<string> {

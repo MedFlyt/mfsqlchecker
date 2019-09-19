@@ -1,4 +1,5 @@
-import { defineSqlView, Connection, Req, Opt } from "./lib/mfsqltool";
+import * as pg from "pg";
+import { defineSqlView, Connection, Req, Opt, migrateDatabase } from "./lib/mfsqltool";
 import { EmployeeId, CarId, CustomerId } from "./types";
 
 // import { coolView } from "./blah";
@@ -17,7 +18,7 @@ export async function test() {
     // const blah: "blah" | null = "blah";
 
     await conn.query(conn.sql`
-    
+
     `);
 
     await conn.query<{
@@ -92,4 +93,45 @@ export async function test() {
     //     `);
 }
 
-test();
+function connectPg(url: string): Promise<pg.Client> {
+    const client = new pg.Client(url);
+    return new Promise<pg.Client>((resolve, reject) => {
+        client.connect(err => {
+            if (<boolean>(<any>err)) {
+                reject(err);
+                return;
+            }
+            resolve(client);
+        });
+    });
+}
+
+function closePg(conn: pg.Client): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+        conn.end(err => {
+            if (<boolean>(<any>err)) {
+                reject(err);
+                return;
+            }
+            resolve();
+        });
+    });
+}
+
+async function logger(msg: string): Promise<void> {
+    console.log(msg);
+}
+
+export async function main() {
+    console.log("Connecting...");
+    const client = await connectPg("postgres://test:password@localhost:6432/test1");
+    try {
+        console.log("Migrating...");
+        await migrateDatabase(client, "demo/migrations", logger);
+        console.log("Done");
+    } finally {
+        await closePg(client);
+    }
+}
+
+main();

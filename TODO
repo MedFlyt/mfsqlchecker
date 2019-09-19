@@ -34,7 +34,7 @@ Run-time Library:
           }], sql`RETURNING id`);
 [ ] update DSL (This is needed to validate that assignments to TEXT columns have an expression of type TEXT (sadly postgresql implicitly casts any type to TEXT)) [NOTE! This issue might not be needed if "pg_cast" above technique works!]
 [ ] Allow embedding rawish SQL fragments into queries
-[ ] migrations runner (algorithm:
+[V] migrations runner (algorithm:
     no un-applied migration files? just "CREATE OR REPLACE" all of the views (for performance: maybe all concatenated together as one huge string?)
     otherwise: try applying un-applied migration(s) file. did it work? great!
       otherwise, did we get error "2BP01" or "0A000"?

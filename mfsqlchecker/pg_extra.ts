@@ -305,7 +305,7 @@ export function parsePostgreSqlError(err: any): PostgreSqlError | null {
         code: code,
         position: err.position !== undefined ? parseInt(err.position, 10) : null,
         message: err.message,
-        detail: err.message !== undefined ? err.message : null,
+        detail: err.detail !== undefined ? err.detail : null,
         hint: err.hint !== undefined ? err.hint : null
     };
 }

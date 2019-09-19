@@ -193,7 +193,7 @@ export class DbConnector {
 }
 
 async function dropView(client: pg.Client, viewName: string): Promise<void> {
-    await client.query(`DROP VIEW IF EXISTS ${viewName}`);
+    await client.query(`DROP VIEW IF EXISTS "${viewName}"`);
 }
 
 /**
@@ -235,7 +235,7 @@ async function updateViews(client: pg.Client, oldViews: [string, ViewAnswer][], 
 
 async function processCreateView(client: pg.Client, view: SqlCreateView): Promise<ViewAnswer> {
     try {
-        await client.query(`CREATE OR REPLACE VIEW ${view.viewName} AS ${view.createQuery}`);
+        await client.query(`CREATE OR REPLACE VIEW "${view.viewName}" AS ${view.createQuery}`);
     } catch (err) {
         const perr = parsePostgreSqlError(err);
         if (perr === null) {
@@ -243,7 +243,7 @@ async function processCreateView(client: pg.Client, view: SqlCreateView): Promis
         } else {
             if (perr.position !== null) {
                 // A bit hacky but does the trick:
-                perr.position -= `CREATE OR REPLACE VIEW ${view.viewName} AS `.length;
+                perr.position -= `CREATE OR REPLACE VIEW "${view.viewName}" AS `.length;
             }
             return {
                 type: "CreateError",
