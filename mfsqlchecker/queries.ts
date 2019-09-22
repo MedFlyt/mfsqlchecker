@@ -278,6 +278,8 @@ function getArrayType(type: ts.Type): ts.Type | null {
 
 /**
  * Checks if the type is something like: "Yes" | "No" | "Maybe"
+ *
+ * One of the union members is also allowed to be `null`: "High" | "Low" | null
  */
 function isUnionOfStringLiterals(type: ts.Type): boolean {
     if ((type.flags & ts.TypeFlags.Union) === 0) { // tslint:disable-line:no-bitwise
@@ -286,7 +288,9 @@ function isUnionOfStringLiterals(type: ts.Type): boolean {
 
     const types: ReadonlyArray<ts.Type> = (<any>type).types;
     for (const unionType of types) {
-        if ((unionType.flags & ts.TypeFlags.String) === 0 && (unionType.flags & ts.TypeFlags.StringLiteral) === 0) { // tslint:disable-line:no-bitwise
+        if (!((unionType.flags & ts.TypeFlags.String) !== 0 || // tslint:disable-line:no-bitwise
+            (unionType.flags & ts.TypeFlags.StringLiteral) !== 0 || // tslint:disable-line:no-bitwise
+            (unionType.flags & ts.TypeFlags.Null) !== 0)) { // tslint:disable-line:no-bitwise
             return false;
         }
     }
@@ -315,6 +319,10 @@ function typescriptTypeToSqlType(typeScriptUniqueColumnTypes: Map<TypeScriptType
         return SqlType.wrap("text");
     } else if (isUnionOfStringLiterals(type)) {
         return SqlType.wrap("text");
+    }
+
+    if ((type.flags & ts.TypeFlags.Union) !== 0) { // tslint:disable-line:no-bitwise
+        return null;
     }
 
     if ((<any>type).symbol === undefined) {
