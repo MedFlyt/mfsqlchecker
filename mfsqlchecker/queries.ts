@@ -5,7 +5,6 @@ import { Either } from "./either";
 import { ErrorDiagnostic, nodeErrorDiagnostic, SrcSpan } from "./ErrorDiagnostic";
 import { QualifiedSqlViewName, resolveViewIdentifier } from "./views";
 
-
 export interface QueryCallExpression {
     readonly fileName: string;
     readonly fileContents: string;
@@ -20,7 +19,23 @@ export namespace QueryCallExpression {
         | { readonly type: "Expression"; readonly exp: ts.Expression };
 }
 
-export interface ResolvedQuery {
+export interface InsertManyExpression {
+    readonly fileName: string;
+    readonly fileContents: string;
+    readonly typeArgument: ts.TypeNode | null;
+    readonly typeArgumentSpan: SrcSpan;
+    readonly tableName: string;
+    readonly tableNameExprSpan: SrcSpan;
+    readonly insertExprSpan: SrcSpan;
+    readonly insertColumns: Map<string, TypeScriptType>;
+    readonly epilougeFragments: QueryCallExpression.QueryFragment[];
+}
+
+export type ResolvedQuery
+    = { type: "ResolvedSelect"; value: ResolvedSelect }
+    | { type: "ResolvedInsert"; value: ResolvedInsert };
+
+export interface ResolvedSelect {
     readonly fileName: string;
     readonly fileContents: string;
 
@@ -43,57 +58,36 @@ export interface ResolvedQuery {
     readonly errors: ErrorDiagnostic[];
 }
 
-/**
- * Expects a node that looks something like this:
- *
- *     query<{name: string}>(conn, sql`SELECT age FROM person WHERE id = ${theId}`);
- *
- * @param node Must be a call expression to the "query" function (from the sql
- * checker lib)
- */
-function buildQueryCallExpression(node: ts.CallExpression): Either<ErrorDiagnostic[], QueryCallExpression> {
-    // TODO This function should return an error instead of null (so that we
-    // catch invalid uses of "query" that still happen to compile, ex. passing
-    // "sql" through stored variable)
+export interface ResolvedInsert {
+    readonly fileName: string;
+    readonly fileContents: string;
 
-    const typeArgument: ts.TypeNode | null =
-        node.typeArguments === undefined || node.typeArguments.length === 0
-            ? null
-            : node.typeArguments[0];
+    readonly tableName: string;
+    readonly insertColumns: Map<string, TypeScriptType>;
 
-    const typeArgumentSpan: SrcSpan = typeArgument !== null
-        ? ((): SrcSpan => {
-            const sourceFile = typeArgument.getSourceFile();
-            const start = sourceFile.getLineAndCharacterOfPosition(typeArgument.pos);
-            const end = sourceFile.getLineAndCharacterOfPosition(typeArgument.end);
-            return {
-                type: "LineAndColRange",
-                startLine: start.line + 1,
-                startCol: start.character + 1,
-                endLine: end.line + 1,
-                endCol: end.character + 1
-            };
-        })()
-        : ((): SrcSpan => {
-            const sourceFile = node.expression.getSourceFile();
-            const loc = sourceFile.getLineAndCharacterOfPosition(node.expression.end);
-            return {
-                type: "LineAndCol",
-                line: loc.line + 1,
-                col: loc.character + 1
-            };
-        })();
+    readonly text: string;
 
-    if (node.arguments.length < 1) {
-        // The TypeScript typechecker will catch this error, so we don't need
-        // to emit our own error message
-        return {
-            type: "Left",
-            value: []
-        };
-    }
+    readonly sourceMap: [number, number][];
 
-    const sqlExp: ts.Expression = node.arguments[0];
+    /**
+     * `null` means that the typeArgument was explicitly declared as `any`
+     * indicating that we are requested not to type-check the return column
+     * types
+     */
+    readonly colTypes: Map<string, [ColNullability, TypeScriptType]> | null;
+
+    readonly colTypeSpan: SrcSpan;
+
+    readonly tableNameExprSpan: SrcSpan;
+    readonly insertExprSpan: SrcSpan;
+
+    /**
+     * Errors that were discovered that should be reported
+     */
+    readonly errors: ErrorDiagnostic[];
+}
+
+function buildQueryFragments(sqlExp: ts.Expression): Either<ErrorDiagnostic[], QueryCallExpression.QueryFragment[]> {
     if (!ts.isTaggedTemplateExpression(sqlExp)) {
         return {
             type: "Left",
@@ -103,22 +97,14 @@ function buildQueryCallExpression(node: ts.CallExpression): Either<ErrorDiagnost
         };
     }
 
-    const sourceFile = node.getSourceFile();
-
     if (ts.isNoSubstitutionTemplateLiteral(sqlExp.template)) {
         return {
             type: "Right",
-            value: {
-                fileName: sourceFile.fileName,
-                fileContents: sourceFile.text,
-                typeArgument: typeArgument,
-                typeArgumentSpan: typeArgumentSpan,
-                queryFragments: [{
-                    type: "StringFragment",
-                    text: sqlExp.template.text,
-                    sourcePosStart: sqlExp.template.pos
-                }]
-            }
+            value: [{
+                type: "StringFragment",
+                text: sqlExp.template.text,
+                sourcePosStart: sqlExp.template.pos
+            }]
         };
     } else if (ts.isTemplateExpression(sqlExp.template)) {
         const fragments: QueryCallExpression.QueryFragment[] = [];
@@ -143,21 +129,181 @@ function buildQueryCallExpression(node: ts.CallExpression): Either<ErrorDiagnost
 
         return {
             type: "Right",
-            value: {
-                fileName: sourceFile.fileName,
-                fileContents: sourceFile.text,
-                typeArgument: typeArgument,
-                typeArgumentSpan: typeArgumentSpan,
-                queryFragments: fragments
-            }
+            value: fragments
         };
     } else {
         return assertNever(sqlExp.template);
     }
 }
 
-export function findAllQueryCalls(checker: ts.TypeChecker, sourceFile: ts.SourceFile): [QueryCallExpression[], ErrorDiagnostic[]] {
-    const queryCallExpresions: QueryCallExpression[] = [];
+function nodeLineAndColSpan(sourceFile: ts.SourceFile, node: ts.Node): SrcSpan.LineAndColRange {
+    const start = sourceFile.getLineAndCharacterOfPosition(node.pos);
+    const end = sourceFile.getLineAndCharacterOfPosition(node.end);
+    return {
+        type: "LineAndColRange",
+        startLine: start.line + 1,
+        startCol: start.character + 1,
+        endLine: end.line + 1,
+        endCol: end.character + 1
+    };
+}
+
+function buildTypeArgumentData(sourceFile: ts.SourceFile, node: ts.CallExpression): [ts.TypeNode | null, SrcSpan] {
+    const typeArgument: ts.TypeNode | null =
+        node.typeArguments === undefined || node.typeArguments.length === 0
+            ? null
+            : node.typeArguments[0];
+
+    const typeArgumentSpan: SrcSpan = typeArgument !== null
+        ? ((): SrcSpan => {
+            return nodeLineAndColSpan(sourceFile, typeArgument);
+        })()
+        : ((): SrcSpan => {
+            const loc = sourceFile.getLineAndCharacterOfPosition(node.expression.end);
+            return {
+                type: "LineAndCol",
+                line: loc.line + 1,
+                col: loc.character + 1
+            };
+        })();
+
+    return [typeArgument, typeArgumentSpan];
+}
+
+/**
+ * Expects a node that looks something like this:
+ *
+ *     query<{name: string}>(conn, sql`SELECT age FROM person WHERE id = ${theId}`);
+ *
+ * @param node Must be a call expression to the "query" function (from the sql
+ * checker lib)
+ */
+function buildQueryCallExpression(node: ts.CallExpression): Either<ErrorDiagnostic[], QueryCallExpression> {
+    if (node.arguments.length < 1) {
+        // The TypeScript typechecker will catch this error, so we don't need
+        // to emit our own error message
+        return {
+            type: "Left",
+            value: []
+        };
+    }
+
+    const sourceFile = node.getSourceFile();
+
+    const [typeArgument, typeArgumentSpan] = buildTypeArgumentData(sourceFile, node);
+
+    const sqlExp: ts.Expression = node.arguments[0];
+    const queryFragments = buildQueryFragments(sqlExp);
+    switch (queryFragments.type) {
+        case "Left":
+            return {
+                type: "Left",
+                value: queryFragments.value
+            };
+        case "Right":
+            return {
+                type: "Right",
+                value: {
+                    fileName: sourceFile.fileName,
+                    fileContents: sourceFile.text,
+                    typeArgument: typeArgument,
+                    typeArgumentSpan: typeArgumentSpan,
+                    queryFragments: queryFragments.value
+                }
+            };
+        default:
+            return assertNever(queryFragments);
+    }
+}
+
+function buildInsertManyCallExpression(checker: ts.TypeChecker, node: ts.CallExpression): Either<ErrorDiagnostic[], InsertManyExpression> {
+    if (node.arguments.length < 2) {
+        // The TypeScript typechecker will catch this error, so we don't need
+        // to emit our own error message
+        return {
+            type: "Left",
+            value: []
+        };
+    }
+
+    const tableNameArg = node.arguments[0];
+    if (!(ts.isStringLiteral(tableNameArg) || ts.isNoSubstitutionTemplateLiteral(tableNameArg))) {
+        return {
+            type: "Left",
+            value: [nodeErrorDiagnostic(tableNameArg, "Argument must be a String Literal")]
+        };
+    }
+
+    const valuesArg = node.arguments[1];
+    const valuesType = checker.getTypeAtLocation(valuesArg);
+
+    checker.typeToString(valuesType);
+
+    const valuesElemType = getArrayType(valuesType);
+
+    if (valuesElemType === null) {
+        // The "values" argument is not an array. The TypeScript typechecker
+        // will catch this error, so we don't need to emit our own error
+        // message
+        return {
+            type: "Left",
+            value: []
+        };
+    }
+
+    const sourceFile = node.getSourceFile();
+
+    const [typeArgument, typeArgumentSpan] = buildTypeArgumentData(sourceFile, node);
+
+    let epilougeFragments: QueryCallExpression.QueryFragment[];
+    if (node.arguments.length >= 3) {
+        const epilougeSqlExp: ts.Expression = node.arguments[2];
+        const queryFragments = buildQueryFragments(epilougeSqlExp);
+        switch (queryFragments.type) {
+            case "Left":
+                return {
+                    type: "Left",
+                    value: queryFragments.value
+                };
+            case "Right":
+                epilougeFragments = queryFragments.value;
+                break;
+            default:
+                return assertNever(queryFragments);
+        }
+    } else {
+        epilougeFragments = [];
+    }
+
+    const objectFieldTypes = getObjectFieldTypes(checker, valuesElemType);
+    switch (objectFieldTypes.type) {
+        case "Left":
+            return {
+                type: "Left",
+                value: [nodeErrorDiagnostic(valuesArg, objectFieldTypes.value)]
+            };
+        case "Right":
+            return {
+                type: "Right",
+                value: {
+                    fileName: sourceFile.fileName,
+                    fileContents: sourceFile.text,
+                    typeArgument: typeArgument,
+                    typeArgumentSpan: typeArgumentSpan,
+                    tableName: tableNameArg.text,
+                    tableNameExprSpan: nodeLineAndColSpan(sourceFile, tableNameArg),
+                    insertExprSpan: nodeLineAndColSpan(sourceFile, valuesArg),
+                    insertColumns: objectFieldTypes.value,
+                    epilougeFragments: epilougeFragments
+                }
+            };
+        default:
+            return assertNever(objectFieldTypes);
+    }
+}
+
+export function findAllQueryCalls(typeScriptUniqueColumnTypes: Map<TypeScriptType, SqlType>, projectDir: string, checker: ts.TypeChecker, lookupViewName: (qualifiedSqlViewName: QualifiedSqlViewName) => string | undefined, sourceFile: ts.SourceFile): [ResolvedQuery[], ErrorDiagnostic[]] {
+    const resolvedQueries: ResolvedQuery[] = [];
     const errorDiagnostics: ErrorDiagnostic[] = [];
 
     const queryMethodNames = ["query", "queryOne", "queryOneOrNone"];
@@ -177,7 +323,54 @@ export function findAllQueryCalls(checker: ts.TypeChecker, sourceFile: ts.Source
                                     }
                                     break;
                                 case "Right":
-                                    queryCallExpresions.push(query.value);
+                                    const resolvedQuery = resolveQueryFragment(typeScriptUniqueColumnTypes, projectDir, checker, query.value, lookupViewName);
+                                    switch (resolvedQuery.type) {
+                                        case "Left":
+                                            for (const e of resolvedQuery.value) {
+                                                errorDiagnostics.push(e);
+                                            }
+                                            break;
+                                        case "Right":
+                                            resolvedQueries.push({
+                                                type: "ResolvedSelect",
+                                                value: resolvedQuery.value
+                                            });
+                                            break;
+                                        default:
+                                            assertNever(resolvedQuery);
+                                    }
+                                    break;
+                                default:
+                                    assertNever(query);
+                            }
+                        }
+                    } else if (node.expression.name.text === "insertMany") {
+                        const type = checker.getTypeAtLocation(node.expression.expression);
+                        if (type.getProperty("MfConnectionTypeTag") !== undefined) {
+                            const query = buildInsertManyCallExpression(checker, node);
+                            switch (query.type) {
+                                case "Left":
+                                    for (const e of query.value) {
+                                        errorDiagnostics.push(e);
+                                    }
+                                    break;
+                                case "Right":
+                                    const resolvedQuery = resolveInsertMany(typeScriptUniqueColumnTypes, projectDir, checker, query.value, lookupViewName);
+                                    switch (resolvedQuery.type) {
+                                        case "Left":
+                                            for (const e of resolvedQuery.value) {
+                                                errorDiagnostics.push(e);
+                                            }
+                                            break;
+                                        case "Right":
+                                            resolvedQueries.push({
+                                                type: "ResolvedInsert",
+                                                value: resolvedQuery.value
+                                            });
+                                            break;
+                                        default:
+                                            assertNever(resolvedQuery);
+                                    }
                                     break;
                                 default:
                                     assertNever(query);
@@ -193,7 +386,7 @@ export function findAllQueryCalls(checker: ts.TypeChecker, sourceFile: ts.Source
 
     ts.forEachChild(sourceFile, visit);
 
-    return [queryCallExpresions, errorDiagnostics];
+    return [resolvedQueries, errorDiagnostics];
 }
 
 function isTypeSqlView(type: ts.Type): boolean {
@@ -274,6 +467,33 @@ function getArrayType(type: ts.Type): ts.Type | null {
     }
 
     return null;
+}
+
+function getObjectFieldTypes(checker: ts.TypeChecker, type: ts.Type): Either<string, Map<string, TypeScriptType>> {
+    if ((<any>type).members === undefined) {
+        return {
+            type: "Left",
+            value: `Values array argument element type must be a regular object. It is:\n${checker.typeToString(type)}`
+        };
+    }
+
+    const errors: string[] = [];
+    const result = new Map<string, TypeScriptType>();
+    const members: Map<string, any> = (<any>type).members;
+    members.forEach((value, key) => {
+        result.set(key, TypeScriptType.wrap(checker.typeToString(value.type)));
+    });
+    if (errors.length > 0) {
+        return {
+            type: "Left",
+            value: "Values array argument element type has invalid fields:\n" + errors.join("\n")
+        };
+    } else {
+        return {
+            type: "Right",
+            value: result
+        };
+    }
 }
 
 /**
@@ -434,7 +654,7 @@ function typescriptRowTypeToColTypes(checker: ts.TypeChecker, typeLiteral: ts.Ty
     return results;
 }
 
-export function resolveQueryFragment(typeScriptUniqueColumnTypes: Map<TypeScriptType, SqlType>, projectDir: string, checker: ts.TypeChecker, query: QueryCallExpression, lookupViewName: (qualifiedSqlViewName: QualifiedSqlViewName) => string | undefined): Either<ErrorDiagnostic[], ResolvedQuery> {
+function resolveQueryFragment(typeScriptUniqueColumnTypes: Map<TypeScriptType, SqlType>, projectDir: string, checker: ts.TypeChecker, query: QueryCallExpression, lookupViewName: (qualifiedSqlViewName: QualifiedSqlViewName) => string | undefined): Either<ErrorDiagnostic[], ResolvedSelect> {
     const errors: ErrorDiagnostic[] = [];
 
     let text = "";
@@ -518,6 +738,120 @@ export function resolveQueryFragment(typeScriptUniqueColumnTypes: Map<TypeScript
                 sourceMap: sourceMap,
                 colTypes: colTypes,
                 colTypeSpan: query.typeArgumentSpan,
+                errors: errors
+            }
+        };
+    } else {
+        return {
+            type: "Left",
+            value: errors
+        };
+    }
+}
+
+
+function resolveInsertMany(typeScriptUniqueColumnTypes: Map<TypeScriptType, SqlType>, projectDir: string, checker: ts.TypeChecker, query: InsertManyExpression, lookupViewName: (qualifiedSqlViewName: QualifiedSqlViewName) => string | undefined): Either<ErrorDiagnostic[], ResolvedInsert> {
+    // TODO This contains lots of copy&pasted code from
+    // `resolveQueryFragment`. The common code should be refactored into
+    // helper functions
+
+    const errors: ErrorDiagnostic[] = [];
+
+    let text = "";
+    const sourceMapOffset = text.length;
+
+    const insertFragment: QueryCallExpression.QueryFragment[] = [{
+        type: "StringFragment",
+        text: `INSERT INTO "${query.tableName}" DEFAULT VALUES `,
+        sourcePosStart: 0
+    }];
+
+    const queryFragments: QueryCallExpression.QueryFragment[] = insertFragment.concat(query.epilougeFragments);
+
+    const sourceMap: [number, number][] = [];
+    let numParams = 0;
+    for (const frag of queryFragments) {
+        switch (frag.type) {
+            case "StringFragment":
+                sourceMap.push([text.length - 2 * sourceMapOffset, frag.sourcePosStart]);
+                text += frag.text;
+                break;
+            case "Expression":
+                const type = checker.getTypeAtLocation(frag.exp);
+                if (isTypeSqlView(type)) {
+                    if (!ts.isIdentifier(frag.exp)) {
+                        errors.push(nodeErrorDiagnostic(frag.exp, "SQL View Reference must be an identifier (not an expression)"));
+                    } else {
+                        const qualifiedSqlViewName = resolveViewIdentifier(projectDir, frag.exp.getSourceFile(), frag.exp);
+                        const viewName = lookupViewName(qualifiedSqlViewName);
+                        if (viewName === undefined) {
+                            errors.push(nodeErrorDiagnostic(frag.exp, "SQL View Reference not found or has errors: \"" + chalk.bold(QualifiedSqlViewName.viewName(qualifiedSqlViewName)) + "\""));
+                        } else {
+                            text += '"' + viewName + '"';
+                        }
+                    }
+                } else {
+                    const sqlType = typescriptTypeToSqlType(typeScriptUniqueColumnTypes, nonNullType(type));
+                    if (sqlType === null) {
+                        const typeStr = checker.typeToString(type, frag.exp);
+                        errors.push(nodeErrorDiagnostic(frag.exp, `Invalid type for SQL parameter: ${typeStr}`));
+                    } else {
+                        numParams++;
+                        const sqlTypeStr = SqlType.unwrap(sqlType);
+
+                        // Ugly hack for detecing an sql array type
+                        //
+                        // WRONG: "myType[]" RIGHT: "myType"[]
+                        //
+                        // The correct (non-hacky) way to do this is to change
+                        // "SqlType" from a string to a real type with an
+                        // (isArray: boolean) prop
+
+                        const escapedSqlTypeStr = sqlTypeStr.endsWith("[]")
+                            ? "\"" + sqlTypeStr.substring(0, sqlTypeStr.length - 2) + "\"[]"
+                            : "\"" + sqlTypeStr + "\"";
+
+                        text += "($" + numParams + (sqlTypeStr !== "" ? "::" + escapedSqlTypeStr : "") + ")";
+                    }
+                }
+                break;
+            default:
+                assertNever(frag);
+        }
+    }
+
+    if (errors.length === 0) {
+        let colTypes: Map<string, [ColNullability, TypeScriptType]> | null;
+        if (query.typeArgument === null) {
+            // If no type argument was specified, then for our purposes it is
+            // equivalent to <{}>
+            colTypes = new Map<string, [ColNullability, TypeScriptType]>();
+        } else {
+            if (ts.isTypeLiteralNode(query.typeArgument)) {
+                colTypes = typescriptRowTypeToColTypes(checker, query.typeArgument, e => errors.push(e));
+                // } else if ( ... TODO handle case of `query<any>(...)` and set colTypes = null
+            } else {
+                // TODO We should enhance `typescriptRowTypeToSqlTypes` so
+                // that it also handles interface types, type aliases, and
+                // maybe also some sensible scenarios
+                errors.push(nodeErrorDiagnostic(query.typeArgument, "Type argument must be a Type Literal"));
+                colTypes = new Map<string, [ColNullability, TypeScriptType]>();
+            }
+        }
+
+        return {
+            type: "Right",
+            value: {
+                fileName: query.fileName,
+                fileContents: query.fileContents,
+                insertColumns: query.insertColumns,
+                tableName: query.tableName,
+                text: text,
+                sourceMap: sourceMap,
+                colTypes: colTypes,
+                colTypeSpan: query.typeArgumentSpan,
+                tableNameExprSpan: query.tableNameExprSpan,
+                insertExprSpan: query.insertExprSpan,
                 errors: errors
             }
         };

@@ -1,6 +1,6 @@
 import * as pg from "pg";
 import { defineSqlView, Connection, Req, Opt, migrateDatabase } from "./lib/mfsqltool";
-import { EmployeeId, CarId, CustomerId } from "./types";
+import { EmployeeId, CarId, CustomerId, DepartmentId } from "./types";
 
 // import { coolView } from "./blah";
 
@@ -122,6 +122,11 @@ async function logger(msg: string): Promise<void> {
     console.log(msg);
 }
 
+interface Department {
+    id: number;
+    name: string | null;
+}
+
 export async function main() {
     console.log("Connecting...");
     const client = await connectPg("postgres://test:password@localhost:6432/test1");
@@ -129,6 +134,21 @@ export async function main() {
         console.log("Migrating...");
         await migrateDatabase(client, "demo/migrations", logger);
         console.log("Done");
+
+        const id1: DepartmentId = null as any;
+
+        const values: Department[] = [
+            { id: 1, name: "dep1" },
+            // { id: 2, name: "dep2" },
+            // { id: 6, name: "dep6" },
+            // { id: id1, name: "hi" }
+        ];
+
+        const conn = new Connection(client);
+        const ret = await conn.insertMany("department", values, conn.sql`
+        ON CONFLICT(name) DO UPDATE SET id = NULL`);
+
+        console.log(ret);
     } finally {
         await closePg(client);
     }

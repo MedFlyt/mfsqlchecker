@@ -5,17 +5,16 @@ import * as fs from "fs";
 import * as path from "path";
 import * as pg from "pg";
 import { equalsUniqueTableColumnTypes, makeUniqueColumnTypes, sqlUniqueTypeName, UniqueTableColumnType } from "./ConfigFile";
-import { Either } from "./either";
 import { ErrorDiagnostic, postgresqlErrorDiagnostic, SrcSpan, toSrcSpan } from "./ErrorDiagnostic";
 import { closePg, connectPg, dropAllFunctions, dropAllSequences, dropAllTables, dropAllTypes, parsePostgreSqlError, pgDescribeQuery, pgMonkeyPatchClient, PostgreSqlError } from "./pg_extra";
 import { calcDbMigrationsHash, connReplaceDbName, createBlankDatabase, dropDatabase, isMigrationFile, readdirAsync, testDatabaseName } from "./pg_test_db";
-import { ColNullability, ResolvedQuery, SqlType, TypeScriptType } from "./queries";
+import { ColNullability, ResolvedInsert, ResolvedQuery, ResolvedSelect, SqlType, TypeScriptType } from "./queries";
 import { resolveFromSourceMap } from "./source_maps";
 import { QualifiedSqlViewName, SqlCreateView } from "./views";
 
 export interface Manifest {
     viewLibrary: SqlCreateView[];
-    queries: Either<ErrorDiagnostic[], ResolvedQuery>[];
+    queries: ResolvedQuery[];
     uniqueTableColumnTypes: UniqueTableColumnType[];
 }
 
@@ -61,7 +60,7 @@ export class DbConnector {
     private pgTypes = new Map<number, SqlType>();
     private uniqueColumnTypes = new Map<SqlType, TypeScriptType>();
 
-    private queryCache = new QueryMap<QueryAnswer>();
+    private queryCache = new QueryMap<SelectAnswer>();
 
     async validateManifest(manifest: Manifest): Promise<ErrorDiagnostic[]> {
         const hash = await calcDbMigrationsHash(this.migrationsDir);
@@ -140,7 +139,7 @@ export class DbConnector {
         }
 
 
-        const newQueryCache = new QueryMap<QueryAnswer>();
+        const newQueryCache = new QueryMap<SelectAnswer>();
 
         const queriesProgressBar = new Bar({
             clearOnComplete: true,
@@ -151,9 +150,7 @@ export class DbConnector {
             let i = 0;
             for (const query of manifest.queries) {
                 switch (query.type) {
-                    case "Left":
-                        break;
-                    case "Right":
+                    case "ResolvedSelect":
                         const cachedResult = this.queryCache.get(query.value.text, query.value.colTypes);
                         if (cachedResult !== undefined) {
                             queryErrors = queryErrors.concat(queryAnswerToErrorDiagnostics(query.value, cachedResult));
@@ -163,6 +160,11 @@ export class DbConnector {
                             newQueryCache.set(query.value.text, query.value.colTypes, result);
                             queryErrors = queryErrors.concat(queryAnswerToErrorDiagnostics(query.value, result));
                         }
+                        break;
+                    case "ResolvedInsert":
+                        // TODO caching
+                        const result = await processInsert(this.client, this.pgTypes, this.tableColsLibrary, this.uniqueColumnTypes, query.value);
+                        queryErrors = queryErrors.concat(insertAnswerToErrorDiagnostics(query.value, result));
                         break;
                     default:
                         assertNever(query);
@@ -178,10 +180,10 @@ export class DbConnector {
         let finalErrors: ErrorDiagnostic[] = [];
         for (const query of manifest.queries) {
             switch (query.type) {
-                case "Left":
-                    finalErrors = finalErrors.concat(query.value);
+                case "ResolvedSelect":
+                    finalErrors = finalErrors.concat(query.value.errors);
                     break;
-                case "Right":
+                case "ResolvedInsert":
                     finalErrors = finalErrors.concat(query.value.errors);
                     break;
                 default:
@@ -315,11 +317,19 @@ class QueryMap<T> {
     private internalMap = new Map<string, T>();
 }
 
-type QueryAnswer =
+type SelectAnswer =
     QueryAnswer.NoErrors |
     QueryAnswer.DescribeError |
     QueryAnswer.DuplicateColNamesError |
     QueryAnswer.WrongColumnTypes;
+
+type InsertAnswer =
+    QueryAnswer.NoErrors |
+    QueryAnswer.DescribeError |
+    QueryAnswer.DuplicateColNamesError |
+    QueryAnswer.WrongColumnTypes |
+    QueryAnswer.InvalidTableName |
+    QueryAnswer.InvalidInsertCols;
 
 namespace QueryAnswer {
     export interface NoErrors {
@@ -340,13 +350,51 @@ namespace QueryAnswer {
         type: "WrongColumnTypes";
         renderedColTypes: string;
     }
+
+    export interface InvalidTableName {
+        type: "InvalidTableName";
+    }
+
+    export type InvalidInsertCol
+        = InvalidInsertCol.MissingRequiredCol
+        | InvalidInsertCol.ColWrongType
+        | InvalidInsertCol.ColNotFound;
+
+    export namespace InvalidInsertCol {
+        export interface MissingRequiredCol {
+            type: "MissingRequiredCol";
+            tableName: string;
+            colName: string;
+            colType: TypeScriptType;
+        }
+
+        export interface ColWrongType {
+            type: "ColWrongType";
+            tableName: string;
+            colName: string;
+            colType: TypeScriptType;
+            invalidType: TypeScriptType;
+        }
+
+        export interface ColNotFound {
+            type: "ColNotFound";
+            tableName: string;
+            colName: string;
+            invalidType: TypeScriptType;
+        }
+    }
+
+    export interface InvalidInsertCols {
+        type: "InvalidInsertCols";
+        invalidCols: InvalidInsertCol[];
+    }
 }
 
 function querySourceStart(fileContents: string, sourceMap: [number, number][]): SrcSpan {
     return toSrcSpan(fileContents, fileContents.slice(sourceMap[0][1] + 1).search(/\S/) + sourceMap[0][1] + 2);
 }
 
-function queryAnswerToErrorDiagnostics(query: ResolvedQuery, queryAnswer: QueryAnswer): ErrorDiagnostic[] {
+function queryAnswerToErrorDiagnostics(query: ResolvedSelect, queryAnswer: SelectAnswer): ErrorDiagnostic[] {
     switch (queryAnswer.type) {
         case "NoErrors":
             return [];
@@ -400,7 +448,49 @@ function queryAnswerToErrorDiagnostics(query: ResolvedQuery, queryAnswer: QueryA
     }
 }
 
-async function processQuery(client: pg.Client, pgTypes: Map<number, SqlType>, tableColsLibrary: TableColsLibrary, uniqueColumnTypes: Map<SqlType, TypeScriptType>, query: ResolvedQuery): Promise<QueryAnswer> {
+function insertAnswerToErrorDiagnostics(query: ResolvedInsert, queryAnswer: InsertAnswer): ErrorDiagnostic[] {
+    switch (queryAnswer.type) {
+        case "NoErrors":
+            return [];
+        case "DescribeError":
+        case "DuplicateColNamesError":
+        case "WrongColumnTypes":
+            return queryAnswerToErrorDiagnostics(query, queryAnswer);
+        case "InvalidTableName":
+            return [{
+                fileName: query.fileName,
+                fileContents: query.fileContents,
+                span: query.tableNameExprSpan,
+                messages: [`Table does not exist: "${query.tableName}"`],
+                epilogue: null,
+                quickFix: null
+            }];
+        case "InvalidInsertCols":
+            return [{
+                fileName: query.fileName,
+                fileContents: query.fileContents,
+                span: query.insertExprSpan,
+                messages: ["Inserted columns are invalid:"].concat(queryAnswer.invalidCols.map(e => {
+                    switch (e.type) {
+                        case "MissingRequiredCol":
+                            return `Insert to table "${e.tableName}" is missing the required column: "${e.colName}" (type "${e.colType}")`;
+                        case "ColWrongType":
+                            return `Insert to table "${e.tableName}" has the wrong type for column "${e.colName}". It should be "${e.colType}" (instead of "${e.invalidType}")`;
+                        case "ColNotFound":
+                            return `Column "${e.colName}" does not exist on table "${e.tableName}"`;
+                        default:
+                            return assertNever(e);
+                    }
+                })),
+                epilogue: null,
+                quickFix: null
+            }];
+        default:
+            return assertNever(queryAnswer);
+    }
+}
+
+async function processQuery(client: pg.Client, pgTypes: Map<number, SqlType>, tableColsLibrary: TableColsLibrary, uniqueColumnTypes: Map<SqlType, TypeScriptType>, query: ResolvedSelect): Promise<SelectAnswer> {
     let fields: pg.FieldDef[] | null;
     try {
         fields = await pgDescribeQuery(client, query.text);
@@ -453,6 +543,98 @@ async function processQuery(client: pg.Client, pgTypes: Map<number, SqlType>, ta
     };
 }
 
+async function processInsert(client: pg.Client, pgTypes: Map<number, SqlType>, tableColsLibrary: TableColsLibrary, uniqueColumnTypes: Map<SqlType, TypeScriptType>, query: ResolvedInsert): Promise<InsertAnswer> {
+    const tableQuery = await client.query(
+        `
+        select
+            pg_attribute.attname,
+            pg_type.typname,
+            pg_attribute.atthasdef
+        from
+            pg_attribute,
+            pg_class,
+            pg_type
+        where
+        pg_attribute.attrelid = pg_class.oid
+        AND pg_attribute.attnum >= 1
+        AND pg_attribute.atttypid = pg_type.oid
+        AND pg_class.relname = $1
+        ORDER BY pg_attribute.attname
+        `, [query.tableName]);
+
+    // Assume that tables with no columns cannot exist
+    if (tableQuery.rowCount === 0) {
+        return {
+            type: "InvalidTableName"
+        };
+    }
+
+    const result = await processQuery(client, pgTypes, tableColsLibrary, uniqueColumnTypes, query);
+    if (result.type !== "NoErrors") {
+        return result;
+    }
+
+    const insertColumnFields = [...query.insertColumns.keys()];
+    insertColumnFields.sort();
+
+    const invalidInsertCols: QueryAnswer.InvalidInsertCol[] = [];
+
+    for (const field of insertColumnFields) {
+        const suppliedType = query.insertColumns.get(field);
+        if (suppliedType === undefined) {
+            throw new Error("The Impossible Happened");
+        }
+
+        const row = tableQuery.rows.find(r => r["attname"] === field);
+        if (row === undefined) {
+            invalidInsertCols.push({
+                type: "ColNotFound",
+                tableName: query.tableName,
+                colName: field,
+                invalidType: suppliedType
+            });
+        } else {
+            const tblType = sqlTypeToTypeScriptType(uniqueColumnTypes, SqlType.wrap(row["typname"]));
+            if (suppliedType !== tblType) {
+                invalidInsertCols.push({
+                    type: "ColWrongType",
+                    tableName: query.tableName,
+                    colName: field,
+                    colType: tblType,
+                    invalidType: suppliedType
+                });
+            }
+        }
+    }
+
+    for (const row of tableQuery.rows) {
+        const attname: string = row["attname"];
+        const typname: string = row["typname"];
+        const atthasdef: boolean = row["atthasdef"];
+        if (!atthasdef) {
+            if (!query.insertColumns.has(attname)) {
+                invalidInsertCols.push({
+                    type: "MissingRequiredCol",
+                    tableName: query.tableName,
+                    colName: attname,
+                    colType: sqlTypeToTypeScriptType(uniqueColumnTypes, SqlType.wrap(typname))
+                });
+            }
+        }
+    }
+
+    if (invalidInsertCols.length > 0) {
+        return {
+            type: "InvalidInsertCols",
+            invalidCols: invalidInsertCols
+        };
+    } else {
+        return {
+            type: "NoErrors"
+        };
+    }
+}
+
 function psqlOidSqlType(pgTypes: Map<number, SqlType>, oid: number): SqlType {
     const name = pgTypes.get(oid);
     if (name === undefined) {
@@ -460,6 +642,45 @@ function psqlOidSqlType(pgTypes: Map<number, SqlType>, oid: number): SqlType {
     }
     return name;
 }
+
+// // class TableLibrary {
+// //     private tableColsLibrary: TableColsLibrary;
+
+// //     /**
+// //      * After calling this method, you should also call `refreshViews`
+// //      */
+// //     public async refreshTables(client: pg.Client): Promise<void> {
+// //         await this.tableColsLibrary.refreshTables(client);
+// //     }
+
+// //     public async refreshViews(client: pg.Client): Promise<void> {
+// //         await this.tableColsLibrary.refreshViews(client);
+// //     }
+
+// //     public isNotNull(tableID: number, columnID: number): boolean {
+// //         return this.tableColsLibrary.isNotNull(tableID, columnID);
+// //     }
+// // }
+
+// // class TableStructLibrary {
+// //     public async refreshTables(client: pg.Client): Promise<void> {
+// //     }
+
+// //     public async refreshViews(client: pg.Client): Promise<void> {
+// //     }
+// // }
+
+// class TableDefaultColsLibrary {
+//     public async refreshTables(client: pg.Client): Promise<void> {
+//         this.defaultCols.clear();
+
+//     }
+
+//     public getDefaultCols(tableName: string): Set<string> {
+//     }
+
+//     private defaultCols = new Map<string, Set<string>>();
+// }
 
 class TableColsLibrary {
     /**
@@ -864,6 +1085,8 @@ export async function applyUniqueTableColumnTypes(client: pg.Client, uniqueTable
 
             const colName = uniqueTableColumnType.columnName;
 
+            const colHasDefault = await tableColHasDefault(client, uniqueTableColumnType.tableName, colName);
+
             await client.query(
                 `
                 ALTER TABLE "${uniqueTableColumnType.tableName}"
@@ -871,9 +1094,20 @@ export async function applyUniqueTableColumnTypes(client: pg.Client, uniqueTable
                     ALTER COLUMN "${colName}" SET DATA TYPE "${typeName}" USING CASE WHEN "${colName}" IS NULL THEN NULL ELSE "${typeName}"("${colName}", "${colName}", '[]') END
                 `);
 
+            if (colHasDefault) {
+                // Restore the column so that it has a default value
+                await client.query(
+                    `
+                    ALTER TABLE "${uniqueTableColumnType.tableName}"
+                        ALTER COLUMN "${colName}" SET DEFAULT 'empty'
+                    `);
+            }
+
             for (const row of queryResult.rows) {
                 const relname: string = row["relname"];
                 const attname: string = row["attname"];
+
+                const refColHasDefault = await tableColHasDefault(client, relname, attname);
 
                 await client.query(
                     `
@@ -881,7 +1115,41 @@ export async function applyUniqueTableColumnTypes(client: pg.Client, uniqueTable
                         ALTER COLUMN "${attname}" DROP DEFAULT,
                         ALTER COLUMN "${attname}" SET DATA TYPE "${typeName}" USING CASE WHEN "${attname}" IS NULL THEN NULL ELSE "${typeName}"("${attname}", "${attname}", '[]') END
                     `);
+
+                if (refColHasDefault) {
+                    // Restore the column so that it has a default value
+                    await client.query(
+                        `
+                        ALTER TABLE "${relname}"
+                            ALTER COLUMN "${attname}" SET DEFAULT 'empty'
+                        `);
+                }
             }
         }
     }
+}
+
+async function tableColHasDefault(client: pg.Client, tableName: string, colName: string): Promise<boolean> {
+    const result = await client.query(
+        `
+        select pg_attribute.atthasdef
+        from
+            pg_attribute,
+            pg_class
+        where
+        pg_attribute.attrelid = pg_class.oid
+        and pg_attribute.attnum >= 1
+        and pg_class.relname = $1
+        and pg_attribute.attname = $2
+        `, [tableName, colName]);
+
+    if (result.rowCount === 0) {
+        throw new Error(`No pg_attribute row found for "${tableName}"."${colName}"`);
+    }
+    if (result.rowCount > 1) {
+        throw new Error(`Multiple pg_attribute rows found for "${tableName}"."${colName}"`);
+    }
+
+    const atthasdef: boolean = result.rows[0]["atthasdef"];
+    return atthasdef;
 }

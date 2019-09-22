@@ -7,7 +7,7 @@ import * as ts from "typescript";
 import { loadConfigFile, sqlUniqueTypeName, UniqueTableColumnType } from "./ConfigFile";
 import { DbConnector } from "./DbConnector";
 import { ErrorDiagnostic } from "./ErrorDiagnostic";
-import { findAllQueryCalls, QueryCallExpression, resolveQueryFragment, SqlType, TypeScriptType } from "./queries";
+import { findAllQueryCalls, ResolvedQuery, SqlType, TypeScriptType } from "./queries";
 import { QualifiedSqlViewName, resolveAllViewDefinitions, sourceFileModuleName, SqlViewDefinition, sqlViewLibraryResetToInitialFragmentsIncludingDeps, sqlViewsLibraryAddFromSourceFile } from "./views";
 
 export class SqlCheckerEngine {
@@ -56,13 +56,6 @@ export class SqlCheckerEngine {
         const [sqlViews, viewErrors] = resolveAllViewDefinitions(this.viewLibrary);
         errorDiagnostics = errorDiagnostics.concat(viewErrors);
 
-        let queries: QueryCallExpression[] = [];
-        for (const sourceFile of progSourceFiles) {
-            const [es, qs] = findAllQueryCalls(checker, sourceFile);
-            queries = queries.concat(es);
-            errorDiagnostics = errorDiagnostics.concat(qs);
-        }
-
         const lookupViewName = (qualifiedSqlViewName: QualifiedSqlViewName): string | undefined => {
             const v = this.viewLibrary.get(qualifiedSqlViewName);
             if (v === undefined) {
@@ -93,7 +86,12 @@ export class SqlCheckerEngine {
             typeScriptUniqueColumnTypes.set(uniqueTableColumnType.typeScriptTypeName, SqlType.wrap(sqlUniqueTypeName(uniqueTableColumnType.tableName, uniqueTableColumnType.columnName)));
         }
 
-        const resolvedQueries = queries.map(q => resolveQueryFragment(typeScriptUniqueColumnTypes, projectDir, checker, q, lookupViewName));
+        let resolvedQueries: ResolvedQuery[] = [];
+        for (const sourceFile of progSourceFiles) {
+            const [es, qs] = findAllQueryCalls(typeScriptUniqueColumnTypes, projectDir, checker, lookupViewName, sourceFile);
+            resolvedQueries = resolvedQueries.concat(es);
+            errorDiagnostics = errorDiagnostics.concat(qs);
+        }
 
         return this.dbConnector.validateManifest({
             queries: resolvedQueries,

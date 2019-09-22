@@ -17,6 +17,7 @@ export class Connection<T> {
 
     constructor(client: pg.Client) {
         this.client = client;
+        this.preparePlaceholder;
     }
 
     readonly client: pg.Client;
@@ -54,46 +55,111 @@ export class Connection<T> {
     }
 
     sql(literals: TemplateStringsArray, ...placeholders: (SqlView | number | number[] | string | string[] | boolean | boolean[] | null | T)[]): SqlQueryExpr<T> {
-        let text = "";
-        const values: any[] = [];
+        return new SqlQueryExpr(this, literals, placeholders);
+    }
 
-        text += literals[0];
-
-        for (let i = 0; i < placeholders.length; ++i) {
-            const placeholder = placeholders[i];
-            if (isSqlView(placeholder)) {
-                if (!sqlViewPrivate(placeholder).isResolved()) {
-                    throw new Error(`View "${placeholder.getViewName()}" has not been created. Views are only allowed to be defined at module-level scope`);
-                }
-                text += `"${placeholder.getViewName()}"`;
-            } else {
-                values.push(this.preparePlaceholder(placeholder));
-                text += `($${values.length})`;
-            }
-
-            text += literals[i + 1];
+    async insertMany<Row extends object = any>(tableName: string, values: any[], epilogue?: SqlQueryExpr<T>): Promise<ResultRow<Row>[]> {
+        if (values.length === 0) {
+            return [];
         }
 
-        return new SqlQueryExpr(text, values);
+        const fields = Object.keys(values[0]);
+        fields.sort();
+
+        if (fields.length === 0) {
+            // TODO !!!
+            throw new Error("TODO Implement inserting 0 column rows");
+        }
+
+        const colTypesQuery = await clientQueryPromise(this.client,
+            `
+            select
+                pg_attribute.attname,
+                pg_type.typname
+            from
+                pg_attribute,
+                pg_class,
+                pg_type
+            where
+            pg_attribute.attrelid = pg_class.oid
+            and pg_class.relname = $1
+            AND pg_attribute.attnum >= 1
+            AND pg_attribute.atttypid = pg_type.oid;
+            `, [tableName]);
+
+        const columnTypes = new Map<string, string>();
+        for (const row of colTypesQuery.rows) {
+            const attname: string = row["attname"];
+            const typname: string = row["typname"];
+            columnTypes.set(attname, typname);
+        }
+
+        // TODO !!!
+        // Proper SQL escaping of `tableName` and the field names
+        // TODO !!!
+
+        // Example result:
+        //     "name", "height", "birth_date"
+        const fieldsSqlFragment: string = fields.map(f => "\"" + f + "\"").join(", ");
+
+        // Example result:
+        //     $1::text, $2::int4, $3::date
+        const paramsSqlFragment: string = fields.map((f, index) => {
+            let typ = columnTypes.get(f);
+            if (typ === undefined) {
+                typ = "unknown";
+            }
+            return "$" + (index + 1) + "::\"" + typ + "\"[]";
+        }).join(", ");
+
+
+        let text =
+            `INSERT INTO "${tableName}" (${fieldsSqlFragment})\n` +
+            "SELECT *\n" +
+            `FROM unnest(${paramsSqlFragment})\n`;
+
+        let vals: any[] = [];
+        for (let i = 0; i < fields.length; ++i) {
+            vals.push([]);
+        }
+
+        for (const value of values) {
+            for (let i = 0; i < fields.length; ++i) {
+                vals[i].push((<any>value)[fields[i]]);
+            }
+        }
+
+        let epilogueText: string;
+        let epilogueValues: any[];
+        if (epilogue) {
+            [epilogueText, epilogueValues] = epilogue.render(vals.length);
+        } else {
+            [epilogueText, epilogueValues] = ["", []];
+        }
+
+        text += epilogueText;
+        vals = vals.concat(epilogueValues);
+
+        const queryResult = await clientQueryPromise(this.client, text, vals);
+
+        for (const row of queryResult.rows) {
+            for (const field of queryResult.fields) {
+                const fieldName = field.name;
+                const oldVal = row[fieldName];
+                try {
+                    row[fieldName] = new RealVal(oldVal !== null ? this.parseColumn(field.dataTypeID, oldVal) : null, fieldName, row);
+                } catch (err) {
+                    throw new Error(`Error parsing column "${fieldName}" containing value "${oldVal}": ${err.message}`);
+                }
+            }
+        }
+
+        return queryResult.rows;
     }
 
     async query<Row extends object = any>(query: SqlQueryExpr<T>): Promise<ResultRow<Row>[]> {
-        // Use this instead of the built-in promise support of pg.Client because
-        // `connectionLogSQL` (currently) needs an actual callback
-        function clientQueryPromise(client: pg.Client, text: string, values: any[]) {
-            return new Promise<pg.QueryResult>((resolve, reject) => {
-                client.query(text, values, (err: Error, result: pg.QueryResult): void => {
-                    if (<boolean>(<any>err)) {
-                        reject(err);
-                        return;
-                    }
-
-                    resolve(result);
-                });
-            });
-        }
-
-        const queryResult = await clientQueryPromise(this.client, query.text, query.values);
+        const [text, values] = query.render();
+        const queryResult = await clientQueryPromise(this.client, text, values);
         for (const row of queryResult.rows) {
             for (const field of queryResult.fields) {
                 const fieldName = field.name;
@@ -133,14 +199,50 @@ export class Connection<T> {
     }
 }
 
+/**
+ * Use this instead of the built-in promise support of pg.Client because
+ * `connectionLogSQL` (currently) needs an actual callback
+ */
+function clientQueryPromise(client: pg.Client, text: string, values: any[]) {
+    return new Promise<pg.QueryResult>((resolve, reject) => {
+        client.query(text, values, (err: Error, result: pg.QueryResult): void => {
+            if (<boolean>(<any>err)) {
+                reject(err);
+                return;
+            }
+
+            resolve(result);
+        });
+    });
+}
+
 class SqlQueryExpr<T> {
-    constructor(text: string, values: any[]) {
-        this.text = text;
-        this.values = values;
+    constructor(private conn: Connection<T>, private literals: TemplateStringsArray, private placeholders: (string | number | boolean | SqlView | number[] | string[] | boolean[] | T | null)[]) {
     }
 
-    public readonly text: string;
-    public readonly values: any[];
+    render(paramNumOffset: number = 0): [string, any[]] {
+        let text = "";
+        const values: any[] = [];
+
+        text += this.literals[0];
+
+        for (let i = 0; i < this.placeholders.length; ++i) {
+            const placeholder = this.placeholders[i];
+            if (isSqlView(placeholder)) {
+                if (!sqlViewPrivate(placeholder).isResolved()) {
+                    throw new Error(`View "${placeholder.getViewName()}" has not been created. Views are only allowed to be defined at module-level scope`);
+                }
+                text += `"${placeholder.getViewName()}"`;
+            } else {
+                values.push((<any>this.conn).preparePlaceholder(placeholder));
+                text += `($${values.length + paramNumOffset})`;
+            }
+
+            text += this.literals[i + 1];
+        }
+
+        return [text, values];
+    }
 
     protected dummy: SqlQueryExpr<T>[];
 }
@@ -204,8 +306,8 @@ class RealVal {
     // Micro-optimization: short variable names to save memory (we might have
     // thousands of these objects)
     constructor(private readonly v: any,
-                private readonly c: string,
-                private readonly r: any) { }
+        private readonly c: string,
+        private readonly r: any) { }
 
     /**
      * Implementation of Req<T>.val
