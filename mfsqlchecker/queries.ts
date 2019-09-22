@@ -3,6 +3,7 @@ import chalk from "chalk";
 import * as ts from "typescript";
 import { Either } from "./either";
 import { ErrorDiagnostic, nodeErrorDiagnostic, SrcSpan } from "./ErrorDiagnostic";
+import { escapeIdentifier } from "./pg_extra";
 import { QualifiedSqlViewName, resolveViewIdentifier } from "./views";
 
 export interface QueryCallExpression {
@@ -762,7 +763,7 @@ function resolveInsertMany(typeScriptUniqueColumnTypes: Map<TypeScriptType, SqlT
 
     const insertFragment: QueryCallExpression.QueryFragment[] = [{
         type: "StringFragment",
-        text: `INSERT INTO "${query.tableName}" DEFAULT VALUES `,
+        text: `INSERT INTO ${escapeIdentifier(query.tableName)} DEFAULT VALUES `,
         sourcePosStart: 0
     }];
 
@@ -808,8 +809,8 @@ function resolveInsertMany(typeScriptUniqueColumnTypes: Map<TypeScriptType, SqlT
                         // (isArray: boolean) prop
 
                         const escapedSqlTypeStr = sqlTypeStr.endsWith("[]")
-                            ? "\"" + sqlTypeStr.substring(0, sqlTypeStr.length - 2) + "\"[]"
-                            : "\"" + sqlTypeStr + "\"";
+                            ? escapeIdentifier(sqlTypeStr.substring(0, sqlTypeStr.length - 2)) + "[]"
+                            : escapeIdentifier(sqlTypeStr);
 
                         text += "($" + numParams + (sqlTypeStr !== "" ? "::" + escapedSqlTypeStr : "") + ")";
                     }

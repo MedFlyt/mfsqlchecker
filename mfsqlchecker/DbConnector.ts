@@ -6,7 +6,7 @@ import * as path from "path";
 import * as pg from "pg";
 import { equalsUniqueTableColumnTypes, makeUniqueColumnTypes, sqlUniqueTypeName, UniqueTableColumnType } from "./ConfigFile";
 import { ErrorDiagnostic, postgresqlErrorDiagnostic, SrcSpan, toSrcSpan } from "./ErrorDiagnostic";
-import { closePg, connectPg, dropAllFunctions, dropAllSequences, dropAllTables, dropAllTypes, parsePostgreSqlError, pgDescribeQuery, pgMonkeyPatchClient, PostgreSqlError } from "./pg_extra";
+import { closePg, connectPg, dropAllFunctions, dropAllSequences, dropAllTables, dropAllTypes, escapeIdentifier, parsePostgreSqlError, pgDescribeQuery, pgMonkeyPatchClient, PostgreSqlError } from "./pg_extra";
 import { calcDbMigrationsHash, connReplaceDbName, createBlankDatabase, dropDatabase, isMigrationFile, readdirAsync, testDatabaseName } from "./pg_test_db";
 import { ColNullability, ResolvedInsert, ResolvedQuery, ResolvedSelect, SqlType, TypeScriptType } from "./queries";
 import { resolveFromSourceMap } from "./source_maps";
@@ -195,7 +195,7 @@ export class DbConnector {
 }
 
 async function dropView(client: pg.Client, viewName: string): Promise<void> {
-    await client.query(`DROP VIEW IF EXISTS "${viewName}"`);
+    await client.query(`DROP VIEW IF EXISTS ${escapeIdentifier(viewName)}`);
 }
 
 /**
@@ -237,7 +237,7 @@ async function updateViews(client: pg.Client, oldViews: [string, ViewAnswer][], 
 
 async function processCreateView(client: pg.Client, view: SqlCreateView): Promise<ViewAnswer> {
     try {
-        await client.query(`CREATE OR REPLACE VIEW "${view.viewName}" AS ${view.createQuery}`);
+        await client.query(`CREATE OR REPLACE VIEW ${escapeIdentifier(view.viewName)} AS ${view.createQuery}`);
     } catch (err) {
         const perr = parsePostgreSqlError(err);
         if (perr === null) {
@@ -245,7 +245,7 @@ async function processCreateView(client: pg.Client, view: SqlCreateView): Promis
         } else {
             if (perr.position !== null) {
                 // A bit hacky but does the trick:
-                perr.position -= `CREATE OR REPLACE VIEW "${view.viewName}" AS `.length;
+                perr.position -= `CREATE OR REPLACE VIEW ${escapeIdentifier(view.viewName)} AS `.length;
             }
             return {
                 type: "CreateError",
@@ -1021,7 +1021,7 @@ async function dropTableConstraints(client: pg.Client) {
 
         await client.query(
             `
-            ALTER TABLE "${relname}" DROP CONSTRAINT IF EXISTS "${conname}" CASCADE
+            ALTER TABLE ${escapeIdentifier(relname)} DROP CONSTRAINT IF EXISTS ${escapeIdentifier(conname)} CASCADE
             `);
     }
 }
@@ -1072,7 +1072,7 @@ export async function applyUniqueTableColumnTypes(client: pg.Client, uniqueTable
 
                 await client.query(
                     `
-                    ALTER TABLE "${relname}" DROP CONSTRAINT "${conname}"
+                    ALTER TABLE ${escapeIdentifier(relname)} DROP CONSTRAINT ${escapeIdentifier(conname)}
                     `);
             }
 
@@ -1080,7 +1080,7 @@ export async function applyUniqueTableColumnTypes(client: pg.Client, uniqueTable
 
             await client.query(
                 `
-                CREATE TYPE "${typeName}" AS RANGE (SUBTYPE = "${tableColumn.typeName}")
+                CREATE TYPE ${escapeIdentifier(typeName)} AS RANGE (SUBTYPE = ${escapeIdentifier(tableColumn.typeName)})
                 `);
 
             const colName = uniqueTableColumnType.columnName;
@@ -1089,17 +1089,17 @@ export async function applyUniqueTableColumnTypes(client: pg.Client, uniqueTable
 
             await client.query(
                 `
-                ALTER TABLE "${uniqueTableColumnType.tableName}"
-                    ALTER COLUMN "${colName}" DROP DEFAULT,
-                    ALTER COLUMN "${colName}" SET DATA TYPE "${typeName}" USING CASE WHEN "${colName}" IS NULL THEN NULL ELSE "${typeName}"("${colName}", "${colName}", '[]') END
+                ALTER TABLE ${escapeIdentifier(uniqueTableColumnType.tableName)}
+                    ALTER COLUMN ${escapeIdentifier(colName)} DROP DEFAULT,
+                    ALTER COLUMN ${escapeIdentifier(colName)} SET DATA TYPE ${escapeIdentifier(typeName)} USING CASE WHEN ${escapeIdentifier(colName)} IS NULL THEN NULL ELSE ${escapeIdentifier(typeName)}(${escapeIdentifier(colName)}, ${escapeIdentifier(colName)}, '[]') END
                 `);
 
             if (colHasDefault) {
                 // Restore the column so that it has a default value
                 await client.query(
                     `
-                    ALTER TABLE "${uniqueTableColumnType.tableName}"
-                        ALTER COLUMN "${colName}" SET DEFAULT 'empty'
+                    ALTER TABLE ${escapeIdentifier(uniqueTableColumnType.tableName)}
+                        ALTER COLUMN ${escapeIdentifier(colName)} SET DEFAULT 'empty'
                     `);
             }
 
@@ -1111,17 +1111,17 @@ export async function applyUniqueTableColumnTypes(client: pg.Client, uniqueTable
 
                 await client.query(
                     `
-                    ALTER TABLE "${relname}"
-                        ALTER COLUMN "${attname}" DROP DEFAULT,
-                        ALTER COLUMN "${attname}" SET DATA TYPE "${typeName}" USING CASE WHEN "${attname}" IS NULL THEN NULL ELSE "${typeName}"("${attname}", "${attname}", '[]') END
+                    ALTER TABLE ${escapeIdentifier(relname)}
+                        ALTER COLUMN ${escapeIdentifier(attname)} DROP DEFAULT,
+                        ALTER COLUMN ${escapeIdentifier(attname)} SET DATA TYPE ${escapeIdentifier(typeName)} USING CASE WHEN ${escapeIdentifier(attname)} IS NULL THEN NULL ELSE ${escapeIdentifier(typeName)}(${escapeIdentifier(attname)}, ${escapeIdentifier(attname)}, '[]') END
                     `);
 
                 if (refColHasDefault) {
                     // Restore the column so that it has a default value
                     await client.query(
                         `
-                        ALTER TABLE "${relname}"
-                            ALTER COLUMN "${attname}" SET DEFAULT 'empty'
+                        ALTER TABLE ${escapeIdentifier(relname)}
+                            ALTER COLUMN ${escapeIdentifier(attname)} SET DEFAULT 'empty'
                         `);
                 }
             }

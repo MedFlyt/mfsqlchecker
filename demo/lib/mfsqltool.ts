@@ -94,13 +94,9 @@ export class Connection<T> {
             columnTypes.set(attname, typname);
         }
 
-        // TODO !!!
-        // Proper SQL escaping of `tableName` and the field names
-        // TODO !!!
-
         // Example result:
         //     "name", "height", "birth_date"
-        const fieldsSqlFragment: string = fields.map(f => "\"" + f + "\"").join(", ");
+        const fieldsSqlFragment: string = fields.map(escapeIdentifier).join(", ");
 
         // Example result:
         //     $1::text, $2::int4, $3::date
@@ -109,12 +105,12 @@ export class Connection<T> {
             if (typ === undefined) {
                 typ = "unknown";
             }
-            return "$" + (index + 1) + "::\"" + typ + "\"[]";
+            return "$" + (index + 1) + "::" + escapeIdentifier(typ) + "[]";
         }).join(", ");
 
 
         let text =
-            `INSERT INTO "${tableName}" (${fieldsSqlFragment})\n` +
+            `INSERT INTO ${escapeIdentifier(tableName)} (${fieldsSqlFragment})\n` +
             "SELECT *\n" +
             `FROM unnest(${paramsSqlFragment})\n`;
 
@@ -199,6 +195,12 @@ export class Connection<T> {
     }
 }
 
+function escapeIdentifier(str: string) {
+    // See:
+    // <https://github.com/brianc/node-postgres/blob/60d8df659c5481723abada2344ac14d77377338c/lib/client.js#L401>
+    return '"' + str.replace(/"/g, '""') + '"'
+}
+
 /**
  * Use this instead of the built-in promise support of pg.Client because
  * `connectionLogSQL` (currently) needs an actual callback
@@ -232,10 +234,10 @@ class SqlQueryExpr<T> {
                 if (!sqlViewPrivate(placeholder).isResolved()) {
                     throw new Error(`View "${placeholder.getViewName()}" has not been created. Views are only allowed to be defined at module-level scope`);
                 }
-                text += `"${placeholder.getViewName()}"`;
+                text += escapeIdentifier(placeholder.getViewName());
             } else {
                 values.push((<any>this.conn).preparePlaceholder(placeholder));
-                text += `($${values.length + paramNumOffset})`;
+                text += "($" + (values.length + paramNumOffset) + ")";
             }
 
             text += this.literals[i + 1];
@@ -438,12 +440,7 @@ export function defineSqlView(x: TemplateStringsArray, ...placeholders: SqlView[
 
     const viewName = calcViewName(varName, query);
 
-    const sqlView = newSqlView(viewName,
-        `
-            CREATE OR REPLACE VIEW "${viewName}"
-            AS ${query}
-        `
-    );
+    const sqlView = newSqlView(viewName, `CREATE OR REPLACE VIEW ${escapeIdentifier(viewName)} AS\n${query}`);
 
     allSqlViewCreateStatements.push(sqlView);
 
@@ -576,7 +573,7 @@ namespace Migrate {
                             await rollbackToAndReleaseSavepoint(conn, savepoint);
 
                             await runAndDropDependentViews(conn, async () => {
-                                await conn.query(`DROP VIEW IF EXISTS "${viewName}"`);
+                                await conn.query(`DROP VIEW IF EXISTS ${escapeIdentifier(viewName)}`);
                             });
 
                             return runAndDropDependentViews(conn, action);

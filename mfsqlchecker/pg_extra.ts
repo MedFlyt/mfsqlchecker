@@ -25,6 +25,12 @@ export function closePg(conn: pg.Client): Promise<void> {
     });
 }
 
+export function escapeIdentifier(str: string) {
+    // See:
+    // <https://github.com/brianc/node-postgres/blob/60d8df659c5481723abada2344ac14d77377338c/lib/client.js#L401>
+    return '"' + str.replace(/"/g, '""') + '"';
+}
+
 /**
  * Submits a request to create a prepared statement
  *
