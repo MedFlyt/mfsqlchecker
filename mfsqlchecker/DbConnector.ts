@@ -549,7 +549,8 @@ async function processInsert(client: pg.Client, pgTypes: Map<number, SqlType>, t
         select
             pg_attribute.attname,
             pg_type.typname,
-            pg_attribute.atthasdef
+            pg_attribute.atthasdef,
+            pg_attribute.attnotnull
         from
             pg_attribute,
             pg_class,
@@ -585,23 +586,38 @@ async function processInsert(client: pg.Client, pgTypes: Map<number, SqlType>, t
             throw new Error("The Impossible Happened");
         }
 
+        const [suppliedTypeName, suppliedTypeNotNull] = suppliedType;
+
         const row = tableQuery.rows.find(r => r["attname"] === field);
         if (row === undefined) {
             invalidInsertCols.push({
                 type: "ColNotFound",
                 tableName: query.tableName,
                 colName: field,
-                invalidType: suppliedType
+                invalidType: suppliedTypeName
             });
         } else {
-            const tblType = sqlTypeToTypeScriptType(uniqueColumnTypes, SqlType.wrap(row["typname"]));
-            if (suppliedType !== tblType) {
+            const typname: string = row["typname"];
+            const attnotnull: boolean = row["attnotnull"];
+            const tblType = sqlTypeToTypeScriptType(uniqueColumnTypes, SqlType.wrap(typname));
+            if (((suppliedTypeName !== TypeScriptType.wrap("null")) && suppliedTypeName !== tblType) ||
+                (attnotnull && !suppliedTypeNotNull)) {
+                let suppliedTypeStr = TypeScriptType.unwrap(suppliedTypeName);
+                if (!suppliedTypeNotNull && suppliedTypeStr !== "null") {
+                    suppliedTypeStr += " | null";
+                }
+
+                let typStr = TypeScriptType.unwrap(tblType);
+                if (!attnotnull) {
+                    typStr += " | null";
+                }
+
                 invalidInsertCols.push({
                     type: "ColWrongType",
                     tableName: query.tableName,
                     colName: field,
-                    colType: tblType,
-                    invalidType: suppliedType
+                    colType: TypeScriptType.wrap(typStr),
+                    invalidType: TypeScriptType.wrap(suppliedTypeStr)
                 });
             }
         }
@@ -611,13 +627,19 @@ async function processInsert(client: pg.Client, pgTypes: Map<number, SqlType>, t
         const attname: string = row["attname"];
         const typname: string = row["typname"];
         const atthasdef: boolean = row["atthasdef"];
+        const attnotnull: boolean = row["attnotnull"];
         if (!atthasdef) {
             if (!query.insertColumns.has(attname)) {
+                let typStr = TypeScriptType.unwrap(sqlTypeToTypeScriptType(uniqueColumnTypes, SqlType.wrap(typname)));
+                if (!attnotnull) {
+                    typStr += " | null";
+                }
+
                 invalidInsertCols.push({
                     type: "MissingRequiredCol",
                     tableName: query.tableName,
                     colName: attname,
-                    colType: sqlTypeToTypeScriptType(uniqueColumnTypes, SqlType.wrap(typname))
+                    colType: TypeScriptType.wrap(typStr)
                 });
             }
         }

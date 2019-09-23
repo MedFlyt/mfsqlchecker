@@ -28,7 +28,7 @@ export interface InsertManyExpression {
     readonly tableName: string;
     readonly tableNameExprSpan: SrcSpan;
     readonly insertExprSpan: SrcSpan;
-    readonly insertColumns: Map<string, TypeScriptType>;
+    readonly insertColumns: Map<string, [TypeScriptType, boolean]>;
     readonly epilougeFragments: QueryCallExpression.QueryFragment[];
 }
 
@@ -64,7 +64,7 @@ export interface ResolvedInsert {
     readonly fileContents: string;
 
     readonly tableName: string;
-    readonly insertColumns: Map<string, TypeScriptType>;
+    readonly insertColumns: Map<string, [TypeScriptType, boolean]>;
 
     readonly text: string;
 
@@ -403,6 +403,20 @@ function isTypeSqlView(type: ts.Type): boolean {
     return symbol.name === "SqlView";
 }
 
+export function isNullableType(type: ts.Type): boolean {
+    if (!type.isUnion()) {
+        return type.flags === ts.TypeFlags.Null;
+    }
+
+    for (const typ of type.types) {
+        if (typ.flags === ts.TypeFlags.Null) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 /**
  * Convert a type of the form `(T | null)` -> `T`
  *
@@ -470,20 +484,22 @@ function getArrayType(type: ts.Type): ts.Type | null {
     return null;
 }
 
-function getObjectFieldTypes(checker: ts.TypeChecker, type: ts.Type): Either<string, Map<string, TypeScriptType>> {
-    if ((<any>type).members === undefined) {
-        return {
-            type: "Left",
-            value: `Values array argument element type must be a regular object. It is:\n${checker.typeToString(type)}`
-        };
+function getObjectFieldTypes(checker: ts.TypeChecker, type: ts.Type): Either<string, Map<string, [TypeScriptType, boolean]>> {
+    const errors: string[] = [];
+    const result = new Map<string, [TypeScriptType, boolean]>();
+
+    if ((<any>type).members !== undefined) {
+        const members: Map<string, any> = (<any>type).members;
+        members.forEach((value, key) => {
+            result.set(key, [TypeScriptType.wrap(checker.typeToString(nonNullType(value.type))), !isNullableType(value.type)]);
+        });
+    } else {
+        type.getProperties().forEach((value) => {
+            const typ = checker.getTypeAtLocation(value.valueDeclaration);
+            result.set(value.name, [TypeScriptType.wrap(checker.typeToString(nonNullType(typ))), !isNullableType(typ)]);
+        });
     }
 
-    const errors: string[] = [];
-    const result = new Map<string, TypeScriptType>();
-    const members: Map<string, any> = (<any>type).members;
-    members.forEach((value, key) => {
-        result.set(key, TypeScriptType.wrap(checker.typeToString(value.type)));
-    });
     if (errors.length > 0) {
         return {
             type: "Left",
