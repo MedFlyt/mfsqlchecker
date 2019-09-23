@@ -61,12 +61,14 @@ export class DbConnector {
     private uniqueColumnTypes = new Map<SqlType, TypeScriptType>();
 
     private queryCache = new QueryMap<SelectAnswer>();
+    private insertCache = new InsertMap<InsertAnswer>();
 
     async validateManifest(manifest: Manifest): Promise<ErrorDiagnostic[]> {
         const hash = await calcDbMigrationsHash(this.migrationsDir);
         if (this.dbMigrationsHash !== hash || !equalsUniqueTableColumnTypes(manifest.uniqueTableColumnTypes, this.prevUniqueTableColumnTypes)) {
             this.dbMigrationsHash = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
             this.queryCache.clear();
+            this.insertCache.clear();
             for (let i = this.viewNames.length - 1; i >= 0; --i) {
                 const viewName = this.viewNames[i];
                 await dropView(this.client, viewName[0]);
@@ -140,6 +142,7 @@ export class DbConnector {
 
 
         const newQueryCache = new QueryMap<SelectAnswer>();
+        const newInsertCache = new InsertMap<InsertAnswer>();
 
         const queriesProgressBar = new Bar({
             clearOnComplete: true,
@@ -150,7 +153,7 @@ export class DbConnector {
             let i = 0;
             for (const query of manifest.queries) {
                 switch (query.type) {
-                    case "ResolvedSelect":
+                    case "ResolvedSelect": {
                         const cachedResult = this.queryCache.get(query.value.text, query.value.colTypes);
                         if (cachedResult !== undefined) {
                             queryErrors = queryErrors.concat(queryAnswerToErrorDiagnostics(query.value, cachedResult));
@@ -161,11 +164,19 @@ export class DbConnector {
                             queryErrors = queryErrors.concat(queryAnswerToErrorDiagnostics(query.value, result));
                         }
                         break;
-                    case "ResolvedInsert":
-                        // TODO caching
-                        const result = await processInsert(this.client, this.pgTypes, this.tableColsLibrary, this.uniqueColumnTypes, query.value);
-                        queryErrors = queryErrors.concat(insertAnswerToErrorDiagnostics(query.value, result));
+                    }
+                    case "ResolvedInsert": {
+                        const cachedResult = this.insertCache.get(query.value.text, query.value.colTypes, query.value.tableName, query.value.insertColumns);
+                        if (cachedResult !== undefined) {
+                            queryErrors = queryErrors.concat(insertAnswerToErrorDiagnostics(query.value, cachedResult));
+                            newInsertCache.set(query.value.text, query.value.colTypes, query.value.tableName, query.value.insertColumns, cachedResult);
+                        } else {
+                            const result = await processInsert(this.client, this.pgTypes, this.tableColsLibrary, this.uniqueColumnTypes, query.value);
+                            newInsertCache.set(query.value.text, query.value.colTypes, query.value.tableName, query.value.insertColumns, result);
+                            queryErrors = queryErrors.concat(insertAnswerToErrorDiagnostics(query.value, result));
+                        }
                         break;
+                    }
                     default:
                         assertNever(query);
                 }
@@ -176,6 +187,7 @@ export class DbConnector {
         }
 
         this.queryCache = newQueryCache;
+        this.insertCache = newInsertCache;
 
         let finalErrors: ErrorDiagnostic[] = [];
         for (const query of manifest.queries) {
@@ -315,6 +327,44 @@ class QueryMap<T> {
     }
 
     private internalMap = new Map<string, T>();
+}
+
+/**
+ * Type safe "Map"-like from insert queries to some T
+ */
+class InsertMap<T> {
+    set(text: string, colTypes: Map<string, [ColNullability, TypeScriptType]> | null, tableName: string, insertColumns: Map<string, [TypeScriptType, boolean]>, value: T): void {
+        this.internalMap.set(InsertMap.toKey(text, colTypes, tableName, insertColumns), value);
+    }
+
+    get(text: string, colTypes: Map<string, [ColNullability, TypeScriptType]> | null, tableName: string, insertColumns: Map<string, [TypeScriptType, boolean]>): T | undefined {
+        return this.internalMap.get(InsertMap.toKey(text, colTypes, tableName, insertColumns));
+    }
+
+    clear(): void {
+        this.internalMap = new Map<string, T>();
+    }
+
+    private static toKey(text: string, colTypes: Map<string, [ColNullability, TypeScriptType]> | null, tableName: string, insertColumns: Map<string, [TypeScriptType, boolean]>): string {
+        // TODO Will this really always give a properly unique key?
+        return text + (colTypes === null ? "" : stringifyColTypes(colTypes)) + "\"" + tableName + "\"" + stringifyInsertColumns(insertColumns);
+    }
+
+    private internalMap = new Map<string, T>();
+}
+
+function stringifyInsertColumns(insertColumns: Map<string, [TypeScriptType, boolean]>): string {
+    const keys = [...insertColumns.keys()];
+    keys.sort();
+    let result = "";
+    for (const key of keys) {
+        const value = insertColumns.get(key);
+        if (value === undefined) {
+            throw new Error("The Impossible Happened");
+        }
+        result += `${JSON.stringify(key)}:[${value[0]}, ${value[1]}]\n`;
+    }
+    return result;
 }
 
 type SelectAnswer =
