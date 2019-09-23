@@ -98,13 +98,21 @@ function buildQueryFragments(sqlExp: ts.Expression): Either<ErrorDiagnostic[], Q
         };
     }
 
+    // Explanation for strange sourcePosStart formula below:
+    //
+    // When encountering a template string literal, if there is whitespace
+    // before the opening quote (`) then the "pos" starts at the beginning of
+    // the whitespace. So instead of relying on "pos", we use a formula that
+    // guarantees that we get the position of the start of the opening quote
+    // (`) char, by going backwards from the end
+
     if (ts.isNoSubstitutionTemplateLiteral(sqlExp.template)) {
         return {
             type: "Right",
             value: [{
                 type: "StringFragment",
                 text: sqlExp.template.text,
-                sourcePosStart: sqlExp.template.pos
+                sourcePosStart: sqlExp.template.end - sqlExp.template.text.length - 2
             }]
         };
     } else if (ts.isTemplateExpression(sqlExp.template)) {
@@ -112,11 +120,7 @@ function buildQueryFragments(sqlExp: ts.Expression): Either<ErrorDiagnostic[], Q
         fragments.push({
             type: "StringFragment",
             text: sqlExp.template.head.text,
-            // If there is whitespace before the opening quote (`) then "pos"
-            // starts at the beginning of the whitespace (so we use this
-            // formula to guarantee that we get the position of the start of
-            // the opening quote (`) char)
-            sourcePosStart: sqlExp.template.head.end - sqlExp.template.head.text.length - 3
+            sourcePosStart: sqlExp.template.head.end - sqlExp.template.head.text.length - 2
         });
 
         for (const span of sqlExp.template.templateSpans) {
@@ -783,7 +787,6 @@ function resolveInsertMany(typeScriptUniqueColumnTypes: Map<TypeScriptType, SqlT
     const errors: ErrorDiagnostic[] = [];
 
     let text = "";
-    const sourceMapOffset = text.length;
 
     const insertFragment: QueryCallExpression.QueryFragment[] = [{
         type: "StringFragment",
@@ -798,7 +801,7 @@ function resolveInsertMany(typeScriptUniqueColumnTypes: Map<TypeScriptType, SqlT
     for (const frag of queryFragments) {
         switch (frag.type) {
             case "StringFragment":
-                sourceMap.push([text.length - 2 * sourceMapOffset, frag.sourcePosStart]);
+                sourceMap.push([text.length, frag.sourcePosStart]);
                 text += frag.text;
                 break;
             case "Expression":
