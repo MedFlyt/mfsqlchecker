@@ -17,6 +17,8 @@ export class Connection<T> {
 
     constructor(client: pg.Client) {
         this.client = client;
+
+        // tslint:disable-next-line:no-unbound-method no-unused-expression
         this.preparePlaceholder;
     }
 
@@ -58,7 +60,91 @@ export class Connection<T> {
         return new SqlQueryExpr(this, literals, placeholders);
     }
 
-    async insertMany<Row extends object = any>(tableName: string, values: any[], epilogue?: SqlQueryExpr<T>): Promise<ResultRow<Row>[]> {
+    /**
+     * If your query contains an 'ON CONFLICT DO NOTHING' clause, or an 'ON
+     * CONFLICT DO UPDATE ... WHERE' clause then you should use `insertMaybe`
+     * instead
+     */
+    async insert<Row extends object = any>(tableName: string, value: object, epilogue?: SqlQueryExpr<T>): Promise<ResultRow<Row>> {
+        // Cast away the type of "this" so that "mfsqlchecker" doesn't detect
+        // this line of code as query that should be analyzed
+        const maybeRow: ResultRow<any> | null = (<any>this).insertMaybe(tableName, value, epilogue);
+        if (maybeRow === null) {
+            throw new Error(`Expected insert query to return 1 row. Got 0 rows`);
+        }
+        return maybeRow;
+    }
+
+    /**
+     * Use this only if your query contains an 'ON CONFLICT DO NOTHING' clause
+     * or an 'ON CONFLICT DO UPDATE ... WHERE' clause
+     */
+    async insertMaybe<Row extends object = any>(tableName: string, value: object, epilogue?: SqlQueryExpr<T>): Promise<ResultRow<Row | null>> {
+        if (Array.isArray(value)) {
+            throw new Error("Invalid insert call with value that is an Array (must be a single object)");
+        }
+
+        const fields = Object.keys(value);
+        fields.sort();
+
+        if (fields.length === 0) {
+            // TODO !!!
+            throw new Error("TODO Implement inserting 0 column rows");
+        }
+
+        // Example result:
+        //     "name", "height", "birth_date"
+        const fieldsSqlFragment: string = fields.map(escapeIdentifier).join(", ");
+
+        // Example result:
+        //     $1, $2, $3
+        const paramsSqlFragment: string = fields.map((_f, index) => "$" + (index + 1)).join(", ");
+
+        let text =
+            `INSERT INTO ${escapeIdentifier(tableName)} (${fieldsSqlFragment})\n` +
+            `VALUES (${paramsSqlFragment})\n`;
+
+        let vals: any[] = [];
+        // tslint:disable-next-line:prefer-for-of
+        for (let i = 0; i < fields.length; ++i) {
+            vals.push((<any>value)[fields[i]]);
+        }
+
+        let epilogueText: string;
+        let epilogueValues: any[];
+        if (epilogue !== undefined) {
+            [epilogueText, epilogueValues] = epilogue.render(vals.length);
+        } else {
+            [epilogueText, epilogueValues] = ["", []];
+        }
+
+        text += epilogueText;
+        vals = vals.concat(epilogueValues);
+
+        const queryResult = await clientQueryPromise(this.client, text, vals);
+
+        for (const row of queryResult.rows) {
+            for (const field of queryResult.fields) {
+                const fieldName = field.name;
+                const oldVal = row[fieldName];
+                try {
+                    row[fieldName] = new RealVal(oldVal !== null ? this.parseColumn(field.dataTypeID, oldVal) : null, fieldName, row);
+                } catch (err) {
+                    throw new Error(`Error parsing column "${fieldName}" containing value "${oldVal}": ${err.message}`);
+                }
+            }
+        }
+
+        if (queryResult.rows.length === 0) {
+            return null;
+        } else if (queryResult.rows.length === 1) {
+            return queryResult.rows[0];
+        } else {
+            throw new Error(`Expected insert query to return 0 or 1 rows. Got ${queryResult.rows.length} rows`);
+        }
+    }
+
+    async insertMany<Row extends object = any>(tableName: string, values: object[], epilogue?: SqlQueryExpr<T>): Promise<ResultRow<Row>[]> {
         if (values.length === 0) {
             return [];
         }
@@ -83,8 +169,8 @@ export class Connection<T> {
             where
             pg_attribute.attrelid = pg_class.oid
             and pg_class.relname = $1
-            AND pg_attribute.attnum >= 1
-            AND pg_attribute.atttypid = pg_type.oid;
+            and pg_attribute.attnum >= 1
+            and pg_attribute.atttypid = pg_type.oid;
             `, [tableName]);
 
         const columnTypes = new Map<string, string>();
@@ -115,6 +201,7 @@ export class Connection<T> {
             `FROM unnest(${paramsSqlFragment})\n`;
 
         let vals: any[] = [];
+        // tslint:disable-next-line:prefer-for-of
         for (let i = 0; i < fields.length; ++i) {
             vals.push([]);
         }
@@ -127,7 +214,7 @@ export class Connection<T> {
 
         let epilogueText: string;
         let epilogueValues: any[];
-        if (epilogue) {
+        if (epilogue !== undefined) {
             [epilogueText, epilogueValues] = epilogue.render(vals.length);
         } else {
             [epilogueText, epilogueValues] = ["", []];
@@ -198,7 +285,7 @@ export class Connection<T> {
 function escapeIdentifier(str: string) {
     // See:
     // <https://github.com/brianc/node-postgres/blob/60d8df659c5481723abada2344ac14d77377338c/lib/client.js#L401>
-    return '"' + str.replace(/"/g, '""') + '"'
+    return '"' + str.replace(/"/g, '""') + '"';
 }
 
 /**
@@ -308,8 +395,8 @@ class RealVal {
     // Micro-optimization: short variable names to save memory (we might have
     // thousands of these objects)
     constructor(private readonly v: any,
-        private readonly c: string,
-        private readonly r: any) { }
+                private readonly c: string,
+                private readonly r: any) { }
 
     /**
      * Implementation of Req<T>.val

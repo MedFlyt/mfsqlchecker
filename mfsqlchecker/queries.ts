@@ -221,7 +221,7 @@ function buildQueryCallExpression(node: ts.CallExpression): Either<ErrorDiagnost
     }
 }
 
-function buildInsertManyCallExpression(checker: ts.TypeChecker, node: ts.CallExpression): Either<ErrorDiagnostic[], InsertManyExpression> {
+function buildInsertCallExpression(checker: ts.TypeChecker, node: ts.CallExpression): Either<ErrorDiagnostic[], InsertManyExpression> {
     if (node.arguments.length < 2) {
         // The TypeScript typechecker will catch this error, so we don't need
         // to emit our own error message
@@ -242,7 +242,85 @@ function buildInsertManyCallExpression(checker: ts.TypeChecker, node: ts.CallExp
     const valuesArg = node.arguments[1];
     const valuesType = checker.getTypeAtLocation(valuesArg);
 
-    checker.typeToString(valuesType);
+    if (getArrayType(valuesType) !== null) {
+        return {
+            type: "Left",
+            value: [nodeErrorDiagnostic(valuesArg, "Argument must not be an array (must be a single object)")]
+        };
+    }
+    const valuesElemType = valuesType;
+
+    const sourceFile = node.getSourceFile();
+
+    const [typeArgument, typeArgumentSpan] = buildTypeArgumentData(sourceFile, node);
+
+    let epilougeFragments: QueryCallExpression.QueryFragment[];
+    if (node.arguments.length >= 3) {
+        const epilougeSqlExp: ts.Expression = node.arguments[2];
+        const queryFragments = buildQueryFragments(epilougeSqlExp);
+        switch (queryFragments.type) {
+            case "Left":
+                return {
+                    type: "Left",
+                    value: queryFragments.value
+                };
+            case "Right":
+                epilougeFragments = queryFragments.value;
+                break;
+            default:
+                return assertNever(queryFragments);
+        }
+    } else {
+        epilougeFragments = [];
+    }
+
+    const objectFieldTypes = getObjectFieldTypes(checker, valuesElemType);
+    switch (objectFieldTypes.type) {
+        case "Left":
+            return {
+                type: "Left",
+                value: [nodeErrorDiagnostic(valuesArg, objectFieldTypes.value)]
+            };
+        case "Right":
+            return {
+                type: "Right",
+                value: {
+                    fileName: sourceFile.fileName,
+                    fileContents: sourceFile.text,
+                    typeArgument: typeArgument,
+                    typeArgumentSpan: typeArgumentSpan,
+                    tableName: tableNameArg.text,
+                    tableNameExprSpan: nodeLineAndColSpan(sourceFile, tableNameArg),
+                    insertExprSpan: nodeLineAndColSpan(sourceFile, valuesArg),
+                    insertColumns: objectFieldTypes.value,
+                    epilougeFragments: epilougeFragments
+                }
+            };
+        default:
+            return assertNever(objectFieldTypes);
+    }
+}
+
+function buildInsertManyCallExpression(checker: ts.TypeChecker, node: ts.CallExpression): Either<ErrorDiagnostic[], InsertManyExpression> {
+    if (node.arguments.length < 2) {
+        // The TypeScript typechecker will catch this error, so we don't need
+        // to emit our own error message
+        return {
+            type: "Left",
+            value: []
+        };
+    }
+
+    const tableNameArg = node.arguments[0];
+    if (!(ts.isStringLiteral(tableNameArg) || ts.isNoSubstitutionTemplateLiteral(tableNameArg))) {
+        return {
+            type: "Left",
+            value: [nodeErrorDiagnostic(tableNameArg, "Argument must be a String Literal")]
+        };
+    }
+
+    const valuesArg = node.arguments[1];
+    const valuesType = checker.getTypeAtLocation(valuesArg);
 
     const valuesElemType = getArrayType(valuesType);
 
@@ -311,12 +389,12 @@ export function findAllQueryCalls(typeScriptUniqueColumnTypes: Map<TypeScriptTyp
     const resolvedQueries: ResolvedQuery[] = [];
     const errorDiagnostics: ErrorDiagnostic[] = [];
 
-    const queryMethodNames = ["query", "queryOne", "queryOneOrNone"];
-
     function visit(node: ts.Node) {
         if (ts.isCallExpression(node)) {
             if (ts.isPropertyAccessExpression(node.expression)) {
                 if (ts.isIdentifier(node.expression.name)) {
+                    const queryMethodNames = ["query", "queryOne", "queryOneOrNone"];
+                    const insertMethodNames = ["insert", "insertMaybe"];
                     if (queryMethodNames.indexOf(node.expression.name.text) >= 0) {
                         const type = checker.getTypeAtLocation(node.expression.expression);
                         if (type.getProperty("MfConnectionTypeTag") !== undefined) {
@@ -353,6 +431,38 @@ export function findAllQueryCalls(typeScriptUniqueColumnTypes: Map<TypeScriptTyp
                         const type = checker.getTypeAtLocation(node.expression.expression);
                         if (type.getProperty("MfConnectionTypeTag") !== undefined) {
                             const query = buildInsertManyCallExpression(checker, node);
+                            switch (query.type) {
+                                case "Left":
+                                    for (const e of query.value) {
+                                        errorDiagnostics.push(e);
+                                    }
+                                    break;
+                                case "Right":
+                                    const resolvedQuery = resolveInsertMany(typeScriptUniqueColumnTypes, projectDir, checker, query.value, lookupViewName);
+                                    switch (resolvedQuery.type) {
+                                        case "Left":
+                                            for (const e of resolvedQuery.value) {
+                                                errorDiagnostics.push(e);
+                                            }
+                                            break;
+                                        case "Right":
+                                            resolvedQueries.push({
+                                                type: "ResolvedInsert",
+                                                value: resolvedQuery.value
+                                            });
+                                            break;
+                                        default:
+                                            assertNever(resolvedQuery);
+                                    }
+                                    break;
+                                default:
+                                    assertNever(query);
+                            }
+                        }
+                    } else if (insertMethodNames.indexOf(node.expression.name.text) >= 0) {
+                        const type = checker.getTypeAtLocation(node.expression.expression);
+                        if (type.getProperty("MfConnectionTypeTag") !== undefined) {
+                            const query = buildInsertCallExpression(checker, node);
                             switch (query.type) {
                                 case "Left":
                                     for (const e of query.value) {
