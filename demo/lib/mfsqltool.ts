@@ -703,11 +703,20 @@ namespace Migrate {
             ORDER BY "installed_rank"
             `);
 
+        let expectedInstallRank = 1;
+
         const result: MigrationMetadata[] = [];
         for (const row of queryResult.rows) {
             const installedRank: number = row["installed_rank"];
-            const checksum: number | null = row["checksum"];
             const script: string = row["script"];
+            const checksum: number | null = row["checksum"];
+
+            if (installedRank !== expectedInstallRank) {
+                throw new MigrationError(
+                    `Previously applied migrations have a gap in the rank.\n` +
+                    `Rank ${expectedInstallRank} is missing. Found: ${installedRank} ${script}`);
+            }
+            expectedInstallRank++;
 
             if (checksum === null) {
                 throw new MigrationError(
