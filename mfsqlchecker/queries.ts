@@ -488,15 +488,23 @@ function getObjectFieldTypes(checker: ts.TypeChecker, type: ts.Type): Either<str
     const errors: string[] = [];
     const result = new Map<string, [TypeScriptType, boolean]>();
 
+    const addResult = (fieldName: string, typ: ts.Type) => {
+        if ((typ.flags & ts.TypeFlags.StringLiteral) !== 0 || // tslint:disable-line:no-bitwise
+            isUnionOfStringLiterals(typ)) {
+            result.set(fieldName, [TypeScriptType.wrap("string"), !isNullableType(typ)]);
+        } else {
+            result.set(fieldName, [TypeScriptType.wrap(checker.typeToString(nonNullType(typ))), !isNullableType(typ)]);
+        }
+    };
+
     if ((<any>type).members !== undefined) {
         const members: Map<string, any> = (<any>type).members;
         members.forEach((value, key) => {
-            result.set(key, [TypeScriptType.wrap(checker.typeToString(nonNullType(value.type))), !isNullableType(value.type)]);
+            addResult(key, value.type);
         });
     } else {
         type.getProperties().forEach((value) => {
-            const typ = checker.getTypeAtLocation(value.valueDeclaration);
-            result.set(value.name, [TypeScriptType.wrap(checker.typeToString(nonNullType(typ))), !isNullableType(typ)]);
+            addResult(value.name, checker.getTypeAtLocation(value.valueDeclaration));
         });
     }
 
