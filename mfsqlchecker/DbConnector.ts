@@ -41,6 +41,12 @@ export class DbConnector {
 
     static async Connect(migrationsDir: string, adminUrl: string, name?: string): Promise<DbConnector> {
         const client = await newConnect(adminUrl, name);
+        client.on("error", () => {
+            // Ignore the error. We get an error event here if the database
+            // server shuts down (This happens when using "launch-postgres".
+            // If we don't handle (ignore) the error event here, then it
+            // bubbles up and hard-crashes the program */
+        });
         return new DbConnector(migrationsDir, client);
     }
 
