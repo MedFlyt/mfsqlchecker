@@ -784,6 +784,8 @@ namespace Migrate {
             `
             SELECT
                 "installed_rank",
+                "version",
+                "description",
                 "script",
                 "checksum"
             FROM "schema_version"
@@ -795,6 +797,8 @@ namespace Migrate {
         const result: MigrationMetadata[] = [];
         for (const row of queryResult.rows) {
             const installedRank: number = row["installed_rank"];
+            const version: string = row["version"];
+            const description: string = row["description"];
             const script: string = row["script"];
             const checksum: number | null = row["checksum"];
 
@@ -808,6 +812,22 @@ namespace Migrate {
             if (checksum === null) {
                 throw new MigrationError(
                     `Previously applied migration ${installedRank} ${script} has NULL checksum value`);
+            }
+
+            const migrationCols = parseMigrationCols(script);
+
+            if (version !== migrationCols.version) {
+                throw new MigrationError(
+                    `Previously applied migration ${installedRank} ${script} has wrong migration version\n` +
+                    `Found: ${version}\n` +
+                    `Should be: ${migrationCols.version}`);
+            }
+
+            if (description !== migrationCols.description) {
+                throw new MigrationError(
+                    `Previously applied migration ${installedRank} ${script} has wrong migration description\n` +
+                    `Found: ${description}\n` +
+                    `Should be: ${migrationCols.description}`);
             }
 
             result.push({
@@ -834,7 +854,7 @@ namespace Migrate {
         }
 
         const version = matches[1];
-        const description = matches[2].replace("_", " ");
+        const description = matches[2].replace(/_/g, " ");
 
         return {
             version: version,
