@@ -472,20 +472,10 @@ function queryAnswerToErrorDiagnostics(query: ResolvedSelect, queryAnswer: Selec
             }];
         case "WrongColumnTypes":
             let replacementText: string;
-            switch (query.colTypeSpan.type) {
-                case "File":
-                    throw new Error("The Impossible Happened");
-                case "LineAndCol":
-                    // This is a bit of a hack. We are assuming that if the
-                    // SrcSpan is a single character, then the type argument is
-                    // completely missing
-                    replacementText = "<" + queryAnswer.renderedColTypes + ">";
-                    break;
-                case "LineAndColRange":
-                    replacementText = queryAnswer.renderedColTypes;
-                    break;
-                default:
-                    return assertNever(query.colTypeSpan);
+            if (query.queryMethodName === null) {
+                replacementText = queryAnswer.renderedColTypes;
+            } else {
+                replacementText = query.queryMethodName + "<" + queryAnswer.renderedColTypes + ">";
             }
 
             return [{

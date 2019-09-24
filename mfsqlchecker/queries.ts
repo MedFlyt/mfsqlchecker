@@ -9,6 +9,13 @@ import { QualifiedSqlViewName, resolveViewIdentifier } from "./views";
 export interface QueryCallExpression {
     readonly fileName: string;
     readonly fileContents: string;
+
+    /**
+     * If `null` then we have a type parameter. Otherwise contains the name of
+     * the method name that was called
+     */
+    readonly queryMethodName: string | null;
+
     readonly typeArgument: ts.TypeNode | null;
     readonly typeArgumentSpan: SrcSpan;
     readonly queryFragments: QueryCallExpression.QueryFragment[];
@@ -23,6 +30,13 @@ export namespace QueryCallExpression {
 export interface InsertManyExpression {
     readonly fileName: string;
     readonly fileContents: string;
+
+    /**
+     * If `null` then we have a type parameter. Otherwise contains the name of
+     * the method name that was called
+     */
+    readonly queryMethodName: string | null;
+
     readonly typeArgument: ts.TypeNode | null;
     readonly typeArgumentSpan: SrcSpan;
     readonly tableName: string;
@@ -51,6 +65,12 @@ export interface ResolvedSelect {
      */
     readonly colTypes: Map<string, [ColNullability, TypeScriptType]> | null;
 
+    /**
+     * If `null` then we have a type parameter. Otherwise contains the name of
+     * the method name that was called
+     */
+    readonly queryMethodName: string | null;
+
     readonly colTypeSpan: SrcSpan;
 
     /**
@@ -76,6 +96,12 @@ export interface ResolvedInsert {
      * types
      */
     readonly colTypes: Map<string, [ColNullability, TypeScriptType]> | null;
+
+    /**
+     * If `null` then we have a type parameter. Otherwise contains the name of
+     * the method name that was called
+     */
+    readonly queryMethodName: string | null;
 
     readonly colTypeSpan: SrcSpan;
 
@@ -160,17 +186,8 @@ function buildTypeArgumentData(sourceFile: ts.SourceFile, node: ts.CallExpressio
             : node.typeArguments[0];
 
     const typeArgumentSpan: SrcSpan = typeArgument !== null
-        ? ((): SrcSpan => {
-            return nodeLineAndColSpan(sourceFile, typeArgument);
-        })()
-        : ((): SrcSpan => {
-            const loc = sourceFile.getLineAndCharacterOfPosition(node.expression.end);
-            return {
-                type: "LineAndCol",
-                line: loc.line + 1,
-                col: loc.character + 1
-            };
-        })();
+        ? nodeLineAndColSpan(sourceFile, typeArgument)
+        : nodeLineAndColSpan(sourceFile, (<any>node.expression).name);
 
     return [typeArgument, typeArgumentSpan];
 }
@@ -183,7 +200,7 @@ function buildTypeArgumentData(sourceFile: ts.SourceFile, node: ts.CallExpressio
  * @param node Must be a call expression to the "query" function (from the sql
  * checker lib)
  */
-function buildQueryCallExpression(node: ts.CallExpression): Either<ErrorDiagnostic[], QueryCallExpression> {
+function buildQueryCallExpression(methodName: string, node: ts.CallExpression): Either<ErrorDiagnostic[], QueryCallExpression> {
     if (node.arguments.length < 1) {
         // The TypeScript typechecker will catch this error, so we don't need
         // to emit our own error message
@@ -211,6 +228,7 @@ function buildQueryCallExpression(node: ts.CallExpression): Either<ErrorDiagnost
                 value: {
                     fileName: sourceFile.fileName,
                     fileContents: sourceFile.text,
+                    queryMethodName: typeArgument === null ? methodName : null,
                     typeArgument: typeArgument,
                     typeArgumentSpan: typeArgumentSpan,
                     queryFragments: queryFragments.value
@@ -221,7 +239,7 @@ function buildQueryCallExpression(node: ts.CallExpression): Either<ErrorDiagnost
     }
 }
 
-function buildInsertCallExpression(checker: ts.TypeChecker, node: ts.CallExpression): Either<ErrorDiagnostic[], InsertManyExpression> {
+function buildInsertCallExpression(checker: ts.TypeChecker, methodName: string, node: ts.CallExpression): Either<ErrorDiagnostic[], InsertManyExpression> {
     if (node.arguments.length < 2) {
         // The TypeScript typechecker will catch this error, so we don't need
         // to emit our own error message
@@ -287,6 +305,7 @@ function buildInsertCallExpression(checker: ts.TypeChecker, node: ts.CallExpress
                 value: {
                     fileName: sourceFile.fileName,
                     fileContents: sourceFile.text,
+                    queryMethodName: typeArgument === null ? methodName : null,
                     typeArgument: typeArgument,
                     typeArgumentSpan: typeArgumentSpan,
                     tableName: tableNameArg.text,
@@ -301,7 +320,7 @@ function buildInsertCallExpression(checker: ts.TypeChecker, node: ts.CallExpress
     }
 }
 
-function buildInsertManyCallExpression(checker: ts.TypeChecker, node: ts.CallExpression): Either<ErrorDiagnostic[], InsertManyExpression> {
+function buildInsertManyCallExpression(checker: ts.TypeChecker, methodName: string, node: ts.CallExpression): Either<ErrorDiagnostic[], InsertManyExpression> {
     if (node.arguments.length < 2) {
         // The TypeScript typechecker will catch this error, so we don't need
         // to emit our own error message
@@ -371,6 +390,7 @@ function buildInsertManyCallExpression(checker: ts.TypeChecker, node: ts.CallExp
                 value: {
                     fileName: sourceFile.fileName,
                     fileContents: sourceFile.text,
+                    queryMethodName: typeArgument === null ? methodName : null,
                     typeArgument: typeArgument,
                     typeArgumentSpan: typeArgumentSpan,
                     tableName: tableNameArg.text,
@@ -398,7 +418,7 @@ export function findAllQueryCalls(typeScriptUniqueColumnTypes: Map<TypeScriptTyp
                     if (queryMethodNames.indexOf(node.expression.name.text) >= 0) {
                         const type = checker.getTypeAtLocation(node.expression.expression);
                         if (type.getProperty("MfConnectionTypeTag") !== undefined) {
-                            const query = buildQueryCallExpression(node);
+                            const query = buildQueryCallExpression(node.expression.name.text, node);
                             switch (query.type) {
                                 case "Left":
                                     for (const e of query.value) {
@@ -430,7 +450,7 @@ export function findAllQueryCalls(typeScriptUniqueColumnTypes: Map<TypeScriptTyp
                     } else if (node.expression.name.text === "insertMany") {
                         const type = checker.getTypeAtLocation(node.expression.expression);
                         if (type.getProperty("MfConnectionTypeTag") !== undefined) {
-                            const query = buildInsertManyCallExpression(checker, node);
+                            const query = buildInsertManyCallExpression(checker, node.expression.name.text, node);
                             switch (query.type) {
                                 case "Left":
                                     for (const e of query.value) {
@@ -462,7 +482,7 @@ export function findAllQueryCalls(typeScriptUniqueColumnTypes: Map<TypeScriptTyp
                     } else if (insertMethodNames.indexOf(node.expression.name.text) >= 0) {
                         const type = checker.getTypeAtLocation(node.expression.expression);
                         if (type.getProperty("MfConnectionTypeTag") !== undefined) {
-                            const query = buildInsertCallExpression(checker, node);
+                            const query = buildInsertCallExpression(checker, node.expression.name.text, node);
                             switch (query.type) {
                                 case "Left":
                                     for (const e of query.value) {
@@ -934,6 +954,7 @@ function resolveQueryFragment(typeScriptUniqueColumnTypes: Map<TypeScriptType, S
                 text: text,
                 sourceMap: sourceMap,
                 colTypes: colTypes,
+                queryMethodName: query.queryMethodName,
                 colTypeSpan: query.typeArgumentSpan,
                 errors: errors
             }
@@ -1036,6 +1057,7 @@ function resolveInsertMany(typeScriptUniqueColumnTypes: Map<TypeScriptType, SqlT
                 text: text,
                 sourceMap: sourceMap,
                 colTypes: colTypes,
+                queryMethodName: query.queryMethodName,
                 colTypeSpan: query.typeArgumentSpan,
                 tableNameExprSpan: query.tableNameExprSpan,
                 insertExprSpan: query.insertExprSpan,

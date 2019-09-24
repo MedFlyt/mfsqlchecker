@@ -13,7 +13,7 @@ Static Checker:
 [ ] Type-safe read JSON values
 [ ] Type-safe write JSON values (might be too complex)
 [ ] mess with pg_cast table to prevent liberal assignments of any value to TEXT columns
-[ ] When query type arg is missing, use error span that has range over entire "query" word
+[V] When query type arg is missing, use error span that has range over entire "query" word
 [ ] Right click menu: copy full (expanded) query to clipboard
 [ ] Hover/click a table name or view name to display a popup containing table(or view) column names + types
 
