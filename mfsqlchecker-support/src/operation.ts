@@ -90,7 +90,7 @@ export function start(context: vscode.ExtensionContext): State {
                             title: "Format",
                             command: "editor.action.formatSelection"
                         };
-                        
+
                         quickFixActions.push(quickFixAction);
                     }
                 }
@@ -116,10 +116,20 @@ function launch(state: State, configPath: string) {
         stdio: ["ignore", "pipe", "pipe"]
     });
 
+    state.childP.on("error", (err: Error) => {
+        console.log("error", err);
+        vscode.window.showErrorMessage("Error launching \"node\" process:\n" + err.message);
+
+        state.status.text = "mfsqlchecker $(database) $(flame)";
+        state.status.tooltip = "mfsqlchecker launch error!";
+        state.status.command = "workbench.action.reloadWindow";
+    });
+
     let stderr: string = "";
 
     const stderrLines = readline.createInterface(state.childP.stderr);
     stderrLines.on("line", (line: string) => {
+        console.log("[stderr] " + line);
         stderr += line + "\n";
     });
 
@@ -177,12 +187,12 @@ function launch(state: State, configPath: string) {
 
     state.childP.on("exit", (code: number) => {
         console.log("exit", code);
-        vscode.window.showErrorMessage(stderr);
+        vscode.window.showErrorMessage("mfsqlchecker emitted an error:\n" + stderr);
 
         state.status.text = "mfsqlchecker $(database) $(flame)";
         state.status.tooltip = "mfsqlchecker crashed!";
         state.status.command = "workbench.action.reloadWindow";
-});
+    });
 }
 
 export function stop(state: State): Promise<void> {
