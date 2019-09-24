@@ -144,8 +144,17 @@ function downloadFile(url: string, filePath: string): Promise<void> {
 
 class TempDir {
     static async create(): Promise<TempDir> {
+        await new Promise<void>((resolve, reject) => {
+            fs.mkdir(path.join(os.tmpdir(), APP_NAME), err => {
+                if (<any>err && err !== null && err.code !== "EEXIST") {
+                    reject(err);
+                    return;
+                }
+                resolve();
+            });
+        });
         const directory = await new Promise<string>((resolve, reject) => {
-            fs.mkdtemp(os.tmpdir() + path.sep, (err, folder) => {
+            fs.mkdtemp(path.join(os.tmpdir(), APP_NAME) + path.sep, (err, folder) => {
                 if (<any>err) {
                     reject(err);
                     return;
