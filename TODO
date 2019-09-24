@@ -20,7 +20,7 @@ Static Checker:
 Run-time Library:
 
 [V] Connection wrapper object (conn.query, conn.queryOne, conn.queryOneOrNone)
-[ ] insert DSL (This is needed to validate that all non-default columns are present)
+[V] insert DSL (This is needed to validate that all non-default columns are present)
       conn.insertOne("employee",
           {
               fname: sql`${"alice"}`,

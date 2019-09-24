@@ -107,7 +107,7 @@ export class Connection<T> {
         let vals: any[] = [];
         // tslint:disable-next-line:prefer-for-of
         for (let i = 0; i < fields.length; ++i) {
-            vals.push((<any>value)[fields[i]]);
+            vals.push(this.preparePlaceholder((<any>value)[fields[i]]));
         }
 
         let epilogueText: string;
@@ -208,7 +208,7 @@ export class Connection<T> {
 
         for (const value of values) {
             for (let i = 0; i < fields.length; ++i) {
-                vals[i].push((<any>value)[fields[i]]);
+                vals[i].push(this.preparePlaceholder((<any>value)[fields[i]]));
             }
         }
 
