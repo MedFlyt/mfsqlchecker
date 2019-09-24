@@ -752,7 +752,25 @@ function getColNullability(symbol: ts.Symbol): ColNullability | null {
     }
 }
 
-function typescriptRowTypeToColTypes(checker: ts.TypeChecker, typeLiteral: ts.TypeLiteralNode, errorReporter: (error: ErrorDiagnostic) => void): Map<string, [ColNullability, TypeScriptType]> {
+function typescriptRowTypeToColTypes(checker: ts.TypeChecker, typeNode: ts.TypeNode, errorReporter: (error: ErrorDiagnostic) => void): Map<string, [ColNullability, TypeScriptType]> | null {
+    if (ts.isTypeLiteralNode(typeNode)) {
+        return typeLiteralNodeToColTypes(checker, typeNode, errorReporter);
+    } else {
+        const typ = checker.getTypeAtLocation(typeNode);
+        if (typ.flags === ts.TypeFlags.Any) {
+            return null;
+        } else {
+            if ((<any>typ).symbol !== undefined && typ.symbol.members !== undefined) {
+                return typeSymbolMembersToColTypes(checker, typeNode, <any>typ.symbol.members, errorReporter);
+            } else {
+                errorReporter(nodeErrorDiagnostic(typeNode, "Invalid type argument (must be a Type Literal or interface type)"));
+                return new Map<string, [ColNullability, TypeScriptType]>();
+            }
+        }
+    }
+}
+
+function typeLiteralNodeToColTypes(checker: ts.TypeChecker, typeLiteral: ts.TypeLiteralNode, errorReporter: (error: ErrorDiagnostic) => void): Map<string, [ColNullability, TypeScriptType]> {
     const results = new Map<string, [ColNullability, TypeScriptType]>();
     for (const member of typeLiteral.members) {
         if (!ts.isPropertySignature(member)) {
@@ -765,32 +783,81 @@ function typescriptRowTypeToColTypes(checker: ts.TypeChecker, typeLiteral: ts.Ty
                     errorReporter(nodeErrorDiagnostic(member, "Property name is not an identifier"));
                 } else {
                     const memberType = checker.getTypeAtLocation(member.type);
-                    if (memberType.flags !== ts.TypeFlags.Object) {
-                        errorReporter(nodeErrorDiagnostic(member, `Invalid type for property "${member.name.text}", it must be \`Req<T>\` or \`Opt<T>\``));
-                    } else {
-                        const colNullability = getColNullability(memberType.symbol);
-                        if (colNullability === null) {
-                            errorReporter(nodeErrorDiagnostic(member, `Invalid type for property "${member.name.text}", it must be \`Req<T>\` or \`Opt<T>\``));
-                        } else {
-                            const typeArguments: ts.Type[] | undefined = (<any>memberType).typeArguments;
-                            if (typeArguments === undefined || typeArguments.length < 1) {
-                                errorReporter(nodeErrorDiagnostic(member, `Invalid type for property "${member.name.text}", it must be \`Req<T>\` or \`Opt<T>\``));
-                            } else {
-                                const typeArgument = typeArguments[0];
-                                const type = readTypeScriptType(checker, typeArgument);
-                                if (type === null) {
-                                    errorReporter(nodeErrorDiagnostic(member, `Invalid type for property "${member.name.text}": ${checker.typeToString(typeArgument)}`));
-                                } else {
-                                    results.set(member.name.text, [colNullability, type]);
-                                }
-                            }
-                        }
+                    const colTypes = getTypeMemberColTypes(checker, member, member.name.text, memberType);
+                    switch (colTypes.type) {
+                        case "Left":
+                            errorReporter(colTypes.value);
+                            break;
+                        case "Right":
+                            results.set(member.name.text, colTypes.value);
+                            break;
+                        default:
+                            assertNever(colTypes);
                     }
                 }
             }
         }
     }
     return results;
+}
+
+function typeSymbolMembersToColTypes(checker: ts.TypeChecker, node: ts.Node, members: Map<string, ts.Symbol>, errorReporter: (error: ErrorDiagnostic) => void): Map<string, [ColNullability, TypeScriptType]> {
+    const results = new Map<string, [ColNullability, TypeScriptType]>();
+    members.forEach((value, key) => {
+        const memberType = checker.getTypeAtLocation(value.valueDeclaration);
+
+        const colTypes = getTypeMemberColTypes(checker, node, key, memberType);
+        switch (colTypes.type) {
+            case "Left":
+                errorReporter(colTypes.value);
+                break;
+            case "Right":
+                results.set(key, colTypes.value);
+                break;
+            default:
+                assertNever(colTypes);
+        }
+    });
+    return results;
+}
+
+function getTypeMemberColTypes(checker: ts.TypeChecker, node: ts.Node, propName: string, memberType: ts.Type): Either<ErrorDiagnostic, [ColNullability, TypeScriptType]> {
+    if (memberType.flags !== ts.TypeFlags.Object) {
+        return {
+            type: "Left",
+            value: nodeErrorDiagnostic(node, `Invalid type for property "${propName}", it must be \`Req<T>\` or \`Opt<T>\``)
+        };
+    } else {
+        const colNullability = getColNullability(memberType.symbol);
+        if (colNullability === null) {
+            return {
+                type: "Left",
+                value: nodeErrorDiagnostic(node, `Invalid type for property "${propName}", it must be \`Req<T>\` or \`Opt<T>\``)
+            };
+        } else {
+            const typeArguments: ts.Type[] | undefined = (<any>memberType).typeArguments;
+            if (typeArguments === undefined || typeArguments.length < 1) {
+                return {
+                    type: "Left",
+                    value: nodeErrorDiagnostic(node, `Invalid type for property "${propName}", it must be \`Req<T>\` or \`Opt<T>\``)
+                };
+            } else {
+                const typeArgument = typeArguments[0];
+                const type = readTypeScriptType(checker, typeArgument);
+                if (type === null) {
+                    return {
+                        type: "Left",
+                        value: nodeErrorDiagnostic(node, `Invalid type for property "${propName}": ${checker.typeToString(typeArgument)}`)
+                    };
+                } else {
+                    return {
+                        type: "Right",
+                        value: [colNullability, type]
+                    };
+                }
+            }
+        }
+    }
 }
 
 function resolveQueryFragment(typeScriptUniqueColumnTypes: Map<TypeScriptType, SqlType>, projectDir: string, checker: ts.TypeChecker, query: QueryCallExpression, lookupViewName: (qualifiedSqlViewName: QualifiedSqlViewName) => string | undefined): Either<ErrorDiagnostic[], ResolvedSelect> {
@@ -856,16 +923,7 @@ function resolveQueryFragment(typeScriptUniqueColumnTypes: Map<TypeScriptType, S
             // equivalent to <{}>
             colTypes = new Map<string, [ColNullability, TypeScriptType]>();
         } else {
-            if (ts.isTypeLiteralNode(query.typeArgument)) {
-                colTypes = typescriptRowTypeToColTypes(checker, query.typeArgument, e => errors.push(e));
-                // } else if ( ... TODO handle case of `query<any>(...)` and set colTypes = null
-            } else {
-                // TODO We should enhance `typescriptRowTypeToSqlTypes` so
-                // that it also handles interface types, type aliases, and
-                // maybe also some sensible scenarios
-                errors.push(nodeErrorDiagnostic(query.typeArgument, "Type argument must be a Type Literal"));
-                colTypes = new Map<string, [ColNullability, TypeScriptType]>();
-            }
+            colTypes = typescriptRowTypeToColTypes(checker, query.typeArgument, e => errors.push(e));
         }
 
         return {
@@ -965,16 +1023,7 @@ function resolveInsertMany(typeScriptUniqueColumnTypes: Map<TypeScriptType, SqlT
             // equivalent to <{}>
             colTypes = new Map<string, [ColNullability, TypeScriptType]>();
         } else {
-            if (ts.isTypeLiteralNode(query.typeArgument)) {
-                colTypes = typescriptRowTypeToColTypes(checker, query.typeArgument, e => errors.push(e));
-                // } else if ( ... TODO handle case of `query<any>(...)` and set colTypes = null
-            } else {
-                // TODO We should enhance `typescriptRowTypeToSqlTypes` so
-                // that it also handles interface types, type aliases, and
-                // maybe also some sensible scenarios
-                errors.push(nodeErrorDiagnostic(query.typeArgument, "Type argument must be a Type Literal"));
-                colTypes = new Map<string, [ColNullability, TypeScriptType]>();
-            }
+            colTypes = typescriptRowTypeToColTypes(checker, query.typeArgument, e => errors.push(e));
         }
 
         return {

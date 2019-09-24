@@ -323,7 +323,7 @@ class QueryMap<T> {
 
     private static toKey(text: string, colTypes: Map<string, [ColNullability, TypeScriptType]> | null): string {
         // TODO Will this really always give a properly unique key?
-        return text + (colTypes === null ? "" : stringifyColTypes(colTypes));
+        return text + (colTypes === null ? "[NULL]" : stringifyColTypes(colTypes));
     }
 
     private internalMap = new Map<string, T>();
