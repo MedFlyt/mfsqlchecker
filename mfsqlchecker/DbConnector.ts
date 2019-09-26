@@ -923,6 +923,9 @@ function sqlTypeToTypeScriptType(uniqueColumnTypes: Map<SqlType, TypeScriptType>
             return TypeScriptType.wrap("string");
         case "bool":
             return TypeScriptType.wrap("boolean");
+        case "float4":
+        case "float8":
+            return TypeScriptType.wrap("number");
 
         // TODO Temporary
         case "jsonb":
