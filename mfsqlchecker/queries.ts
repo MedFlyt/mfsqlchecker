@@ -626,6 +626,8 @@ function getObjectFieldTypes(checker: ts.TypeChecker, type: ts.Type): Either<str
         if ((typ.flags & ts.TypeFlags.StringLiteral) !== 0 || // tslint:disable-line:no-bitwise
             isUnionOfStringLiterals(typ)) {
             result.set(fieldName, [TypeScriptType.wrap("string"), !isNullableType(typ)]);
+        } else if (isUnionOfBooleanLiterals(typ)) {
+            result.set(fieldName, [TypeScriptType.wrap("boolean"), !isNullableType(typ)]);
         } else {
             result.set(fieldName, [TypeScriptType.wrap(checker.typeToString(nonNullType(typ))), !isNullableType(typ)]);
         }
@@ -669,6 +671,32 @@ function isUnionOfStringLiterals(type: ts.Type): boolean {
     for (const unionType of types) {
         if (!((unionType.flags & ts.TypeFlags.String) !== 0 || // tslint:disable-line:no-bitwise
             (unionType.flags & ts.TypeFlags.StringLiteral) !== 0 || // tslint:disable-line:no-bitwise
+            (unionType.flags & ts.TypeFlags.Null) !== 0)) { // tslint:disable-line:no-bitwise
+            return false;
+        }
+    }
+
+    return true;
+}
+
+/**
+ * Checks if the type is something like: "true | false".
+ *
+ * One of the union members is also allowed to be `null`: "true | false |
+ * null"
+ *
+ * We would expect TypeScript to report the above forms as "boolean" and
+ * "boolean | null", but sometimes they do look this like
+ */
+function isUnionOfBooleanLiterals(type: ts.Type): boolean {
+    if ((type.flags & ts.TypeFlags.Union) === 0) { // tslint:disable-line:no-bitwise
+        return false;
+    }
+
+    const types: ReadonlyArray<ts.Type> = (<any>type).types;
+    for (const unionType of types) {
+        if (!((unionType.flags & ts.TypeFlags.Boolean) !== 0 || // tslint:disable-line:no-bitwise
+            (unionType.flags & ts.TypeFlags.BooleanLiteral) !== 0 || // tslint:disable-line:no-bitwise
             (unionType.flags & ts.TypeFlags.Null) !== 0)) { // tslint:disable-line:no-bitwise
             return false;
         }
