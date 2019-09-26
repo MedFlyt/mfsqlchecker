@@ -200,6 +200,14 @@ async function main(): Promise<void> {
         dbName = undefined;
     }
     try {
+        process.on(<any>"crash", async () => {
+            if (pgServer !== null) {
+                await pgServer.close();
+                pgServer = null;
+            }
+            process.exit(1);
+        });
+
         process.on("SIGINT", async () => {
             if (pgServer !== null) {
                 await pgServer.close();

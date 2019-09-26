@@ -17,7 +17,7 @@ export class SqlCheckerEngine {
 
     viewLibrary: Map<QualifiedSqlViewName, SqlViewDefinition>;
 
-    checkChangedSourceFiles(projectDir: string, program: ts.Program, checker: ts.TypeChecker, sourceFiles: string[]): Promise<ErrorDiagnostic[]> {
+    async checkChangedSourceFiles(projectDir: string, program: ts.Program, checker: ts.TypeChecker, sourceFiles: string[]): Promise<ErrorDiagnostic[]> {
         const progSourceFiles = program.getSourceFiles().filter(s => !s.isDeclarationFile);
 
         let errorDiagnostics: ErrorDiagnostic[] = [];
@@ -93,13 +93,13 @@ export class SqlCheckerEngine {
             errorDiagnostics = errorDiagnostics.concat(qs);
         }
 
-        return this.dbConnector.validateManifest({
+        const errs = await this.dbConnector.validateManifest({
             queries: resolvedQueries,
             viewLibrary: sqlViews,
             uniqueTableColumnTypes: uniqueTableColumnTypes
-        }).then(errs => {
-            return errorDiagnostics.concat(errs);
         });
+
+        return errorDiagnostics.concat(errs);
     }
 }
 
@@ -281,7 +281,12 @@ export class TypeScriptWatcher {
             }
         } else {
             this.currentlyRunning = true;
-            this.observer.checkChangedSourceFiles(this.projectDir, program, program.getTypeChecker(), sourceFiles.map(s => s.fileName)).then(this.checkerComplete);
+            this.observer.checkChangedSourceFiles(this.projectDir, program, program.getTypeChecker(), sourceFiles.map(s => s.fileName))
+                .then(this.checkerComplete)
+                .catch(err => {
+                    console.error(err);
+                    process.emit(<any>"crash");
+                });
         }
     }
 
@@ -290,7 +295,12 @@ export class TypeScriptWatcher {
             if (this.program === undefined) {
                 throw new Error("The Impossible Happened");
             }
-            this.observer.checkChangedSourceFiles(this.projectDir, this.program, this.program.getTypeChecker(), this.queuedSourceFiles).then(this.checkerComplete);
+            this.observer.checkChangedSourceFiles(this.projectDir, this.program, this.program.getTypeChecker(), this.queuedSourceFiles)
+                .then(this.checkerComplete)
+                .catch(err => {
+                    console.error(err);
+                    process.emit(<any>"crash");
+                });
             this.queuedSourceFiles = [];
         } else {
             this.currentlyRunning = false;
