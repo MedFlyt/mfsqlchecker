@@ -280,6 +280,12 @@ export class Connection<T> {
             throw new Error(`Expected query to return 0 or 1 rows. Got ${rows.length} rows`);
         }
     }
+
+    async unsafeQuery(text: string, values?: any[]): Promise<pg.QueryResult> {
+        const vals: any[] = values !== undefined ? values : [];
+        const queryResult = await clientQueryPromise(this.client, text, vals);
+        return queryResult;
+    }
 }
 
 function escapeIdentifier(str: string) {
