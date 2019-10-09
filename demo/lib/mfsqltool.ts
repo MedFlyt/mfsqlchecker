@@ -26,8 +26,15 @@ export class Connection<T> {
 
     /**
      * May be overriden by child class
+     *
+     * @param debugContext Human-readable text that should part of any
+     * exception message, should describe the name/location of this
+     * placeholder
      */
-    protected formatPlaceholder(placeholder: T): any {
+    protected formatPlaceholder(debugContext: string, placeholder: T): any {
+        // tslint:disable-next-line:no-unused-expression
+        debugContext;
+
         return placeholder;
     }
 
@@ -42,17 +49,23 @@ export class Connection<T> {
         return val;
     }
 
-    private preparePlaceholder(placeholder: number | number[] | string | string[] | boolean | boolean[] | null | T): any {
+    /**
+     * @param debugContext Human-readable text that should part of any
+     * exception message, should describe the name/location of this
+     * placeholder
+     */
+    private preparePlaceholder(debugContext: string, placeholder: number | number[] | string | string[] | boolean | boolean[] | null | T): any {
         if (Array.isArray(placeholder)) {
             const result: any[] = [];
-            for (const elem of placeholder) {
-                result.push(this.preparePlaceholder(elem));
+            for (let i = 0; i < placeholder.length; ++i) {
+                const elem = placeholder[i];
+                result.push(this.preparePlaceholder(debugContext + `, array index ${i}`, elem));
             }
             return result;
         } else if (typeof placeholder === "number" || typeof placeholder === "string" || typeof placeholder === "boolean" || placeholder === null) {
             return placeholder;
         } else {
-            return this.formatPlaceholder(placeholder);
+            return this.formatPlaceholder(debugContext, placeholder);
         }
     }
 
@@ -107,7 +120,7 @@ export class Connection<T> {
         let vals: any[] = [];
         // tslint:disable-next-line:prefer-for-of
         for (let i = 0; i < fields.length; ++i) {
-            vals.push(this.preparePlaceholder((<any>value)[fields[i]]));
+            vals.push(this.preparePlaceholder(`field: "${fields[i]}"`, (<any>value)[fields[i]]));
         }
 
         let epilogueText: string;
@@ -206,9 +219,10 @@ export class Connection<T> {
             vals.push([]);
         }
 
-        for (const value of values) {
-            for (let i = 0; i < fields.length; ++i) {
-                vals[i].push(this.preparePlaceholder((<any>value)[fields[i]]));
+        for (let i = 0; i < values.length; ++i) {
+            const value = values[i];
+            for (let j = 0; j < fields.length; ++j) {
+                vals[j].push(this.preparePlaceholder(`values array element index ${i}, field: "${fields[j]}"`, (<any>value)[fields[j]]));
             }
         }
 
@@ -329,7 +343,7 @@ class SqlQueryExpr<T> {
                 }
                 text += escapeIdentifier(placeholder.getViewName());
             } else {
-                values.push((<any>this.conn).preparePlaceholder(placeholder));
+                values.push((<any>this.conn).preparePlaceholder(`query placeholder index ${i}`, placeholder));
                 text += "($" + (values.length + paramNumOffset) + ")";
             }
 
