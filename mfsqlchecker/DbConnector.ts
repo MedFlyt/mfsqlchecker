@@ -98,7 +98,7 @@ export class DbConnector {
                     if (perr === null) {
                         throw err;
                     } else {
-                        const errorDiagnostic = postgresqlErrorDiagnostic(path.join(this.migrationsDir, matchingFile), text, perr, toSrcSpan(text, perr.position), "Error in migration file");
+                        const errorDiagnostic = postgresqlErrorDiagnostic(path.join(this.migrationsDir, matchingFile), text, perr, perr.position !== null ? toSrcSpan(text, perr.position) : { type: "File" }, "Error in migration file");
                         return [errorDiagnostic];
                     }
                 }
@@ -301,8 +301,8 @@ function viewAnswerToErrorDiagnostics(createView: SqlCreateView, viewAnswer: Vie
         case "CreateError":
             const message = "Error in view \"" + chalk.bold(viewAnswer.viewName) + "\"";
             if (viewAnswer.perr.position !== null) {
-                const p = resolveFromSourceMap(viewAnswer.perr.position, createView.sourceMap);
-                return [postgresqlErrorDiagnostic(createView.fileName, createView.fileContents, viewAnswer.perr, toSrcSpan(createView.fileContents, p), message)];
+                const srcSpan = resolveFromSourceMap(createView.fileContents, viewAnswer.perr.position - 1, createView.sourceMap);
+                return [postgresqlErrorDiagnostic(createView.fileName, createView.fileContents, viewAnswer.perr, srcSpan, message)];
             } else {
                 return [postgresqlErrorDiagnostic(createView.fileName, createView.fileContents, viewAnswer.perr, querySourceStart(createView.fileContents, createView.sourceMap), message)];
             }
@@ -446,8 +446,8 @@ namespace QueryAnswer {
     }
 }
 
-function querySourceStart(fileContents: string, sourceMap: [number, number][]): SrcSpan {
-    return toSrcSpan(fileContents, fileContents.slice(sourceMap[0][1] + 1).search(/\S/) + sourceMap[0][1] + 2);
+function querySourceStart(fileContents: string, sourceMap: [number, number, number][]): SrcSpan {
+    return toSrcSpan(fileContents, fileContents.slice(sourceMap[0][0] + 1).search(/\S/) + sourceMap[0][0] + 2);
 }
 
 function queryAnswerToErrorDiagnostics(query: ResolvedSelect, queryAnswer: SelectAnswer): ErrorDiagnostic[] {
@@ -456,8 +456,8 @@ function queryAnswerToErrorDiagnostics(query: ResolvedSelect, queryAnswer: Selec
             return [];
         case "DescribeError":
             if (queryAnswer.perr.position !== null) {
-                const p = resolveFromSourceMap(queryAnswer.perr.position, query.sourceMap);
-                return [postgresqlErrorDiagnostic(query.fileName, query.fileContents, queryAnswer.perr, toSrcSpan(query.fileContents, p), null)];
+                const srcSpan = resolveFromSourceMap(query.fileContents, queryAnswer.perr.position - 1, query.sourceMap);
+                return [postgresqlErrorDiagnostic(query.fileName, query.fileContents, queryAnswer.perr, srcSpan, null)];
             } else {
                 return [postgresqlErrorDiagnostic(query.fileName, query.fileContents, queryAnswer.perr, querySourceStart(query.fileContents, query.sourceMap), null)];
             }

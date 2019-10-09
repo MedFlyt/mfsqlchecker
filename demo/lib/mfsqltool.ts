@@ -69,7 +69,7 @@ export class Connection<T> {
         }
     }
 
-    sql(literals: TemplateStringsArray, ...placeholders: (SqlView | number | number[] | string | string[] | boolean | boolean[] | null | T)[]): SqlQueryExpr<T> {
+    sql(literals: TemplateStringsArray, ...placeholders: (SqlView | SqlFrag<string> | number | number[] | string | string[] | boolean | boolean[] | null | T)[]): SqlQueryExpr<T> {
         return new SqlQueryExpr(this, literals, placeholders);
     }
 
@@ -326,7 +326,7 @@ function clientQueryPromise(client: pg.Client, text: string, values: any[]) {
 }
 
 class SqlQueryExpr<T> {
-    constructor(private conn: Connection<T>, private literals: TemplateStringsArray, private placeholders: (string | number | boolean | SqlView | number[] | string[] | boolean[] | T | null)[]) {
+    constructor(private conn: Connection<T>, private literals: TemplateStringsArray, private placeholders: (SqlView | SqlFrag<string> | number | number[] | string | string[] | boolean | boolean[] | null | T)[]) {
     }
 
     render(paramNumOffset: number = 0): [string, any[]] {
@@ -342,6 +342,8 @@ class SqlQueryExpr<T> {
                     throw new Error(`View "${placeholder.getViewName()}" has not been created. Views are only allowed to be defined at module-level scope`);
                 }
                 text += escapeIdentifier(placeholder.getViewName());
+            } else if (placeholder instanceof SqlFrag) {
+                text += placeholder.text;
             } else {
                 values.push((<any>this.conn).preparePlaceholder(`query placeholder index ${i}`, placeholder));
                 text += "($" + (values.length + paramNumOffset) + ")";
@@ -462,6 +464,26 @@ function stringifyRealValRow(obj: any): string {
         obj2[key] = obj[key].v;
     }
     return JSON.stringify(obj2);
+}
+
+export class SqlFrag<T extends string> {
+    private constructor(text: string) {
+        this.text = text;
+    }
+
+    readonly text: string;
+
+    protected dummy: SqlFrag<T>[];
+    protected tag: T;
+
+    private static Create<S extends string>(text: string): SqlFrag<S> {
+        SqlFrag.Create;
+        return new SqlFrag<S>(text);
+    }
+}
+
+export function sqlFrag<T extends string>(text: T): SqlFrag<T> {
+    return (<any>SqlFrag).Create(text);
 }
 
 export abstract class SqlView {

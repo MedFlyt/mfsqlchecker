@@ -3,11 +3,12 @@ import * as path from "path";
 import * as ts from "typescript";
 import { Either } from "./either";
 import { ErrorDiagnostic, fileLineCol, nodeErrorDiagnostic } from "./ErrorDiagnostic";
+import { escapeIdentifier } from "./pg_extra";
 import { identifierImportedFrom, isIdentifierFromModule, ModuleId } from "./ts_extra";
 import { calcViewName } from "./view_names";
 
 function viewNameLength(varName: string | null): number {
-    return calcViewName(varName, "").length;
+    return escapeIdentifier(calcViewName(varName, "")).length;
 }
 
 export function resolveViewIdentifier(projectDir: string, sourceFile: ts.SourceFile, ident: ts.Identifier): QualifiedSqlViewName {
@@ -25,13 +26,13 @@ export function resolveViewIdentifier(projectDir: string, sourceFile: ts.SourceF
 export class SqlViewDefinition {
     static parseFromTemplateExpression(projectDir: string, sourceFile: ts.SourceFile, varName: string | null, node: ts.TemplateLiteral): Either<ErrorDiagnostic, SqlViewDefinition> {
         if (ts.isNoSubstitutionTemplateLiteral(node)) {
-            const sourceMap: [number, number][] = [[0, node.pos]];
+            const sourceMap: [number, number, number][] = [[node.end - node.text.length, 0, node.text.length]];
             return {
                 type: "Right",
                 value: new SqlViewDefinition(sourceFile.fileName, sourceFile.text, varName, [{ type: "StringFragment", text: node.text }], sourceMap)
             };
         } else if (ts.isTemplateExpression(node)) {
-            const sourceMap: [number, number][] = [];
+            const sourceMap: [number, number, number][] = [];
 
             const fragments: SqlViewDefinition.Fragment[] = [];
             fragments.push({ type: "StringFragment", text: node.head.text });
@@ -42,11 +43,12 @@ export class SqlViewDefinition {
             // starts at the beginning of the whitespace (so we use this
             // formula to guarantee that we get the position of the start of
             // the opening quote (`) char)
-            sourceMap.push([c, node.head.end - node.head.text.length - 3]);
+            sourceMap.push([node.head.end - node.head.text.length - 1, c, c + node.head.text.length]);
 
             c += node.head.text.length;
 
-            for (const span of node.templateSpans) {
+            for (let i = 0; i < node.templateSpans.length; ++i) {
+                const span = node.templateSpans[i];
                 if (!ts.isIdentifier(span.expression)) {
                     return {
                         type: "Left",
@@ -60,7 +62,9 @@ export class SqlViewDefinition {
                 c += viewNameLength(span.expression.text);
 
                 fragments.push({ type: "StringFragment", text: span.literal.text });
-                sourceMap.push([c, span.literal.pos]);
+                sourceMap.push([span.literal.end - span.literal.text.length -
+                    (i < node.templateSpans.length - 1 ? 1 : 0) // The end of the last template span is different from the others
+                    , c, c + span.literal.text.length]);
 
                 c += span.literal.text.length;
             }
@@ -106,7 +110,7 @@ export class SqlViewDefinition {
         for (let i = 0; i < this.fragments.length; ++i) {
             const frag = this.fragments[i];
             if (frag.type === "ViewReference" && frag.qualifiedSqlViewName === dependency) {
-                this.fragments[i] = { type: "StringFragment", text: "\"" + viewName + "\"" };
+                this.fragments[i] = { type: "StringFragment", text: escapeIdentifier(viewName) };
             }
         }
     }
@@ -130,7 +134,7 @@ export class SqlViewDefinition {
         return this.fileContents;
     }
 
-    getSourceMap(): [number, number][] {
+    getSourceMap(): [number, number, number][] {
         return this.sourceMap;
     }
 
@@ -160,7 +164,7 @@ export class SqlViewDefinition {
         return `${this.varName} ${JSON.stringify(this.dependencies)} ${JSON.stringify(this.fragments)}`;
     }
 
-    private constructor(fileName: string, fileContents: string, varName: string | null, fragments: SqlViewDefinition.Fragment[], sourceMap: [number, number][]) {
+    private constructor(fileName: string, fileContents: string, varName: string | null, fragments: SqlViewDefinition.Fragment[], sourceMap: [number, number, number][]) {
         this.fileName = fileName;
         this.fileContents = fileContents;
         this.sourceMap = sourceMap;
@@ -178,7 +182,7 @@ export class SqlViewDefinition {
 
     private readonly fileName: string;
     private readonly fileContents: string;
-    private readonly sourceMap: [number, number][];
+    private readonly sourceMap: [number, number, number][];
     private readonly varName: string | null;
     private readonly initialFragments: SqlViewDefinition.Fragment[];
     private readonly dependencies: QualifiedSqlViewName[];
@@ -211,7 +215,7 @@ export interface SqlCreateView {
     readonly createQuery: string;
     readonly fileName: string;
     readonly fileContents: string;
-    readonly sourceMap: [number, number][];
+    readonly sourceMap: [number, number, number][];
 }
 
 function fullyResolveSqlViewDefinition(v: SqlViewDefinition, myName: QualifiedSqlViewName, library: Map<QualifiedSqlViewName, SqlViewDefinition>): ErrorDiagnostic[] {
@@ -225,7 +229,7 @@ function fullyResolveSqlViewDefinition(v: SqlViewDefinition, myName: QualifiedSq
             return [{
                 fileName: v.getFileName(),
                 fileContents: v.getFileContents(),
-                span: fileLineCol(v.getFileContents(), v.getSourceMap()[0][1]),
+                span: fileLineCol(v.getFileContents(), v.getSourceMap()[0][0]),
                 messages: [`View depends on itself: "${QualifiedSqlViewName.viewName(myName)}"`],
                 epilogue: null,
                 quickFix: null
@@ -237,7 +241,7 @@ function fullyResolveSqlViewDefinition(v: SqlViewDefinition, myName: QualifiedSq
             return [{
                 fileName: v.getFileName(),
                 fileContents: v.getFileContents(),
-                span: fileLineCol(v.getFileContents(), v.getSourceMap()[0][1]),
+                span: fileLineCol(v.getFileContents(), v.getSourceMap()[0][0]),
                 messages: [`Missing dependency in view "${QualifiedSqlViewName.viewName(myName)}": "${QualifiedSqlViewName.viewName(depName)}" (from module "${QualifiedSqlViewName.moduleId(depName)}"`],
                 epilogue: null,
                 quickFix: null

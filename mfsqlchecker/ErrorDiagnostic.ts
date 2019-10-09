@@ -22,9 +22,9 @@ export interface ErrorDiagnostic {
 
 export function fileLineCol(fileContents: string, position: number): SrcSpan.LineAndCol {
     let line = 1;
-    let col = 0;
+    let col = 1;
     for (let i = 0; i < position; ++i) {
-        if (fileContents.codePointAt(i) === 10) {
+        if (fileContents.codePointAt(i) === 0x0A /* "\n" */) {
             line++;
             col = 0;
         }
@@ -37,10 +37,7 @@ export function fileLineCol(fileContents: string, position: number): SrcSpan.Lin
     };
 }
 
-export function toSrcSpan(fileContents: string, position: number | null): SrcSpan {
-    if (position === null) {
-        return { type: "File" };
-    }
+export function toSrcSpan(fileContents: string, position: number): SrcSpan.LineAndCol {
     return fileLineCol(fileContents, position - 1);
 }
 
@@ -88,15 +85,39 @@ export type SrcSpan = SrcSpan.LineAndColRange | SrcSpan.LineAndCol | SrcSpan.Fil
 export namespace SrcSpan {
     export interface LineAndColRange {
         type: "LineAndColRange";
+
+        /**
+         * First line of the file is 1
+         */
         startLine: number;
+
+        /**
+         * First column is 1
+         */
         startCol: number;
+
+        /**
+         * First line of the file is 1
+         */
         endLine: number;
+
+        /**
+         * First column is 1
+         */
         endCol: number;
     }
 
     export interface LineAndCol {
         type: "LineAndCol";
+
+        /**
+         * First line of the file is 1
+         */
         line: number;
+
+        /**
+         * First column is 1
+         */
         col: number;
     }
 

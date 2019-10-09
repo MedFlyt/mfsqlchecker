@@ -1,5 +1,5 @@
 import * as pg from "pg";
-import { defineSqlView, Connection, Req, Opt, migrateDatabase } from "./lib/mfsqltool";
+import { defineSqlView, Connection, Req, Opt, migrateDatabase, sqlFrag } from "./lib/mfsqltool";
 import { EmployeeId, CarId, CustomerId, DepartmentId } from "./types";
 
 // import { coolView } from "./blah";
@@ -44,6 +44,15 @@ export async function test() {
         AND id = ANY(${goodEmployees})
         `);
 
+    const employeeColsFrag = sqlFrag(
+        `
+        employee.fname,
+        employee.lname,
+        employee.phonenumber,
+        employee.salary,
+        employee.manager_id,
+        `);
+
     // const rows = await query<{ name: string, age: number }>(conn, sql
     const rows = await conn.query<{
         fname: Req<string>,
@@ -56,11 +65,7 @@ export async function test() {
     }>(conn.sql
         `
         SELECT
-            employee.fname,
-            employee.lname,
-            employee.phonenumber,
-            employee.salary,
-            employee.manager_id,
+            ${employeeColsFrag}
             e.fname AS managerName,
             ${badView}.num AS "badViewNum"
         FROM
@@ -123,8 +128,8 @@ async function logger(msg: string): Promise<void> {
 }
 
 interface Department {
-    id: number;
-    name: string | null;
+    id: DepartmentId;
+    name: string;
 }
 
 export async function main() {
@@ -138,7 +143,7 @@ export async function main() {
         const id1: DepartmentId = null as any;
 
         const values: Department[] = [
-            { id: 1, name: "dep1" },
+            { id: id1, name: "dep1" },
             // { id: 2, name: "dep2" },
             // { id: 6, name: "dep6" },
             // { id: id1, name: "hi" }

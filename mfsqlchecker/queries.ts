@@ -56,7 +56,7 @@ export interface ResolvedSelect {
 
     readonly text: string;
 
-    readonly sourceMap: [number, number][];
+    readonly sourceMap: [number, number, number][];
 
     /**
      * `null` means that the typeArgument was explicitly declared as `any`
@@ -88,7 +88,7 @@ export interface ResolvedInsert {
 
     readonly text: string;
 
-    readonly sourceMap: [number, number][];
+    readonly sourceMap: [number, number, number][];
 
     /**
      * `null` means that the typeArgument was explicitly declared as `any`
@@ -138,7 +138,7 @@ function buildQueryFragments(sqlExp: ts.Expression): Either<ErrorDiagnostic[], Q
             value: [{
                 type: "StringFragment",
                 text: sqlExp.template.text,
-                sourcePosStart: sqlExp.template.end - sqlExp.template.text.length - 2
+                sourcePosStart: sqlExp.template.end - sqlExp.template.text.length
             }]
         };
     } else if (ts.isTemplateExpression(sqlExp.template)) {
@@ -146,15 +146,17 @@ function buildQueryFragments(sqlExp: ts.Expression): Either<ErrorDiagnostic[], Q
         fragments.push({
             type: "StringFragment",
             text: sqlExp.template.head.text,
-            sourcePosStart: sqlExp.template.head.end - sqlExp.template.head.text.length - 2
+            sourcePosStart: sqlExp.template.head.end - sqlExp.template.head.text.length - 1
         });
 
-        for (const span of sqlExp.template.templateSpans) {
+        for (let i = 0; i < sqlExp.template.templateSpans.length; ++i) {
+            const span = sqlExp.template.templateSpans[i];
             fragments.push({ type: "Expression", exp: span.expression });
             fragments.push({
                 type: "StringFragment",
                 text: span.literal.text,
-                sourcePosStart: span.literal.pos
+                sourcePosStart: span.literal.end - span.literal.text.length
+                    - (i < sqlExp.template.templateSpans.length - 1 ? 1 : 0) // The end of the last template span is different from the others
             });
         }
 
@@ -537,6 +539,49 @@ function isTypeSqlView(type: ts.Type): boolean {
     return symbol.name === "SqlView";
 }
 
+/**
+ * @returns `null` if the type is not an SqlFrag<T>
+ */
+function tryTypeSqlFrag(type: ts.Type): Either<string, string | null> {
+    // TODO This should be more robust: make sure that it is the "SqlFrag"
+    // type defined in the sql library (and not some other user-defined type
+    // that happens to have the same name)
+
+    const symbol: ts.Symbol | undefined = <ts.Symbol | undefined>type.symbol;
+    if (symbol === undefined) {
+        return {
+            type: "Right",
+            value: null
+        };
+    }
+
+    if (symbol.name === "SqlFrag") {
+        const typeArguments = (<any>type).typeArguments;
+        if (Array.isArray(typeArguments)) {
+            if (typeArguments.length === 1) {
+                if (typeArguments[0].flags === ts.TypeFlags.String) {
+                    return {
+                        type: "Left",
+                        value: "Invalid call to `sqlFrag`: argument must be a String Literal (not a dynamic string)"
+                    };
+                } else if (typeArguments[0].flags === ts.TypeFlags.StringLiteral) {
+                    if (typeof typeArguments[0].value === "string") {
+                        return {
+                            type: "Right",
+                            value: typeArguments[0].value
+                        };
+                    }
+                }
+            }
+        }
+    }
+
+    return {
+        type: "Right",
+        value: null
+    };
+}
+
 export function isNullableType(type: ts.Type): boolean {
     if (!type.isUnion()) {
         return type.flags === ts.TypeFlags.Null;
@@ -912,51 +957,63 @@ function resolveQueryFragment(typeScriptUniqueColumnTypes: Map<TypeScriptType, S
     const errors: ErrorDiagnostic[] = [];
 
     let text = "";
-    const sourceMap: [number, number][] = [];
+    const sourceMap: [number, number, number][] = [];
     let numParams = 0;
     for (const frag of query.queryFragments) {
         switch (frag.type) {
             case "StringFragment":
-                sourceMap.push([text.length, frag.sourcePosStart]);
+                sourceMap.push([frag.sourcePosStart, text.length, text.length + frag.text.length]);
                 text += frag.text;
                 break;
             case "Expression":
                 const type = checker.getTypeAtLocation(frag.exp);
-                if (isTypeSqlView(type)) {
-                    if (!ts.isIdentifier(frag.exp)) {
-                        errors.push(nodeErrorDiagnostic(frag.exp, "SQL View Reference must be an identifier (not an expression)"));
-                    } else {
-                        const qualifiedSqlViewName = resolveViewIdentifier(projectDir, frag.exp.getSourceFile(), frag.exp);
-                        const viewName = lookupViewName(qualifiedSqlViewName);
-                        if (viewName === undefined) {
-                            errors.push(nodeErrorDiagnostic(frag.exp, "SQL View Reference not found or has errors: \"" + chalk.bold(QualifiedSqlViewName.viewName(qualifiedSqlViewName)) + "\""));
+                const maybeSqlFrag = tryTypeSqlFrag(type);
+                switch (maybeSqlFrag.type) {
+                    case "Left":
+                        errors.push(nodeErrorDiagnostic(frag.exp, maybeSqlFrag.value));
+                        break;
+                    case "Right":
+                        if (maybeSqlFrag.value !== null) {
+                            text += maybeSqlFrag.value;
+                        } else if (isTypeSqlView(type)) {
+                            if (!ts.isIdentifier(frag.exp)) {
+                                errors.push(nodeErrorDiagnostic(frag.exp, "SQL View Reference must be an identifier (not an expression)"));
+                            } else {
+                                const qualifiedSqlViewName = resolveViewIdentifier(projectDir, frag.exp.getSourceFile(), frag.exp);
+                                const viewName = lookupViewName(qualifiedSqlViewName);
+                                if (viewName === undefined) {
+                                    errors.push(nodeErrorDiagnostic(frag.exp, "SQL View Reference not found or has errors: \"" + chalk.bold(QualifiedSqlViewName.viewName(qualifiedSqlViewName)) + "\""));
+                                } else {
+                                    text += '"' + viewName + '"';
+                                }
+                            }
                         } else {
-                            text += '"' + viewName + '"';
+                            const sqlType = typescriptTypeToSqlType(typeScriptUniqueColumnTypes, nonNullType(type));
+                            if (sqlType === null) {
+                                const typeStr = checker.typeToString(type, frag.exp);
+                                errors.push(nodeErrorDiagnostic(frag.exp, `Invalid type for SQL parameter: ${typeStr}`));
+                            } else {
+                                numParams++;
+                                const sqlTypeStr = SqlType.unwrap(sqlType);
+
+                                // Ugly hack for detecing an sql array type
+                                //
+                                // WRONG: "myType[]" RIGHT: "myType"[]
+                                //
+                                // The correct (non-hacky) way to do this is to change
+                                // "SqlType" from a string to a real type with an
+                                // (isArray: boolean) prop
+
+                                const escapedSqlTypeStr = sqlTypeStr.endsWith("[]")
+                                    ? escapeIdentifier(sqlTypeStr.substring(0, sqlTypeStr.length - 2)) + "[]"
+                                    : escapeIdentifier(sqlTypeStr);
+
+                                text += "($" + numParams + (sqlTypeStr !== "" ? "::" + escapedSqlTypeStr : "") + ")";
+                            }
                         }
-                    }
-                } else {
-                    const sqlType = typescriptTypeToSqlType(typeScriptUniqueColumnTypes, nonNullType(type));
-                    if (sqlType === null) {
-                        const typeStr = checker.typeToString(type, frag.exp);
-                        errors.push(nodeErrorDiagnostic(frag.exp, `Invalid type for SQL parameter: ${typeStr}`));
-                    } else {
-                        numParams++;
-                        const sqlTypeStr = SqlType.unwrap(sqlType);
-
-                        // Ugly hack for detecing an sql array type
-                        //
-                        // WRONG: "myType[]" RIGHT: "myType"[]
-                        //
-                        // The correct (non-hacky) way to do this is to change
-                        // "SqlType" from a string to a real type with an
-                        // (isArray: boolean) prop
-
-                        const escapedSqlTypeStr = sqlTypeStr.endsWith("[]")
-                            ? "\"" + sqlTypeStr.substring(0, sqlTypeStr.length - 2) + "\"[]"
-                            : "\"" + sqlTypeStr + "\"";
-
-                        text += "($" + numParams + (sqlTypeStr !== "" ? "::" + escapedSqlTypeStr : "") + ")";
-                    }
+                        break;
+                    default:
+                        assertNever(maybeSqlFrag);
                 }
                 break;
             default:
@@ -1013,51 +1070,63 @@ function resolveInsertMany(typeScriptUniqueColumnTypes: Map<TypeScriptType, SqlT
 
     const queryFragments: QueryCallExpression.QueryFragment[] = insertFragment.concat(query.epilougeFragments);
 
-    const sourceMap: [number, number][] = [];
+    const sourceMap: [number, number, number][] = [];
     let numParams = 0;
     for (const frag of queryFragments) {
         switch (frag.type) {
             case "StringFragment":
-                sourceMap.push([text.length, frag.sourcePosStart]);
+                sourceMap.push([frag.sourcePosStart, text.length, text.length + frag.text.length]);
                 text += frag.text;
                 break;
             case "Expression":
                 const type = checker.getTypeAtLocation(frag.exp);
-                if (isTypeSqlView(type)) {
-                    if (!ts.isIdentifier(frag.exp)) {
-                        errors.push(nodeErrorDiagnostic(frag.exp, "SQL View Reference must be an identifier (not an expression)"));
-                    } else {
-                        const qualifiedSqlViewName = resolveViewIdentifier(projectDir, frag.exp.getSourceFile(), frag.exp);
-                        const viewName = lookupViewName(qualifiedSqlViewName);
-                        if (viewName === undefined) {
-                            errors.push(nodeErrorDiagnostic(frag.exp, "SQL View Reference not found or has errors: \"" + chalk.bold(QualifiedSqlViewName.viewName(qualifiedSqlViewName)) + "\""));
+                const maybeSqlFrag = tryTypeSqlFrag(type);
+                switch (maybeSqlFrag.type) {
+                    case "Left":
+                        errors.push(nodeErrorDiagnostic(frag.exp, maybeSqlFrag.value));
+                        break;
+                    case "Right":
+                        if (maybeSqlFrag.value !== null) {
+                            text += maybeSqlFrag.value;
+                        } else if (isTypeSqlView(type)) {
+                            if (!ts.isIdentifier(frag.exp)) {
+                                errors.push(nodeErrorDiagnostic(frag.exp, "SQL View Reference must be an identifier (not an expression)"));
+                            } else {
+                                const qualifiedSqlViewName = resolveViewIdentifier(projectDir, frag.exp.getSourceFile(), frag.exp);
+                                const viewName = lookupViewName(qualifiedSqlViewName);
+                                if (viewName === undefined) {
+                                    errors.push(nodeErrorDiagnostic(frag.exp, "SQL View Reference not found or has errors: \"" + chalk.bold(QualifiedSqlViewName.viewName(qualifiedSqlViewName)) + "\""));
+                                } else {
+                                    text += '"' + viewName + '"';
+                                }
+                            }
                         } else {
-                            text += '"' + viewName + '"';
+                            const sqlType = typescriptTypeToSqlType(typeScriptUniqueColumnTypes, nonNullType(type));
+                            if (sqlType === null) {
+                                const typeStr = checker.typeToString(type, frag.exp);
+                                errors.push(nodeErrorDiagnostic(frag.exp, `Invalid type for SQL parameter: ${typeStr}`));
+                            } else {
+                                numParams++;
+                                const sqlTypeStr = SqlType.unwrap(sqlType);
+
+                                // Ugly hack for detecing an sql array type
+                                //
+                                // WRONG: "myType[]" RIGHT: "myType"[]
+                                //
+                                // The correct (non-hacky) way to do this is to change
+                                // "SqlType" from a string to a real type with an
+                                // (isArray: boolean) prop
+
+                                const escapedSqlTypeStr = sqlTypeStr.endsWith("[]")
+                                    ? escapeIdentifier(sqlTypeStr.substring(0, sqlTypeStr.length - 2)) + "[]"
+                                    : escapeIdentifier(sqlTypeStr);
+
+                                text += "($" + numParams + (sqlTypeStr !== "" ? "::" + escapedSqlTypeStr : "") + ")";
+                            }
                         }
-                    }
-                } else {
-                    const sqlType = typescriptTypeToSqlType(typeScriptUniqueColumnTypes, nonNullType(type));
-                    if (sqlType === null) {
-                        const typeStr = checker.typeToString(type, frag.exp);
-                        errors.push(nodeErrorDiagnostic(frag.exp, `Invalid type for SQL parameter: ${typeStr}`));
-                    } else {
-                        numParams++;
-                        const sqlTypeStr = SqlType.unwrap(sqlType);
-
-                        // Ugly hack for detecing an sql array type
-                        //
-                        // WRONG: "myType[]" RIGHT: "myType"[]
-                        //
-                        // The correct (non-hacky) way to do this is to change
-                        // "SqlType" from a string to a real type with an
-                        // (isArray: boolean) prop
-
-                        const escapedSqlTypeStr = sqlTypeStr.endsWith("[]")
-                            ? escapeIdentifier(sqlTypeStr.substring(0, sqlTypeStr.length - 2)) + "[]"
-                            : escapeIdentifier(sqlTypeStr);
-
-                        text += "($" + numParams + (sqlTypeStr !== "" ? "::" + escapedSqlTypeStr : "") + ")";
-                    }
+                        break;
+                    default:
+                        assertNever(maybeSqlFrag);
                 }
                 break;
             default:
