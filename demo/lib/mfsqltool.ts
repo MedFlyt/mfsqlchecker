@@ -583,11 +583,48 @@ export class MigrationError extends Error {
 }
 
 /**
- * @throws `MigrationError` If the migration failed for any reason. The
- * database will be left in its original state
+ * Determines which migration files have not yet been run on the database, and
+ * executes them. Will also create all of the mfsqlchecker views. Everything
+ * will be run inside a transaction.
+ *
+ * @throws `MigrationError` If the migration failed for any reason. The database
+ * will be left in its original state
  */
 export async function migrateDatabase(conn: pg.Client, migrationsDir: string, logger: (message: string) => Promise<void>): Promise<void> {
     await Migrate.migrate(conn, migrationsDir, allSqlViewCreateStatements.map(sqlViewPrivate), logger);
+}
+
+/**
+ * Create all of the mfsqlchecker views. Normally you should just use
+ * `migrateDatabase`, which will also take care of this step.
+ *
+ * One valid use for this function is when you have cloned a database that you
+ * are sure already has all of the migrations applied to it, but might be
+ * missing the views.
+ *
+ * After you call this function you must call `setAllViewsResolved`.
+ */
+export async function createAllViews(conn: pg.Client) {
+    await Migrate.createViews(conn, allSqlViewCreateStatements.map(sqlViewPrivate));
+}
+
+/**
+ * You must call this if you use `createAllViews`. The reason this is a separate
+ * function is in case you call `createAllViews` inside a transaction, then you
+ * should call this only after the transaction succesfully commits.
+ */
+export function setAllViewsResolved(): void {
+    Migrate.setViewsResolved(allSqlViewCreateStatements.map(sqlViewPrivate));
+}
+
+/**
+ * It is recommended to use `migrateDatabase` instead of this. Only use this
+ * function if you have some other process that always runs `migrateDatabase`
+ */
+export function markAllViewsResolved() {
+    for (const view of allSqlViewCreateStatements) {
+        sqlViewPrivate(view).setResolved();
+    }
 }
 
 namespace Migrate {
@@ -780,21 +817,28 @@ namespace Migrate {
                 });
             }
 
-            // Create all of the views:
-
-            let combinedCreateVewsQuery: string = "";
-            for (const v of views) {
-                combinedCreateVewsQuery += v.getCreateQuery() + ";\n";
-            }
             await logger(`Creating ${views.length} views...`);
-            await tryRunPg("run combined CREATE VIEW statements", () => conn.query(combinedCreateVewsQuery));
+            await tryRunPg("run combined CREATE VIEW statements", () => createViews(conn, views));
         });
 
+        setViewsResolved(views);
+
+        await logger("Migration complete");
+    }
+
+    export async function createViews(conn: pg.Client, views: SqlViewPrivate[]): Promise<void> {
+        let combinedCreateVewsQuery: string = "";
+        for (const v of views) {
+            combinedCreateVewsQuery += v.getCreateQuery() + ";\n";
+        }
+
+        await conn.query(combinedCreateVewsQuery);
+    }
+
+    export function setViewsResolved(views: SqlViewPrivate[]): void {
         for (const v of views) {
             v.setResolved();
         }
-
-        await logger("Migration complete");
     }
 
     async function createSchemaVersionTable(conn: pg.Client): Promise<void> {
