@@ -18,6 +18,14 @@ export interface QueryCallExpression {
 
     readonly typeArgument: ts.TypeNode | null;
     readonly typeArgumentSpan: SrcSpan;
+
+    /**
+     * Number of space characters that the line is indented (4, 8, 12, etc...)
+     *
+     * Currently we only supported 4-space indentation style
+     */
+    readonly indentLevel: number;
+
     readonly queryFragments: QueryCallExpression.QueryFragment[];
 }
 
@@ -42,6 +50,14 @@ export interface InsertManyExpression {
     readonly tableName: string;
     readonly tableNameExprSpan: SrcSpan;
     readonly insertExprSpan: SrcSpan;
+
+    /**
+     * Number of space characters that the line is indented (4, 8, 12, etc...)
+     *
+     * Currently we only supported 4-space indentation style
+     */
+    readonly indentLevel: number;
+
     readonly insertColumns: Map<string, [TypeScriptType, boolean]>;
     readonly epilougeFragments: QueryCallExpression.QueryFragment[];
 }
@@ -74,6 +90,13 @@ export interface ResolvedSelect {
     readonly colTypeSpan: SrcSpan;
 
     /**
+     * Number of space characters that the line is indented (4, 8, 12, etc...)
+     *
+     * Currently we only supported 4-space indentation style
+     */
+    readonly indentLevel: number;
+
+    /**
      * Errors that were discovered that should be reported
      */
     readonly errors: ErrorDiagnostic[];
@@ -104,6 +127,13 @@ export interface ResolvedInsert {
     readonly queryMethodName: string | null;
 
     readonly colTypeSpan: SrcSpan;
+
+    /**
+     * Number of space characters that the line is indented (4, 8, 12, etc...)
+     *
+     * Currently we only supported 4-space indentation style
+     */
+    readonly indentLevel: number;
 
     readonly tableNameExprSpan: SrcSpan;
     readonly insertExprSpan: SrcSpan;
@@ -200,6 +230,14 @@ function buildTypeArgumentData(sourceFile: ts.SourceFile, node: ts.CallExpressio
     }
 }
 
+function getIndentLevel(sourceFile: ts.SourceFile, node: ts.Node): number {
+    const sourceFileText = sourceFile.getFullText();
+    const nlPos = sourceFileText.lastIndexOf("\n", node.pos);
+    const lineText = sourceFileText.substring(nlPos + 1, node.pos);
+    const indentLevel = lineText.search(/\S/);
+    return indentLevel;
+}
+
 /**
  * Expects a node that looks something like this:
  *
@@ -239,6 +277,7 @@ function buildQueryCallExpression(methodName: string, node: ts.CallExpression): 
                     queryMethodName: typeArgument === null ? methodName : null,
                     typeArgument: typeArgument,
                     typeArgumentSpan: typeArgumentSpan,
+                    indentLevel: getIndentLevel(sourceFile, node),
                     queryFragments: queryFragments.value
                 }
             };
@@ -319,6 +358,7 @@ function buildInsertCallExpression(checker: ts.TypeChecker, methodName: string, 
                     tableName: tableNameArg.text,
                     tableNameExprSpan: nodeLineAndColSpan(sourceFile, tableNameArg),
                     insertExprSpan: nodeLineAndColSpan(sourceFile, valuesArg),
+                    indentLevel: getIndentLevel(sourceFile, node),
                     insertColumns: objectFieldTypes.value,
                     epilougeFragments: epilougeFragments
                 }
@@ -404,6 +444,7 @@ function buildInsertManyCallExpression(checker: ts.TypeChecker, methodName: stri
                     tableName: tableNameArg.text,
                     tableNameExprSpan: nodeLineAndColSpan(sourceFile, tableNameArg),
                     insertExprSpan: nodeLineAndColSpan(sourceFile, valuesArg),
+                    indentLevel: getIndentLevel(sourceFile, node),
                     insertColumns: objectFieldTypes.value,
                     epilougeFragments: epilougeFragments
                 }
@@ -1049,6 +1090,7 @@ function resolveQueryFragment(typeScriptUniqueColumnTypes: Map<TypeScriptType, S
                 colTypes: colTypes,
                 queryMethodName: query.queryMethodName,
                 colTypeSpan: query.typeArgumentSpan,
+                indentLevel: query.indentLevel,
                 errors: errors
             }
         };
@@ -1166,6 +1208,7 @@ function resolveInsertMany(typeScriptUniqueColumnTypes: Map<TypeScriptType, SqlT
                 colTypeSpan: query.typeArgumentSpan,
                 tableNameExprSpan: query.tableNameExprSpan,
                 insertExprSpan: query.insertExprSpan,
+                indentLevel: query.indentLevel,
                 errors: errors
             }
         };

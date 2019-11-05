@@ -472,18 +472,39 @@ function queryAnswerToErrorDiagnostics(query: ResolvedSelect, queryAnswer: Selec
             }];
         case "WrongColumnTypes":
             let replacementText: string;
-            if (query.queryMethodName === null) {
-                if (queryAnswer.renderedColTypes.split("\n").length > 3) {
-                    replacementText = "<\n//#region ColTypes\n" + queryAnswer.renderedColTypes + "\n//#endregion\n>";
-            } else {
-                    replacementText = "<" + queryAnswer.renderedColTypes + ">";
+
+            let colTypes = queryAnswer.renderedColTypes.split("\n");
+            if (colTypes.length === 2) {
+                // {
+                // }
+                replacementText = "<{}>";
+            } else if (colTypes.length === 3) {
+                // {
+                //   foo: Req<number>
+                // }
+                colTypes = colTypes.map(c => c.trimLeft());
+                colTypes[1] = " ".repeat(query.indentLevel + 4) + colTypes[1];
+                colTypes[2] = " ".repeat(query.indentLevel) + colTypes[2];
+                replacementText = "<" + colTypes.join("\n") + ">";
+            } else if (colTypes.length > 3) {
+                // {
+                //   foo: Req<number>,
+                //   bar: Opt<string>
+                // }
+                colTypes = colTypes.map(c => c.trimLeft());
+                colTypes[0] = " ".repeat(query.indentLevel + 4) + colTypes[0];
+                for (let i = 1; i < colTypes.length - 1; ++i) {
+                    colTypes[i] = " ".repeat(query.indentLevel + 8) + colTypes[i];
                 }
+                colTypes[colTypes.length - 1] = " ".repeat(query.indentLevel + 4) + colTypes[colTypes.length - 1];
+                replacementText = "<\n" + " ".repeat(query.indentLevel + 4) + "//#region ColTypes\n" + colTypes.join("\n") + "\n" + " ".repeat(query.indentLevel) + "//#endregion\n" + " ".repeat(query.indentLevel) + ">";
             } else {
-                if (queryAnswer.renderedColTypes.split("\n").length > 3) {
-                    replacementText = query.queryMethodName + "<\n//#region ColTypes\n" + queryAnswer.renderedColTypes + "\n//#endregion\n>";
-                } else {
-                replacementText = query.queryMethodName + "<" + queryAnswer.renderedColTypes + ">";
+                // This can't happen because the open and close braces each take up a line
+                throw new Error(`colTypes.length < 2: ${queryAnswer.renderedColTypes}`);
             }
+
+            if (query.queryMethodName !== null) {
+                replacementText = query.queryMethodName + replacementText;
             }
 
             return [{
