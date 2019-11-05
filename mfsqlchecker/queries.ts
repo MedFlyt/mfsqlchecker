@@ -182,16 +182,22 @@ function nodeLineAndColSpan(sourceFile: ts.SourceFile, node: ts.Node): SrcSpan.L
 }
 
 function buildTypeArgumentData(sourceFile: ts.SourceFile, node: ts.CallExpression): [ts.TypeNode | null, SrcSpan] {
-    const typeArgument: ts.TypeNode | null =
-        node.typeArguments === undefined || node.typeArguments.length === 0
-            ? null
-            : node.typeArguments[0];
+    if (node.typeArguments === undefined || node.typeArguments.length === 0) {
+        return [null, nodeLineAndColSpan(sourceFile, (<any>node.expression).name)];
+    } else {
+        const start = sourceFile.getLineAndCharacterOfPosition(node.expression.end);
+        const end = sourceFile.getLineAndCharacterOfPosition(node.arguments.pos - 1);
 
-    const typeArgumentSpan: SrcSpan = typeArgument !== null
-        ? nodeLineAndColSpan(sourceFile, typeArgument)
-        : nodeLineAndColSpan(sourceFile, (<any>node.expression).name);
+        const span: SrcSpan.LineAndColRange = {
+            type: "LineAndColRange",
+            startLine: start.line + 1,
+            startCol: start.character + 1,
+            endLine: end.line + 1,
+            endCol: end.character + 1
+        };
 
-    return [typeArgument, typeArgumentSpan];
+        return [node.typeArguments[0], span];
+    }
 }
 
 /**

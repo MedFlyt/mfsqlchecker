@@ -473,9 +473,17 @@ function queryAnswerToErrorDiagnostics(query: ResolvedSelect, queryAnswer: Selec
         case "WrongColumnTypes":
             let replacementText: string;
             if (query.queryMethodName === null) {
-                replacementText = queryAnswer.renderedColTypes;
+                if (queryAnswer.renderedColTypes.split("\n").length > 3) {
+                    replacementText = "<\n//#region ColTypes\n" + queryAnswer.renderedColTypes + "\n//#endregion\n>";
             } else {
+                    replacementText = "<" + queryAnswer.renderedColTypes + ">";
+                }
+            } else {
+                if (queryAnswer.renderedColTypes.split("\n").length > 3) {
+                    replacementText = query.queryMethodName + "<\n//#region ColTypes\n" + queryAnswer.renderedColTypes + "\n//#endregion\n>";
+                } else {
                 replacementText = query.queryMethodName + "<" + queryAnswer.renderedColTypes + ">";
+            }
             }
 
             return [{
