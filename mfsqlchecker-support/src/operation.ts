@@ -82,15 +82,6 @@ export function start(context: vscode.ExtensionContext): State {
                         quickFixAction.edit.replace(document.uri, diag.range, quickFix.replacementText);
                         quickFixAction.kind = vscode.CodeActionKind.QuickFix;
 
-                        // TODO Figure out how to format the entire range of the
-                        // changed text (this only formats the last line). There
-                        // doesn't seem to be an easy way to do this from here.
-                        // (Might have to manually figure out the indents)
-                        quickFixAction.command = {
-                            title: "Format",
-                            command: "editor.action.formatSelection"
-                        };
-
                         quickFixActions.push(quickFixAction);
                     }
                 }
