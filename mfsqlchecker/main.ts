@@ -56,7 +56,7 @@ function parseFormat(value: string): Format {
 
 function parseOptions(): Options {
     const program = new commander.Command();
-    program.version("0.0.1");
+    program.version("0.0.13");
 
     program
         .option("-w, --watch", "watch mode")
