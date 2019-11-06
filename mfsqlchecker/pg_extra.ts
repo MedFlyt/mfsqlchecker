@@ -1,3 +1,4 @@
+import * as crypto from "crypto";
 import * as pg from "pg";
 
 export function connectPg(url: string): Promise<pg.Client> {
@@ -314,4 +315,37 @@ export function parsePostgreSqlError(err: any): PostgreSqlError | null {
         detail: err.detail !== undefined ? err.detail : null,
         hint: err.hint !== undefined ? err.hint : null
     };
+}
+
+class Savepoint {
+    public constructor(public readonly name: string) { }
+}
+
+/**
+ * Generates a cryptographically random token
+ */
+function randomSavepointName(): Promise<string> {
+    return new Promise<string>((resolve, reject) => {
+        crypto.randomBytes(24, (err, buf) => {
+            if (<boolean>(<any>err)) {
+                reject(err);
+                return;
+            }
+
+            const token = buf.toString("hex");
+            resolve("savepoint_" + token);
+        });
+    });
+}
+
+export async function newSavepoint(conn: pg.Client): Promise<Savepoint> {
+    const savepointName = await randomSavepointName();
+
+    await conn.query(`SAVEPOINT ${savepointName}`);
+
+    return new Savepoint(savepointName);
+}
+
+export async function rollbackToAndReleaseSavepoint(conn: pg.Client, savepoint: Savepoint): Promise<void> {
+    await conn.query(`ROLLBACK TO SAVEPOINT ${savepoint.name}; RELEASE SAVEPOINT ${savepoint.name}`);
 }

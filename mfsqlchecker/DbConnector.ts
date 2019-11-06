@@ -6,7 +6,7 @@ import * as path from "path";
 import * as pg from "pg";
 import { equalsUniqueTableColumnTypes, makeUniqueColumnTypes, sqlUniqueTypeName, UniqueTableColumnType } from "./ConfigFile";
 import { ErrorDiagnostic, postgresqlErrorDiagnostic, SrcSpan, toSrcSpan } from "./ErrorDiagnostic";
-import { closePg, connectPg, dropAllFunctions, dropAllSequences, dropAllTables, dropAllTypes, escapeIdentifier, parsePostgreSqlError, pgDescribeQuery, pgMonkeyPatchClient, PostgreSqlError } from "./pg_extra";
+import { closePg, connectPg, dropAllFunctions, dropAllSequences, dropAllTables, dropAllTypes, escapeIdentifier, newSavepoint, parsePostgreSqlError, pgDescribeQuery, pgMonkeyPatchClient, PostgreSqlError, rollbackToAndReleaseSavepoint } from "./pg_extra";
 import { calcDbMigrationsHash, connReplaceDbName, createBlankDatabase, dropDatabase, isMigrationFile, readdirAsync, testDatabaseName } from "./pg_test_db";
 import { ColNullability, ResolvedInsert, ResolvedQuery, ResolvedSelect, SqlType, TypeScriptType } from "./queries";
 import { resolveFromSourceMap } from "./source_maps";
@@ -150,6 +150,13 @@ export class DbConnector {
         const newQueryCache = new QueryMap<SelectAnswer>();
         const newInsertCache = new InsertMap<InsertAnswer>();
 
+        // We modify the system catalogs only inside a transaction, so that we
+        // can ROLLBACK the changes later. This is needed so that in the
+        // future if we need to run our migrations again, they can be run on
+        // the original system catalogs.
+        await this.client.query("BEGIN");
+        await modifySystemCatalogs(this.client);
+
         const queriesProgressBar = new Bar({
             clearOnComplete: true,
             etaBuffer: 50
@@ -191,6 +198,8 @@ export class DbConnector {
         } finally {
             queriesProgressBar.stop();
         }
+
+        await this.client.query("ROLLBACK");
 
         this.queryCache = newQueryCache;
         this.insertCache = newInsertCache;
@@ -254,6 +263,8 @@ async function updateViews(client: pg.Client, oldViews: [string, ViewAnswer][], 
 }
 
 async function processCreateView(client: pg.Client, view: SqlCreateView): Promise<ViewAnswer> {
+    await client.query("BEGIN");
+    await modifySystemCatalogs(client);
     try {
         await client.query(`CREATE OR REPLACE VIEW ${escapeIdentifier(view.viewName)} AS ${view.createQuery}`);
     } catch (err) {
@@ -261,6 +272,7 @@ async function processCreateView(client: pg.Client, view: SqlCreateView): Promis
         if (perr === null) {
             throw err;
         } else {
+            await client.query("ROLLBACK");
             if (perr.position !== null) {
                 // A bit hacky but does the trick:
                 perr.position -= `CREATE OR REPLACE VIEW ${escapeIdentifier(view.viewName)} AS `.length;
@@ -272,6 +284,15 @@ async function processCreateView(client: pg.Client, view: SqlCreateView): Promis
             };
         }
     }
+
+    // We need to ROLLBACK in order to restore the system catalogs, but the
+    // rollback will also undo the VIEW we just created. So after the rollback
+    // we need to create the VIEW again. Since it succeeded the first time, it
+    // should also succeed the second time (the modifications we make to the
+    // system catalogs only make things more restrictive)
+
+    await client.query("ROLLBACK");
+    await client.query(`CREATE OR REPLACE VIEW ${escapeIdentifier(view.viewName)} AS ${view.createQuery}`);
 
     return {
         type: "NoErrors"
@@ -567,6 +588,7 @@ function insertAnswerToErrorDiagnostics(query: ResolvedInsert, queryAnswer: Inse
 
 async function processQuery(client: pg.Client, pgTypes: Map<number, SqlType>, tableColsLibrary: TableColsLibrary, uniqueColumnTypes: Map<SqlType, TypeScriptType>, query: ResolvedSelect): Promise<SelectAnswer> {
     let fields: pg.FieldDef[] | null;
+    const savepoint = await newSavepoint(client);
     try {
         fields = await pgDescribeQuery(client, query.text);
     } catch (err) {
@@ -574,12 +596,14 @@ async function processQuery(client: pg.Client, pgTypes: Map<number, SqlType>, ta
         if (perr === null) {
             throw err;
         } else {
+            await rollbackToAndReleaseSavepoint(client, savepoint);
             return {
                 type: "DescribeError",
                 perr: perr
             };
         }
     }
+    await rollbackToAndReleaseSavepoint(client, savepoint);
 
     const duplicateResultColumns: string[] = [];
     if (fields === null) {
@@ -1252,4 +1276,86 @@ async function tableColHasDefault(client: pg.Client, tableName: string, colName:
 
     const atthasdef: boolean = result.rows[0]["atthasdef"];
     return atthasdef;
+}
+
+async function modifySystemCatalogs(client: pg.Client): Promise<void> {
+    const operatorOids: number[] = [
+        2345, // date_lt_timestamp
+        2346, // date_le_timestamp
+        2347, // date_eq_timestamp
+        2348, // date_ge_timestamp
+        2349, // date_gt_timestamp
+        2350, // date_ne_timestamp
+
+        2358, // date_lt_timestamptz
+        2359, // date_le_timestamptz
+        2360, // date_eq_timestamptz
+        2361, // date_ge_timestamptz
+        2362, // date_gt_timestamptz
+        2363, // date_ne_timestamptz
+
+        2371, // timestamp_lt_date
+        2372, // timestamp_le_date
+        2373, // timestamp_eq_date
+        2374, // timestamp_ge_date
+        2375, // timestamp_gt_date
+        2376, // timestamp_ne_date
+
+        2384, // timestamptz_lt_date
+        2385, // timestamptz_le_date
+        2386, // timestamptz_eq_date
+        2387, // timestamptz_ge_date
+        2388, // timestamptz_gt_date
+        2389, // timestamptz_ne_date
+
+        2534, // timestamp_lt_timestamptz
+        2535, // timestamp_le_timestamptz
+        2536, // timestamp_eq_timestamptz
+        2537, // timestamp_ge_timestamptz
+        2538, // timestamp_gt_timestamptz
+        2539, // timestamp_ne_timestamptz
+
+        2540, // timestamptz_lt_timestamp
+        2541, // timestamptz_le_timestamp
+        2542, // timestamptz_eq_timestamp
+        2543, // timestamptz_ge_timestamp
+        2544, // timestamptz_gt_timestamp
+        2545 // timestamptz_ne_timestamp
+    ];
+
+    const explicitCasts: [number, number][] = [
+        [1114, 1082], // timestamp -> date
+        [1114, 1083] // timestamp -> time
+    ];
+
+    const illegalCasts: [number, number][] = [
+        [1082, 1114], // date -> timestamp
+        [1082, 1184], // date -> timestamptz
+
+        [1114, 1184], // timestamp -> timestamptz
+
+        [1184, 1082], // timestamptz -> date
+        [1184, 1083], // timestamptz -> time
+        [1184, 1114], // timestamptz -> timestamp
+        [1184, 1266] // timestamptz -> timetz
+    ];
+
+    await client.query(
+        `
+        delete from pg_operator
+        where oid = any($1)
+        `, [operatorOids]);
+
+    await client.query(
+        `
+        update pg_cast
+        set castcontext = 'e'
+        where (castsource, casttarget) in (select * from unnest($1::oid[], $2::oid[]));
+        `, [explicitCasts.map(c => c[0]), explicitCasts.map(c => c[1])]);
+
+    await client.query(
+        `
+        delete from pg_cast
+        where (castsource, casttarget) in (select * from unnest($1::oid[], $2::oid[]));
+        `, [illegalCasts.map(c => c[0]), illegalCasts.map(c => c[1])]);
 }
