@@ -4,7 +4,7 @@ import { assertNever } from "assert-never";
 import * as fs from "fs";
 import * as path from "path";
 import * as ts from "typescript";
-import { loadConfigFile, sqlUniqueTypeName, UniqueTableColumnType } from "./ConfigFile";
+import { ColTypesFormat, defaultColTypesFormat, loadConfigFile, sqlUniqueTypeName, UniqueTableColumnType } from "./ConfigFile";
 import { DbConnector } from "./DbConnector";
 import { ErrorDiagnostic } from "./ErrorDiagnostic";
 import { findAllQueryCalls, ResolvedQuery, SqlType, TypeScriptType } from "./queries";
@@ -64,8 +64,9 @@ export class SqlCheckerEngine {
             return v.getName();
         };
 
-        let uniqueTableColumnTypes: UniqueTableColumnType[] = [];
+        let colTypesFormat: ColTypesFormat = defaultColTypesFormat;
         let strictDateTimeChecking: boolean = false;
+        let uniqueTableColumnTypes: UniqueTableColumnType[] = [];
 
         if (this.configFileName !== null) {
             const config = loadConfigFile(this.configFileName);
@@ -73,6 +74,7 @@ export class SqlCheckerEngine {
                 case "Left":
                     return Promise.resolve<ErrorDiagnostic[]>([config.value]);
                 case "Right":
+                    colTypesFormat = config.value.colTypesFormat;
                     strictDateTimeChecking = config.value.strictDateTimeChecking;
                     uniqueTableColumnTypes = config.value.uniqueTableColumnTypes;
                     break;
@@ -94,6 +96,7 @@ export class SqlCheckerEngine {
         }
 
         const errs = await this.dbConnector.validateManifest({
+            colTypesFormat: colTypesFormat,
             strictDateTimeChecking: strictDateTimeChecking,
             queries: resolvedQueries,
             viewLibrary: sqlViews,

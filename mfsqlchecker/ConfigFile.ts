@@ -8,10 +8,21 @@ import { SqlType, TypeScriptType } from "./queries";
 export interface Config {
     migrationsDir: string | null;
     postgresVersion: string | null;
+    colTypesFormat: ColTypesFormat;
     strictDateTimeChecking: boolean;
     customSqlTypeMappings: CustomSqlTypeMapping[];
     uniqueTableColumnTypes: UniqueTableColumnType[];
 }
+
+export interface ColTypesFormat {
+    includeRegionMarker: boolean;
+    delimiter: "," | ";";
+}
+
+export const defaultColTypesFormat: ColTypesFormat = {
+    includeRegionMarker: false,
+    delimiter: ","
+};
 
 export interface CustomSqlTypeMapping {
     typeScriptTypeName: TypeScriptType;
@@ -28,6 +39,7 @@ function normalizeConfigFile(configFile: ConfigFile): Config {
     return {
         migrationsDir: configFile.migrationsDir !== undefined ? configFile.migrationsDir : null,
         postgresVersion: configFile.postgresVersion !== undefined ? configFile.postgresVersion : null,
+        colTypesFormat: configFile.colTypesFormat !== undefined ? toColTypesFormat(configFile.colTypesFormat) : defaultColTypesFormat,
         strictDateTimeChecking: configFile.strictDateTimeChecking === true,
         customSqlTypeMappings: configFile.customSqlTypeMappings !== undefined ? configFile.customSqlTypeMappings.map(toCustomSqlTypeMapping) : [],
         uniqueTableColumnTypes: configFile.uniqueTableColumnTypes !== undefined ? configFile.uniqueTableColumnTypes.map(toUniqueTableColumnType) : []
@@ -39,9 +51,22 @@ function normalizeConfigFile(configFile: ConfigFile): Config {
 interface ConfigFile {
     migrationsDir?: string;
     postgresVersion?: string;
+    colTypesFormat?: ConfigColTypesFormat;
     strictDateTimeChecking?: boolean;
     customSqlTypeMappings?: ConfigCustomSqlTypeMapping[];
     uniqueTableColumnTypes?: ConfigUniqueTableColumnType[];
+}
+
+interface ConfigColTypesFormat {
+    includeRegionMarker?: boolean;
+    delimiter?: "," | ";";
+}
+
+function toColTypesFormat(v: ConfigColTypesFormat): ColTypesFormat {
+    return {
+        includeRegionMarker: v.includeRegionMarker !== undefined ? v.includeRegionMarker : defaultColTypesFormat.includeRegionMarker,
+        delimiter: v.delimiter !== undefined ? v.delimiter : defaultColTypesFormat.delimiter
+    };
 }
 
 interface ConfigCustomSqlTypeMapping {
@@ -194,6 +219,22 @@ const configFileSchema = {
                 },
                 "postgresVersion": {
                     "type": "string"
+                },
+                "colTypesFormat": {
+                    "type": "object",
+                    "properties": {
+                        "includeRegionMarker": {
+                            "type": "boolean"
+                        },
+                        "delimiter": {
+                            "type": "string",
+                            "enum": [
+                                ",",
+                                ";"
+                            ]
+                        }
+                    },
+                    "additionalProperties": false
                 },
                 "strictDateTimeChecking": {
                     "type": "boolean"

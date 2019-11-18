@@ -4,7 +4,7 @@ import { Bar, Presets } from "cli-progress";
 import * as fs from "fs";
 import * as path from "path";
 import * as pg from "pg";
-import { equalsUniqueTableColumnTypes, makeUniqueColumnTypes, sqlUniqueTypeName, UniqueTableColumnType } from "./ConfigFile";
+import { ColTypesFormat, equalsUniqueTableColumnTypes, makeUniqueColumnTypes, sqlUniqueTypeName, UniqueTableColumnType } from "./ConfigFile";
 import { ErrorDiagnostic, postgresqlErrorDiagnostic, SrcSpan, toSrcSpan } from "./ErrorDiagnostic";
 import { closePg, connectPg, dropAllFunctions, dropAllSequences, dropAllTables, dropAllTypes, escapeIdentifier, newSavepoint, parsePostgreSqlError, pgDescribeQuery, pgMonkeyPatchClient, PostgreSqlError, rollbackToAndReleaseSavepoint } from "./pg_extra";
 import { calcDbMigrationsHash, connReplaceDbName, createBlankDatabase, dropDatabase, isMigrationFile, readdirAsync, testDatabaseName } from "./pg_test_db";
@@ -13,6 +13,7 @@ import { resolveFromSourceMap } from "./source_maps";
 import { QualifiedSqlViewName, SqlCreateView } from "./views";
 
 export interface Manifest {
+    colTypesFormat: ColTypesFormat;
     strictDateTimeChecking: boolean;
     viewLibrary: SqlCreateView[];
     queries: ResolvedQuery[];
@@ -183,24 +184,24 @@ export class DbConnector {
                     case "ResolvedSelect": {
                         const cachedResult = this.queryCache.get(query.value.text, query.value.colTypes);
                         if (cachedResult !== undefined) {
-                            queryErrors = queryErrors.concat(queryAnswerToErrorDiagnostics(query.value, cachedResult));
+                            queryErrors = queryErrors.concat(queryAnswerToErrorDiagnostics(query.value, cachedResult, manifest.colTypesFormat));
                             newQueryCache.set(query.value.text, query.value.colTypes, cachedResult);
                         } else {
-                            const result = await processQuery(this.client, this.pgTypes, this.tableColsLibrary, this.uniqueColumnTypes, query.value);
+                            const result = await processQuery(this.client, manifest.colTypesFormat, this.pgTypes, this.tableColsLibrary, this.uniqueColumnTypes, query.value);
                             newQueryCache.set(query.value.text, query.value.colTypes, result);
-                            queryErrors = queryErrors.concat(queryAnswerToErrorDiagnostics(query.value, result));
+                            queryErrors = queryErrors.concat(queryAnswerToErrorDiagnostics(query.value, result, manifest.colTypesFormat));
                         }
                         break;
                     }
                     case "ResolvedInsert": {
                         const cachedResult = this.insertCache.get(query.value.text, query.value.colTypes, query.value.tableName, query.value.insertColumns);
                         if (cachedResult !== undefined) {
-                            queryErrors = queryErrors.concat(insertAnswerToErrorDiagnostics(query.value, cachedResult));
+                            queryErrors = queryErrors.concat(insertAnswerToErrorDiagnostics(query.value, cachedResult, manifest.colTypesFormat));
                             newInsertCache.set(query.value.text, query.value.colTypes, query.value.tableName, query.value.insertColumns, cachedResult);
                         } else {
-                            const result = await processInsert(this.client, this.pgTypes, this.tableColsLibrary, this.uniqueColumnTypes, query.value);
+                            const result = await processInsert(this.client, manifest.colTypesFormat, this.pgTypes, this.tableColsLibrary, this.uniqueColumnTypes, query.value);
                             newInsertCache.set(query.value.text, query.value.colTypes, query.value.tableName, query.value.insertColumns, result);
-                            queryErrors = queryErrors.concat(insertAnswerToErrorDiagnostics(query.value, result));
+                            queryErrors = queryErrors.concat(insertAnswerToErrorDiagnostics(query.value, result, manifest.colTypesFormat));
                         }
                         break;
                     }
@@ -487,7 +488,7 @@ function querySourceStart(fileContents: string, sourceMap: [number, number, numb
     return toSrcSpan(fileContents, fileContents.slice(sourceMap[0][0] + 1).search(/\S/) + sourceMap[0][0] + 2);
 }
 
-function queryAnswerToErrorDiagnostics(query: ResolvedSelect, queryAnswer: SelectAnswer): ErrorDiagnostic[] {
+function queryAnswerToErrorDiagnostics(query: ResolvedSelect, queryAnswer: SelectAnswer, colTypesFormat: ColTypesFormat): ErrorDiagnostic[] {
     switch (queryAnswer.type) {
         case "NoErrors":
             return [];
@@ -529,12 +530,20 @@ function queryAnswerToErrorDiagnostics(query: ResolvedSelect, queryAnswer: Selec
                 //   bar: Opt<string>
                 // }
                 colTypes = colTypes.map(c => c.trimLeft());
-                colTypes[0] = " ".repeat(query.indentLevel + 4) + colTypes[0];
-                for (let i = 1; i < colTypes.length - 1; ++i) {
-                    colTypes[i] = " ".repeat(query.indentLevel + 8) + colTypes[i];
+                if (colTypesFormat.includeRegionMarker) {
+                    colTypes[0] = " ".repeat(query.indentLevel + 4) + colTypes[0];
+                    for (let i = 1; i < colTypes.length - 1; ++i) {
+                        colTypes[i] = " ".repeat(query.indentLevel + 8) + colTypes[i];
+                    }
+                    colTypes[colTypes.length - 1] = " ".repeat(query.indentLevel + 4) + colTypes[colTypes.length - 1];
+                    replacementText = "<\n" + " ".repeat(query.indentLevel + 4) + "//#region ColTypes\n" + colTypes.join("\n") + "\n" + " ".repeat(query.indentLevel) + "//#endregion\n" + " ".repeat(query.indentLevel) + ">";
+                } else {
+                    for (let i = 1; i < colTypes.length - 1; ++i) {
+                        colTypes[i] = " ".repeat(query.indentLevel + 4) + colTypes[i];
+                    }
+                    colTypes[colTypes.length - 1] = " ".repeat(query.indentLevel) + colTypes[colTypes.length - 1];
+                    replacementText = "<" + colTypes.join("\n") + ">";
                 }
-                colTypes[colTypes.length - 1] = " ".repeat(query.indentLevel + 4) + colTypes[colTypes.length - 1];
-                replacementText = "<\n" + " ".repeat(query.indentLevel + 4) + "//#region ColTypes\n" + colTypes.join("\n") + "\n" + " ".repeat(query.indentLevel) + "//#endregion\n" + " ".repeat(query.indentLevel) + ">";
             } else {
                 // This can't happen because the open and close braces each take up a line
                 throw new Error(`colTypes.length < 2: ${queryAnswer.renderedColTypes}`);
@@ -560,14 +569,14 @@ function queryAnswerToErrorDiagnostics(query: ResolvedSelect, queryAnswer: Selec
     }
 }
 
-function insertAnswerToErrorDiagnostics(query: ResolvedInsert, queryAnswer: InsertAnswer): ErrorDiagnostic[] {
+function insertAnswerToErrorDiagnostics(query: ResolvedInsert, queryAnswer: InsertAnswer, colTypesFormat: ColTypesFormat): ErrorDiagnostic[] {
     switch (queryAnswer.type) {
         case "NoErrors":
             return [];
         case "DescribeError":
         case "DuplicateColNamesError":
         case "WrongColumnTypes":
-            return queryAnswerToErrorDiagnostics(query, queryAnswer);
+            return queryAnswerToErrorDiagnostics(query, queryAnswer, colTypesFormat);
         case "InvalidTableName":
             return [{
                 fileName: query.fileName,
@@ -602,7 +611,7 @@ function insertAnswerToErrorDiagnostics(query: ResolvedInsert, queryAnswer: Inse
     }
 }
 
-async function processQuery(client: pg.Client, pgTypes: Map<number, SqlType>, tableColsLibrary: TableColsLibrary, uniqueColumnTypes: Map<SqlType, TypeScriptType>, query: ResolvedSelect): Promise<SelectAnswer> {
+async function processQuery(client: pg.Client, colTypesFormat: ColTypesFormat, pgTypes: Map<number, SqlType>, tableColsLibrary: TableColsLibrary, uniqueColumnTypes: Map<SqlType, TypeScriptType>, query: ResolvedSelect): Promise<SelectAnswer> {
     let fields: pg.FieldDef[] | null;
     const savepoint = await newSavepoint(client);
     try {
@@ -648,7 +657,7 @@ async function processQuery(client: pg.Client, pgTypes: Map<number, SqlType>, ta
         if (query.colTypes !== null && stringifyColTypes(query.colTypes) !== stringifyColTypes(sqlFields)) {
             return {
                 type: "WrongColumnTypes",
-                renderedColTypes: renderColTypesType(sqlFields)
+                renderedColTypes: renderColTypesType(colTypesFormat, sqlFields)
             };
         }
     }
@@ -658,7 +667,7 @@ async function processQuery(client: pg.Client, pgTypes: Map<number, SqlType>, ta
     };
 }
 
-async function processInsert(client: pg.Client, pgTypes: Map<number, SqlType>, tableColsLibrary: TableColsLibrary, uniqueColumnTypes: Map<SqlType, TypeScriptType>, query: ResolvedInsert): Promise<InsertAnswer> {
+async function processInsert(client: pg.Client, colTypesFormat: ColTypesFormat, pgTypes: Map<number, SqlType>, tableColsLibrary: TableColsLibrary, uniqueColumnTypes: Map<SqlType, TypeScriptType>, query: ResolvedInsert): Promise<InsertAnswer> {
     const tableQuery = await client.query(
         `
         select
@@ -685,7 +694,7 @@ async function processInsert(client: pg.Client, pgTypes: Map<number, SqlType>, t
         };
     }
 
-    const result = await processQuery(client, pgTypes, tableColsLibrary, uniqueColumnTypes, query);
+    const result = await processQuery(client, colTypesFormat, pgTypes, tableColsLibrary, uniqueColumnTypes, query);
     if (result.type !== "NoErrors") {
         return result;
     }
@@ -1035,20 +1044,31 @@ function renderIdentifier(ident: string): string {
     return ident;
 }
 
-function renderColTypesType(colTypes: Map<string, [ColNullability, TypeScriptType]>): string {
+function renderColTypesType(colTypesFormat: ColTypesFormat, colTypes: Map<string, [ColNullability, TypeScriptType]>): string {
     if (colTypes.size === 0) {
         return "{}";
     }
 
     let result = "{\n";
 
-    colTypes.forEach((value, key) => {
+    const delim = colTypesFormat.delimiter;
 
-        result += `  ${renderIdentifier(key)}: ${colNullabilityStr(value[0])}<${TypeScriptType.unwrap(value[1])}>,\n`;
+    colTypes.forEach((value, key) => {
+        result += `  ${renderIdentifier(key)}: ${colNullabilityStr(value[0])}<${TypeScriptType.unwrap(value[1])}>${delim}\n`;
     });
 
-    // Remove trailing comma
-    result = result.substr(0, result.length - 2);
+    switch (delim) {
+        case ",":
+            // Remove trailing comma and newline
+            result = result.substr(0, result.length - 2);
+            break;
+        case ";":
+            // Remove trailing newline
+            result = result.substr(0, result.length - 1);
+            break;
+        default:
+            return assertNever(delim);
+    }
 
     result += "\n}";
     return result;
