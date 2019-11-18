@@ -235,6 +235,15 @@ function getIndentLevel(sourceFile: ts.SourceFile, node: ts.Node): number {
     const nlPos = sourceFileText.lastIndexOf("\n", node.pos);
     const lineText = sourceFileText.substring(nlPos + 1, node.pos);
     const indentLevel = lineText.search(/\S/);
+
+    // This happens if the node starts at the beginning of the line
+    if (indentLevel === -1) {
+        const pos = node.end - node.getText().length;
+        const nlPos2 = sourceFileText.lastIndexOf("\n", pos);
+        const lineText2 = sourceFileText.substring(nlPos2 + 1, pos);
+        return lineText2.length;
+    }
+
     return indentLevel;
 }
 
