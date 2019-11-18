@@ -1,14 +1,15 @@
 import * as Ajv from "ajv";
+import { assertNever } from "assert-never";
 import * as fs from "fs";
 import { Either } from "./either";
 import { ErrorDiagnostic } from "./ErrorDiagnostic";
 import { SqlType, TypeScriptType } from "./queries";
 
-export interface ConfigFile {
-    migrationsDir?: string;
-    postgresVersion?: string;
-    customSqlTypeMappings?: CustomSqlTypeMapping[];
-    uniqueTableColumnTypes?: UniqueTableColumnType[];
+export interface Config {
+    migrationsDir: string | null;
+    postgresVersion: string | null;
+    customSqlTypeMappings: CustomSqlTypeMapping[];
+    uniqueTableColumnTypes: UniqueTableColumnType[];
 }
 
 export interface CustomSqlTypeMapping {
@@ -20,6 +21,50 @@ export interface UniqueTableColumnType {
     typeScriptTypeName: TypeScriptType;
     tableName: string;
     columnName: string;
+}
+
+function normalizeConfigFile(configFile: ConfigFile): Config {
+    return {
+        migrationsDir: configFile.migrationsDir !== undefined ? configFile.migrationsDir : null,
+        postgresVersion: configFile.postgresVersion !== undefined ? configFile.postgresVersion : null,
+        customSqlTypeMappings: configFile.customSqlTypeMappings !== undefined ? configFile.customSqlTypeMappings.map(toCustomSqlTypeMapping) : [],
+        uniqueTableColumnTypes: configFile.uniqueTableColumnTypes !== undefined ? configFile.uniqueTableColumnTypes.map(toUniqueTableColumnType) : []
+    };
+}
+
+// Important: If you change the "ConfigFile" interface then update the
+// `configFileSchema` below
+interface ConfigFile {
+    migrationsDir?: string;
+    postgresVersion?: string;
+    customSqlTypeMappings?: ConfigCustomSqlTypeMapping[];
+    uniqueTableColumnTypes?: ConfigUniqueTableColumnType[];
+}
+
+interface ConfigCustomSqlTypeMapping {
+    typeScriptTypeName: string;
+    sqlTypeName: string;
+}
+
+function toCustomSqlTypeMapping(v: ConfigCustomSqlTypeMapping): CustomSqlTypeMapping {
+    return {
+        sqlTypeName: SqlType.wrap(v.sqlTypeName),
+        typeScriptTypeName: TypeScriptType.wrap(v.typeScriptTypeName)
+    };
+}
+
+interface ConfigUniqueTableColumnType {
+    typeScriptTypeName: string;
+    tableName: string;
+    columnName: string;
+}
+
+function toUniqueTableColumnType(v: ConfigUniqueTableColumnType): UniqueTableColumnType {
+    return {
+        typeScriptTypeName: TypeScriptType.wrap(v.typeScriptTypeName),
+        tableName: v.tableName,
+        columnName: v.columnName
+    };
 }
 
 export function equalsUniqueTableColumnType(lhs: UniqueTableColumnType, rhs: UniqueTableColumnType) {
@@ -57,7 +102,7 @@ export function makeUniqueColumnTypes(uniqueTableColumnTypes: UniqueTableColumnT
     return result;
 }
 
-export function loadConfigFile(fileName: string): Either<ErrorDiagnostic, ConfigFile> {
+export function loadConfigFile(fileName: string): Either<ErrorDiagnostic, Config> {
     let fileContents: string;
     try {
         fileContents = fs.readFileSync(fileName, { encoding: "utf8" });
@@ -76,7 +121,20 @@ export function loadConfigFile(fileName: string): Either<ErrorDiagnostic, Config
             }
         };
     }
-    return parseConfigFile(fileName, fileContents);
+
+    const mbConfigFile = parseConfigFile(fileName, fileContents);
+
+    switch (mbConfigFile.type) {
+        case "Left":
+            return mbConfigFile;
+        case "Right":
+            return {
+                type: "Right",
+                value: normalizeConfigFile(mbConfigFile.value)
+            };
+        default:
+            return assertNever(mbConfigFile);
+    }
 }
 
 const ajv = new Ajv();
@@ -137,52 +195,46 @@ const configFileSchema = {
                 "customSqlTypeMappings": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/CustomSqlTypeMapping"
+                        "type": "object",
+                        "properties": {
+                            "typeScriptTypeName": {
+                                "type": "string"
+                            },
+                            "sqlTypeName": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "typeScriptTypeName",
+                            "sqlTypeName"
+                        ],
+                        "additionalProperties": false
                     }
                 },
                 "uniqueTableColumnTypes": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/UniqueTableColumnType"
+                        "type": "object",
+                        "properties": {
+                            "typeScriptTypeName": {
+                                "type": "string"
+                            },
+                            "tableName": {
+                                "type": "string"
+                            },
+                            "columnName": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "typeScriptTypeName",
+                            "tableName",
+                            "columnName"
+                        ],
+                        "additionalProperties": false
                     }
                 }
             },
-            "additionalProperties": false
-        },
-        "CustomSqlTypeMapping": {
-            "type": "object",
-            "properties": {
-                "typeScriptTypeName": {
-                    "type": "string"
-                },
-                "sqlTypeName": {
-                    "type": "string"
-                }
-            },
-            "required": [
-                "typeScriptTypeName",
-                "sqlTypeName"
-            ],
-            "additionalProperties": false
-        },
-        "UniqueTableColumnType": {
-            "type": "object",
-            "properties": {
-                "typeScriptTypeName": {
-                    "type": "string"
-                },
-                "tableName": {
-                    "type": "string"
-                },
-                "columnName": {
-                    "type": "string"
-                }
-            },
-            "required": [
-                "typeScriptTypeName",
-                "tableName",
-                "columnName"
-            ],
             "additionalProperties": false
         }
     },

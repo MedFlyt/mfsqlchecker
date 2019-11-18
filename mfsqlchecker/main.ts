@@ -151,7 +151,7 @@ async function main(): Promise<void> {
                 }
                 return process.exit(1);
             case "Right":
-                if (config.value.migrationsDir !== undefined) {
+                if (config.value.migrationsDir !== null) {
                     if (path.isAbsolute(config.value.migrationsDir)) {
                         migrationsDir = config.value.migrationsDir;
                     } else {

@@ -72,9 +72,7 @@ export class SqlCheckerEngine {
                 case "Left":
                     return Promise.resolve<ErrorDiagnostic[]>([config.value]);
                 case "Right":
-                    if (config.value.uniqueTableColumnTypes !== undefined) {
-                        uniqueTableColumnTypes = config.value.uniqueTableColumnTypes;
-                    }
+                    uniqueTableColumnTypes = config.value.uniqueTableColumnTypes;
                     break;
                 default:
                     return assertNever(config);
