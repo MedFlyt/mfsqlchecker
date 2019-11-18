@@ -13,6 +13,7 @@ import { resolveFromSourceMap } from "./source_maps";
 import { QualifiedSqlViewName, SqlCreateView } from "./views";
 
 export interface Manifest {
+    strictDateTimeChecking: boolean;
     viewLibrary: SqlCreateView[];
     queries: ResolvedQuery[];
     uniqueTableColumnTypes: UniqueTableColumnType[];
@@ -55,6 +56,7 @@ export class DbConnector {
     }
 
     private migrationsDir: string;
+    private prevStrictDateTimeChecking: boolean | null = null;
     private prevUniqueTableColumnTypes: UniqueTableColumnType[] = [];
     private client: pg.Client;
 
@@ -69,17 +71,21 @@ export class DbConnector {
     private queryCache = new QueryMap<SelectAnswer>();
     private insertCache = new InsertMap<InsertAnswer>();
 
+    private async dropViews(): Promise<void> {
+        for (let i = this.viewNames.length - 1; i >= 0; --i) {
+            const viewName = this.viewNames[i];
+            await dropView(this.client, viewName[0]);
+        }
+        this.viewNames = [];
+    }
+
     async validateManifest(manifest: Manifest): Promise<ErrorDiagnostic[]> {
         const hash = await calcDbMigrationsHash(this.migrationsDir);
         if (this.dbMigrationsHash !== hash || !equalsUniqueTableColumnTypes(manifest.uniqueTableColumnTypes, this.prevUniqueTableColumnTypes)) {
             this.dbMigrationsHash = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
             this.queryCache.clear();
             this.insertCache.clear();
-            for (let i = this.viewNames.length - 1; i >= 0; --i) {
-                const viewName = this.viewNames[i];
-                await dropView(this.client, viewName[0]);
-            }
-            this.viewNames = [];
+            await this.dropViews();
 
             await dropAllTables(this.client);
             await dropAllSequences(this.client);
@@ -128,9 +134,14 @@ export class DbConnector {
             this.dbMigrationsHash = hash;
         }
 
+        if (manifest.strictDateTimeChecking !== this.prevStrictDateTimeChecking) {
+            await this.dropViews();
+        }
+        this.prevStrictDateTimeChecking = manifest.strictDateTimeChecking;
+
         let queryErrors: ErrorDiagnostic[] = [];
 
-        const [updated, newViewNames] = await updateViews(this.client, this.viewNames, manifest.viewLibrary);
+        const [updated, newViewNames] = await updateViews(this.client, manifest.strictDateTimeChecking, this.viewNames, manifest.viewLibrary);
 
         if (updated) {
             await this.tableColsLibrary.refreshViews(this.client);
@@ -155,7 +166,10 @@ export class DbConnector {
         // future if we need to run our migrations again, they can be run on
         // the original system catalogs.
         await this.client.query("BEGIN");
-        await modifySystemCatalogs(this.client);
+
+        if (manifest.strictDateTimeChecking) {
+            await modifySystemCatalogs(this.client);
+        }
 
         const queriesProgressBar = new Bar({
             clearOnComplete: true,
@@ -229,7 +243,7 @@ async function dropView(client: pg.Client, viewName: string): Promise<void> {
  * @returns Array with the same length as `newViews`, with a matching element
  * for each view in `newViews`
  */
-async function updateViews(client: pg.Client, oldViews: [string, ViewAnswer][], newViews: SqlCreateView[]): Promise<[boolean, [string, ViewAnswer][]]> {
+async function updateViews(client: pg.Client, strictDateTimeChecking: boolean, oldViews: [string, ViewAnswer][], newViews: SqlCreateView[]): Promise<[boolean, [string, ViewAnswer][]]> {
     let updated: boolean = false;
 
     const newViewNames = new Set<string>();
@@ -253,7 +267,7 @@ async function updateViews(client: pg.Client, oldViews: [string, ViewAnswer][], 
         if (oldAnswer !== undefined) {
             result.push([view.viewName, oldAnswer]);
         } else {
-            const answer = await processCreateView(client, view);
+            const answer = await processCreateView(client, strictDateTimeChecking, view);
             result.push([view.viewName, answer]);
             updated = true;
         }
@@ -262,9 +276,11 @@ async function updateViews(client: pg.Client, oldViews: [string, ViewAnswer][], 
     return [updated, result];
 }
 
-async function processCreateView(client: pg.Client, view: SqlCreateView): Promise<ViewAnswer> {
+async function processCreateView(client: pg.Client, strictDateTimeChecking: boolean, view: SqlCreateView): Promise<ViewAnswer> {
     await client.query("BEGIN");
-    await modifySystemCatalogs(client);
+    if (strictDateTimeChecking) {
+        await modifySystemCatalogs(client);
+    }
     try {
         await client.query(`CREATE OR REPLACE VIEW ${escapeIdentifier(view.viewName)} AS ${view.createQuery}`);
     } catch (err) {

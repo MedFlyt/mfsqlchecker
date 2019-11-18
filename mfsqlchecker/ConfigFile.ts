@@ -8,6 +8,7 @@ import { SqlType, TypeScriptType } from "./queries";
 export interface Config {
     migrationsDir: string | null;
     postgresVersion: string | null;
+    strictDateTimeChecking: boolean;
     customSqlTypeMappings: CustomSqlTypeMapping[];
     uniqueTableColumnTypes: UniqueTableColumnType[];
 }
@@ -27,6 +28,7 @@ function normalizeConfigFile(configFile: ConfigFile): Config {
     return {
         migrationsDir: configFile.migrationsDir !== undefined ? configFile.migrationsDir : null,
         postgresVersion: configFile.postgresVersion !== undefined ? configFile.postgresVersion : null,
+        strictDateTimeChecking: configFile.strictDateTimeChecking === true,
         customSqlTypeMappings: configFile.customSqlTypeMappings !== undefined ? configFile.customSqlTypeMappings.map(toCustomSqlTypeMapping) : [],
         uniqueTableColumnTypes: configFile.uniqueTableColumnTypes !== undefined ? configFile.uniqueTableColumnTypes.map(toUniqueTableColumnType) : []
     };
@@ -37,6 +39,7 @@ function normalizeConfigFile(configFile: ConfigFile): Config {
 interface ConfigFile {
     migrationsDir?: string;
     postgresVersion?: string;
+    strictDateTimeChecking?: boolean;
     customSqlTypeMappings?: ConfigCustomSqlTypeMapping[];
     uniqueTableColumnTypes?: ConfigUniqueTableColumnType[];
 }
@@ -191,6 +194,9 @@ const configFileSchema = {
                 },
                 "postgresVersion": {
                     "type": "string"
+                },
+                "strictDateTimeChecking": {
+                    "type": "boolean"
                 },
                 "customSqlTypeMappings": {
                     "type": "array",

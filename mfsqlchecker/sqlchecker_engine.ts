@@ -65,6 +65,7 @@ export class SqlCheckerEngine {
         };
 
         let uniqueTableColumnTypes: UniqueTableColumnType[] = [];
+        let strictDateTimeChecking: boolean = false;
 
         if (this.configFileName !== null) {
             const config = loadConfigFile(this.configFileName);
@@ -72,6 +73,7 @@ export class SqlCheckerEngine {
                 case "Left":
                     return Promise.resolve<ErrorDiagnostic[]>([config.value]);
                 case "Right":
+                    strictDateTimeChecking = config.value.strictDateTimeChecking;
                     uniqueTableColumnTypes = config.value.uniqueTableColumnTypes;
                     break;
                 default:
@@ -92,6 +94,7 @@ export class SqlCheckerEngine {
         }
 
         const errs = await this.dbConnector.validateManifest({
+            strictDateTimeChecking: strictDateTimeChecking,
             queries: resolvedQueries,
             viewLibrary: sqlViews,
             uniqueTableColumnTypes: uniqueTableColumnTypes
