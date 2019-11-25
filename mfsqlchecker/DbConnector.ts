@@ -277,6 +277,10 @@ async function updateViews(client: pg.Client, strictDateTimeChecking: boolean, o
     return [updated, result];
 }
 
+// This regexp is a bit of a hack, but hopefully works. The goal is to still
+// allow COUNT(*) as well as multiplication
+const SELECT_STAR_REGEX = new RegExp("(select|\\.|\\,)\\s*\\*", "i");
+
 function validateViewFeatures(view: SqlCreateView): ViewAnswer {
     // We don't allow using `SELECT *` in views.
     //
@@ -287,13 +291,13 @@ function validateViewFeatures(view: SqlCreateView): ViewAnswer {
     // VIEW ..." call when an existing view exists but the expanded column lists
     // differ.
 
-    const starIndex = view.createQuery.indexOf("*");
-    if (starIndex >= 0) {
+    const searchIndex = view.createQuery.search(SELECT_STAR_REGEX);
+    if (searchIndex >= 0) {
         return {
             type: "InvalidFeatureError",
             viewName: view.viewName,
             message: "SELECT * not allowed in views. List all columns explicitly",
-            position: starIndex + 1
+            position: view.createQuery.indexOf("*", searchIndex) + 1
         };
     }
 
