@@ -307,11 +307,6 @@ function validateViewFeatures(view: SqlCreateView): ViewAnswer {
 }
 
 async function processCreateView(client: pg.Client, strictDateTimeChecking: boolean, view: SqlCreateView): Promise<ViewAnswer> {
-    const invalidFeatureError = validateViewFeatures(view);
-    if (invalidFeatureError.type !== "NoErrors") {
-        return invalidFeatureError;
-    }
-
     await client.query("BEGIN");
     if (strictDateTimeChecking) {
         await modifySystemCatalogs(client);
@@ -344,6 +339,11 @@ async function processCreateView(client: pg.Client, strictDateTimeChecking: bool
 
     await client.query("ROLLBACK");
     await client.query(`CREATE OR REPLACE VIEW ${escapeIdentifier(view.viewName)} AS ${view.createQuery}`);
+
+    const invalidFeatureError = validateViewFeatures(view);
+    if (invalidFeatureError.type !== "NoErrors") {
+        return invalidFeatureError;
+    }
 
     return {
         type: "NoErrors"
