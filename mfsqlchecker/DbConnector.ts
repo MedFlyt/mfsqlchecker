@@ -277,7 +277,37 @@ async function updateViews(client: pg.Client, strictDateTimeChecking: boolean, o
     return [updated, result];
 }
 
+function validateViewFeatures(view: SqlCreateView): ViewAnswer {
+    // We don't allow using `SELECT *` in views.
+    //
+    // The reason is that PostgreSQL will expand the star only once, at
+    // view-create time (not each time the view is queried). This can cause bad
+    // inconsistencies where old views will not have the expected columns. Even
+    // worse, it can cause the DB migration to fail on the "CREATE OR REPLACE
+    // VIEW ..." call when an existing view exists but the expanded column lists
+    // differ.
+
+    const starIndex = view.createQuery.indexOf("*");
+    if (starIndex >= 0) {
+        return {
+            type: "InvalidFeatureError",
+            viewName: view.viewName,
+            message: "SELECT * not allowed in views. List all columns explicitly",
+            position: starIndex + 1
+        };
+    }
+
+    return {
+        type: "NoErrors"
+    };
+}
+
 async function processCreateView(client: pg.Client, strictDateTimeChecking: boolean, view: SqlCreateView): Promise<ViewAnswer> {
+    const invalidFeatureError = validateViewFeatures(view);
+    if (invalidFeatureError.type !== "NoErrors") {
+        return invalidFeatureError;
+    }
+
     await client.query("BEGIN");
     if (strictDateTimeChecking) {
         await modifySystemCatalogs(client);
@@ -318,7 +348,8 @@ async function processCreateView(client: pg.Client, strictDateTimeChecking: bool
 
 type ViewAnswer =
     ViewAnswer.NoErrors |
-    ViewAnswer.CreateError;
+    ViewAnswer.CreateError |
+    ViewAnswer.InvalidFeatureError;
 
 namespace ViewAnswer {
     export interface NoErrors {
@@ -330,13 +361,20 @@ namespace ViewAnswer {
         viewName: string;
         perr: PostgreSqlError;
     }
+
+    export interface InvalidFeatureError {
+        type: "InvalidFeatureError";
+        viewName: string;
+        message: string;
+        position: number;
+    }
 }
 
 function viewAnswerToErrorDiagnostics(createView: SqlCreateView, viewAnswer: ViewAnswer): ErrorDiagnostic[] {
     switch (viewAnswer.type) {
         case "NoErrors":
             return [];
-        case "CreateError":
+        case "CreateError": {
             const message = "Error in view \"" + chalk.bold(viewAnswer.viewName) + "\"";
             if (viewAnswer.perr.position !== null) {
                 const srcSpan = resolveFromSourceMap(createView.fileContents, viewAnswer.perr.position - 1, createView.sourceMap);
@@ -344,6 +382,21 @@ function viewAnswerToErrorDiagnostics(createView: SqlCreateView, viewAnswer: Vie
             } else {
                 return [postgresqlErrorDiagnostic(createView.fileName, createView.fileContents, viewAnswer.perr, querySourceStart(createView.fileContents, createView.sourceMap), message)];
             }
+        }
+        case "InvalidFeatureError": {
+            const srcSpan = resolveFromSourceMap(createView.fileContents, viewAnswer.position - 1, createView.sourceMap);
+            return [{
+                fileName: createView.fileName,
+                fileContents: createView.fileContents,
+                span: srcSpan,
+                messages: [
+                    chalk.bold("Error in view \"" + chalk.bold(viewAnswer.viewName) + "\""),
+                    viewAnswer.message
+                ],
+                epilogue: null,
+                quickFix: null
+            }];
+        }
         default:
             return assertNever(viewAnswer);
     }
