@@ -255,6 +255,9 @@ async function main(): Promise<void> {
         } finally {
             await dbConnector.close();
         }
+    } catch (err) {
+        process.exitCode = 1;
+        throw err;
     } finally {
         if (pgServer !== null) {
             await pgServer.close();
