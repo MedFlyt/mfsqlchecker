@@ -569,7 +569,7 @@ function queryAnswerToErrorDiagnostics(query: ResolvedSelect, queryAnswer: Selec
             let replacementText: string;
 
             let colTypes = queryAnswer.renderedColTypes.split("\n");
-            if (colTypes.length === 2) {
+            if (colTypes.length <= 2) {
                 // {
                 // }
                 replacementText = "<{}>";
@@ -602,8 +602,7 @@ function queryAnswerToErrorDiagnostics(query: ResolvedSelect, queryAnswer: Selec
                     replacementText = "<" + colTypes.join("\n") + ">";
                 }
             } else {
-                // This can't happen because the open and close braces each take up a line
-                throw new Error(`colTypes.length < 2: ${queryAnswer.renderedColTypes}`);
+                throw new Error(`Invalid colTypes.length: ${queryAnswer.renderedColTypes}`);
             }
 
             if (query.queryMethodName !== null) {
