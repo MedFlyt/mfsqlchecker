@@ -552,10 +552,16 @@ function peekAssignedVariableName(): string | null {
     const line = lines[stackFrame.getLineNumber() - 1];
 
     const r = /(var|let|const)(\s+)(\w+)[\s=]/.exec(line);
-    if (r === null) {
-        return null;
+    if (r !== null) {
+        return r[3];
     }
-    return r[3];
+
+    const r2 = /exports\.(\w+)[\s=]/.exec(line);
+    if (r2 !== null) {
+        return r2[1];
+    }
+
+    return null;
 }
 
 export function defineSqlView(x: TemplateStringsArray, ...placeholders: SqlView[]): SqlView {
