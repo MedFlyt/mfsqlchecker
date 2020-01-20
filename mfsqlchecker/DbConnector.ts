@@ -931,6 +931,14 @@ class TableColsLibrary {
     public async refreshViews(client: pg.Client): Promise<void> {
         this.viewLookupTable = new Map<string, boolean>();
 
+        // TODO Detect pg version from the `client` object (issue "select
+        // version()" query?)
+        const PG_VERSION_LT_100 = false;
+
+        const subselectRegex = PG_VERSION_LT_100
+            ? `:subselect {.*?:constraintDeps <>} :location \\d+} :res(no|ult)`
+            : `:subselect {.*?:stmt_len 0} :location \\d+} :res(no|ult)`;
+
         // This query was taken from here and (slightly) adapted:
         // <https://github.com/PostgREST/postgrest/blob/e83144ce7fc239b3161f53f17ecaf80fbb9e19f8/src/PostgREST/DbStructure.hs#L725>
         const queryResult = await client.query(
@@ -949,7 +957,7 @@ class TableColsLibrary {
               removed_subselects as(
                 select
                   view_schema, view_name, view_oid,
-                  regexp_replace(view_definition, '{subselectRegex}', '', 'g') as x
+                  regexp_replace(view_definition, '${subselectRegex}', '', 'g') as x
                 from views
               ),
               target_lists as(
