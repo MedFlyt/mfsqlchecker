@@ -282,6 +282,11 @@ export class Connection<T> {
         return rows[0];
     }
 
+    /**
+     *
+     * @param query SQL query string
+     * @returns The first ROW of queried dataset or NULL if query didnt return rows
+     */
     async queryOneOrNone<Row extends object = any>(query: SqlQueryExpr<T>): Promise<ResultRow<Row> | null> {
         // Cast away the type of "this" so that "mfsqlchecker" doesn't detect
         // this line of code as query that should be analyzed
@@ -362,7 +367,7 @@ export interface SqlParameter {
     type: "SqlParameter";
 }
 
-type ResultRow<T> = {
+export type ResultRow<T> = {
     [P in keyof T]: (
         T[P] extends Req<any> ? (
             T[P]
@@ -477,7 +482,7 @@ export class SqlFrag<T extends string> {
     protected tag: T;
 
     private static Create<S extends string>(text: string): SqlFrag<S> {
-        SqlFrag.Create;
+        SqlFrag.Create; // tslint:disable-line:no-unused-expression
         return new SqlFrag<S>(text);
     }
 }
@@ -575,7 +580,7 @@ export function defineSqlView(x: TemplateStringsArray, ...placeholders: SqlView[
 
     const viewName = calcViewName(varName, query);
 
-    const sqlView = newSqlView(viewName, `CREATE OR REPLACE VIEW ${escapeIdentifier(viewName)} AS\n${query}`);
+    const sqlView = newSqlView(viewName, `CREATE VIEW ${escapeIdentifier(viewName)} AS\n${query}`);
 
     allSqlViewCreateStatements.push(sqlView);
 
@@ -598,6 +603,42 @@ export class MigrationError extends Error {
  */
 export async function migrateDatabase(conn: pg.Client, migrationsDir: string, logger: (message: string) => Promise<void>): Promise<void> {
     await Migrate.migrate(conn, migrationsDir, allSqlViewCreateStatements.map(sqlViewPrivate), logger);
+}
+
+/**
+ * When the code of a view is changed, its hash will change, so a new view will
+ * be created in the database.
+ *
+ * The old view (with the previous hash) will still remain. Over time, many of
+ * these old unused used build up inside the database.
+ *
+ * Run this function periodically to delete these old views.
+ *
+ * Note: This is purposefully not run automatically during the migration step.
+ * The reason is that we might have multiple servers in operation. When a new
+ * app version is deployed, they are not all updated exactly together. Some of
+ * the servers might continue running the old code for several minutes until it
+ * is there turn to be updated. If we were to drop the views too early, these
+ * tardy servers would break (the views they are looking for would not be found)
+ */
+export async function dropUnusedViews(conn: pg.Client): Promise<void> {
+    await withTransaction(conn, async () => {
+        await Migrate.dropAllViews(conn);
+        await Migrate.createViews(conn, allSqlViewCreateStatements.map(sqlViewPrivate));
+    });
+}
+
+/**
+ * This drops ALL of the auto generated views. I can't think of a reason why you
+ * would need this. The `dropUnusedViews` function should always be sufficient.
+ * But the function is here in case for some reason you do need to do this.
+ *
+ * Note: This should never be run on production!
+ */
+export async function dropAllViews(conn: pg.Client): Promise<void> {
+    await withTransaction(conn, async () => {
+        await Migrate.dropAllViews(conn);
+    });
 }
 
 /**
@@ -788,7 +829,14 @@ namespace Migrate {
         await tryRunPg("create schema_version table", () => createSchemaVersionTable(conn));
 
         await withTransaction(conn, async () => {
-            await tryRunPg("lock \"schema_version\" table", () => conn.query("LOCK TABLE schema_version IN ACCESS EXCLUSIVE MODE"));
+            await logger("Acquiring schema_version table lock...");
+            await tryRunPg("lock \"schema_version\" table", () => conn.query("LOCK TABLE schema_version IN SHARE UPDATE EXCLUSIVE MODE"));
+
+            // The "schema_version_s_idx" index is created here, inside the
+            // transaction, after we have acquired the table lock. This is
+            // because otherwise another process holding the table lock would
+            // block this query (yes, even if the index does already exists).
+            await tryRunPg("create schema_version_s_idx index", () => conn.query("CREATE INDEX IF NOT EXISTS \"schema_version_s_idx\" ON \"schema_version\" USING btree (\"success\")"));
 
             const appliedMigrations = await tryRunPg("query database for applied migrations", () => queryAppliedMigrations(conn));
             await logger(`Database has ${appliedMigrations.length} migrations already applied`);
@@ -823,8 +871,20 @@ namespace Migrate {
                 });
             }
 
-            await logger(`Creating ${views.length} views...`);
-            await tryRunPg("run combined CREATE VIEW statements", () => createViews(conn, views));
+            // Create new views:
+
+            const existingViews = await tryRunPg("list all existing views", () => selectAllSqlViews(conn));
+            const existingViewsSet = new Set<string>(existingViews);
+
+            const newViews: SqlViewPrivate[] = [];
+            for (const view of views) {
+                if (!existingViewsSet.has(view.getViewName())) {
+                    newViews.push(view);
+                }
+            }
+
+            await logger(`Database has ${existingViews.length} views. Code has ${views.length} views. Creating ${newViews.length} new views...`);
+            await tryRunPg("run combined CREATE VIEW statements", () => createViews(conn, newViews));
         });
 
         setViewsResolved(views);
@@ -833,6 +893,10 @@ namespace Migrate {
     }
 
     export async function createViews(conn: pg.Client, views: SqlViewPrivate[]): Promise<void> {
+        if (views.length === 0) {
+            return;
+        }
+
         let combinedCreateVewsQuery: string = "";
         for (const v of views) {
             combinedCreateVewsQuery += v.getCreateQuery() + ";\n";
@@ -851,6 +915,10 @@ namespace Migrate {
         // Table schema is the same that is used in flyway:
         // <https://github.com/flyway/flyway/blob/master/flyway-core/src/main/java/org/flywaydb/core/internal/database/postgresql/PostgreSQLDatabase.java>
 
+        // NOTE: To be consistent with flyway, there is also an index on the
+        // table called "schema_version_s_idx". We create this index separately
+        // (inside a transaction, because of tricky locking behaviour)
+
         await conn.query(
             `
             CREATE TABLE IF NOT EXISTS "schema_version"
@@ -865,9 +933,7 @@ namespace Migrate {
                 "installed_on" TIMESTAMP NOT NULL DEFAULT now(),
                 "execution_time" INTEGER NOT NULL,
                 "success" BOOLEAN NOT NULL
-            );
-
-            CREATE INDEX IF NOT EXISTS "schema_version_s_idx" ON "schema_version" USING btree ("success");
+            )
             `);
     }
 
@@ -993,6 +1059,40 @@ namespace Migrate {
                 executionTime
             ]);
     }
+
+    export async function dropAllViews(conn: pg.Client): Promise<void> {
+        const viewNames = await selectAllSqlViews(conn);
+        await dropViews(conn, viewNames);
+    }
+
+    export async function dropViews(conn: pg.Client, viewNames: string[]): Promise<void> {
+        for (const viewName of viewNames) {
+            await runAndDropDependentViews(conn, async () => {
+                await conn.query(`DROP VIEW IF EXISTS ${escapeIdentifier(viewName)}`);
+            });
+        }
+    }
+}
+
+async function selectAllSqlViews(conn: pg.Client): Promise<string[]> {
+    const queryResult = await conn.query(
+        `
+        select
+            relname
+        from
+            pg_class
+        where
+            relkind = 'v'
+            and relname::text like '$$mfv_%'
+        order by relname
+        `);
+
+    const viewNames: string[] = [];
+    for (const row of queryResult.rows) {
+        viewNames.push(row["relname"]);
+    }
+
+    return viewNames;
 }
 
 /**
