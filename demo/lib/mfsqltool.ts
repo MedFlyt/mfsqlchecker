@@ -621,11 +621,8 @@ export async function migrateDatabase(conn: pg.Client, migrationsDir: string, lo
  * is there turn to be updated. If we were to drop the views too early, these
  * tardy servers would break (the views they are looking for would not be found)
  */
-export async function dropUnusedViews(conn: pg.Client): Promise<void> {
-    await withTransaction(conn, async () => {
-        await Migrate.dropAllViews(conn);
-        await Migrate.createViews(conn, allSqlViewCreateStatements.map(sqlViewPrivate));
-    });
+export async function dropUnusedViews(conn: pg.Client, logger: (message: string) => Promise<void>): Promise<void> {
+    await Migrate.dropUnusedViews(conn, allSqlViewCreateStatements.map(sqlViewPrivate), logger);
 }
 
 /**
@@ -635,10 +632,8 @@ export async function dropUnusedViews(conn: pg.Client): Promise<void> {
  *
  * Note: This should never be run on production!
  */
-export async function dropAllViews(conn: pg.Client): Promise<void> {
-    await withTransaction(conn, async () => {
-        await Migrate.dropAllViews(conn);
-    });
+export async function dropAllViews(conn: pg.Client, logger: (message: string) => Promise<void>): Promise<void> {
+    await Migrate.dropAllViews(conn, logger);
 }
 
 /**
@@ -873,24 +868,29 @@ namespace Migrate {
 
             // Create new views:
 
-            const existingViews = await tryRunPg("list all existing views", () => selectAllSqlViews(conn));
-            const existingViewsSet = new Set<string>(existingViews);
-
-            const newViews: SqlViewPrivate[] = [];
-            for (const view of views) {
-                if (!existingViewsSet.has(view.getViewName())) {
-                    newViews.push(view);
-                }
-            }
-
-            await logger(`Database has ${existingViews.length} views. Code has ${views.length} views. Creating ${newViews.length} new views...`);
-            await tryRunPg("run combined CREATE VIEW statements", () => createViews(conn, newViews));
+            await createNewViews(conn, views, logger);
         });
 
         setViewsResolved(views);
 
         await logger("Migration complete");
     }
+
+    export async function createNewViews(conn: pg.Client, views: SqlViewPrivate[], logger: (message: string) => Promise<void>): Promise<void> {
+        const existingViews = await tryRunPg("list all existing views", () => selectAllSqlViews(conn));
+
+        const existingViewsSet = new Set<string>(existingViews);
+
+        const newViews: SqlViewPrivate[] = [];
+        for (const view of views) {
+            if (!existingViewsSet.has(view.getViewName())) {
+                newViews.push(view);
+            }
+        }
+
+        await logger(`Database has ${existingViews.length} views. Code has ${views.length} views. Creating ${newViews.length} new views...`);
+        await tryRunPg("run combined CREATE VIEW statements", () => createViews(conn, newViews));
+}
 
     export async function createViews(conn: pg.Client, views: SqlViewPrivate[]): Promise<void> {
         if (views.length === 0) {
@@ -1060,13 +1060,44 @@ namespace Migrate {
             ]);
     }
 
-    export async function dropAllViews(conn: pg.Client): Promise<void> {
-        const viewNames = await selectAllSqlViews(conn);
-        await dropViews(conn, viewNames);
+    export async function dropUnusedViews(conn: pg.Client, views: SqlViewPrivate[], logger: (message: string) => Promise<void>): Promise<void> {
+        await withTransaction(conn, async () => {
+            await logger("Acquiring schema_version table lock...");
+            await tryRunPg("lock \"schema_version\" table", () => conn.query("LOCK TABLE schema_version IN SHARE UPDATE EXCLUSIVE MODE"));
+
+            const existingViews = await tryRunPg("list all existing views", () => selectAllSqlViews(conn));
+
+            const newViewNamesSet = new Set<string>(views.map(v => v.getViewName()));
+
+            const expiredViews: string[] = [];
+            for (const viewName of existingViews) {
+                if (!newViewNamesSet.has(viewName)) {
+                    expiredViews.push(viewName);
+                }
+            }
+
+            await logger(`Need to drop ${expiredViews.length} views`);
+
+            await dropViews(conn, expiredViews, logger);
+
+            await createNewViews(conn, views, logger);
+        });
     }
 
-    export async function dropViews(conn: pg.Client, viewNames: string[]): Promise<void> {
+    export async function dropAllViews(conn: pg.Client, logger: (message: string) => Promise<void>): Promise<void> {
+        await withTransaction(conn, async () => {
+            await logger("Acquiring schema_version table lock...");
+            await tryRunPg("lock \"schema_version\" table", () => conn.query("LOCK TABLE schema_version IN SHARE UPDATE EXCLUSIVE MODE"));
+
+            const viewNames = await selectAllSqlViews(conn);
+            await dropViews(conn, viewNames, logger);
+        });
+    }
+
+    export async function dropViews(conn: pg.Client, viewNames: string[], logger: (message: string) => Promise<void>): Promise<void> {
+        let i = 0;
         for (const viewName of viewNames) {
+            await logger(`(${++i}/${viewNames.length}) Dropping view ${escapeIdentifier(viewName)}`);
             await runAndDropDependentViews(conn, async () => {
                 await conn.query(`DROP VIEW IF EXISTS ${escapeIdentifier(viewName)}`);
             });
