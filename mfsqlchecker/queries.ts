@@ -862,6 +862,8 @@ function typescriptTypeToSqlType(typeScriptUniqueColumnTypes: Map<TypeScriptType
         return SqlType.wrap("timestamp");
     } else if (type.symbol.name === "LocalDate") {
         return SqlType.wrap("date");
+    } else if (type.symbol.name === "LocalTime") {
+        return SqlType.wrap("time");
     }
 
     return null;
