@@ -727,23 +727,17 @@ function getObjectFieldTypes(checker: ts.TypeChecker, type: ts.Type): Either<str
         if ((typ.flags & ts.TypeFlags.StringLiteral) !== 0 || // tslint:disable-line:no-bitwise
             isUnionOfStringLiterals(typ)) {
             result.set(fieldName, [TypeScriptType.wrap("string"), !isNullableType(typ)]);
-        } else if (isUnionOfBooleanLiterals(typ)) {
+        } else if ((typ.flags & ts.TypeFlags.BooleanLiteral) !== 0 || // tslint:disable-line:no-bitwise
+            isUnionOfBooleanLiterals(typ)) {
             result.set(fieldName, [TypeScriptType.wrap("boolean"), !isNullableType(typ)]);
         } else {
             result.set(fieldName, [TypeScriptType.wrap(checker.typeToString(nonNullType(typ))), !isNullableType(typ)]);
         }
     };
 
-    if ((<any>type).members !== undefined) {
-        const members: Map<string, any> = (<any>type).members;
-        members.forEach((value, key) => {
-            addResult(key, value.type);
-        });
-    } else {
-        type.getProperties().forEach((value) => {
-            addResult(value.name, checker.getTypeAtLocation(value.valueDeclaration));
-        });
-    }
+    type.getProperties().forEach((value) => {
+        addResult(value.name, checker.getTypeAtLocation(value.valueDeclaration));
+    });
 
     if (errors.length > 0) {
         return {
