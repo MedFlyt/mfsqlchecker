@@ -811,6 +811,7 @@ namespace Migrate {
                     ` * position: ${pgErr.position}\n` +
                     ` * message: ${pgErr.message}\n` +
                     ` * detail: ${pgErr.detail}\n` +
+                    ` * table: ${pgErr.table}\n` +
                     ` * hint: ${pgErr.hint}`);
             }
         }
@@ -1182,6 +1183,7 @@ interface PostgreSqlError {
     position: number | null;
     message: string;
     detail: string | null;
+    table: string | null;
     hint: string | null;
 }
 
@@ -1200,6 +1202,7 @@ function parsePostgreSqlError(err: any): PostgreSqlError | null {
         position: err.position !== undefined ? parseInt(err.position, 10) : null,
         message: err.message,
         detail: err.detail !== undefined ? err.detail : null,
+        table: err.table !== undefined ? err.table : null,
         hint: err.hint !== undefined ? err.hint : null
     };
 }
