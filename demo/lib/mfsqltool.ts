@@ -254,9 +254,13 @@ export class Connection<T> {
         return queryResult.rows;
     }
 
+    protected async executeQuery(text: string, values: any[]) {
+        return await clientQueryPromise(this.client, text, values);
+    }
+
     async query<Row extends object = any>(query: SqlQueryExpr<T>): Promise<ResultRow<Row>[]> {
         const [text, values] = query.render();
-        const queryResult = await clientQueryPromise(this.client, text, values);
+        const queryResult = await this.executeQuery(text, values);
         for (const row of queryResult.rows) {
             for (const field of queryResult.fields) {
                 const fieldName = field.name;
