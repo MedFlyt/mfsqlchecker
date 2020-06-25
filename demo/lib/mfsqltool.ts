@@ -311,7 +311,7 @@ export class Connection<T> {
     }
 }
 
-function escapeIdentifier(str: string) {
+export function escapeIdentifier(str: string) {
     // See:
     // <https://github.com/brianc/node-postgres/blob/60d8df659c5481723abada2344ac14d77377338c/lib/client.js#L401>
     return '"' + str.replace(/"/g, '""') + '"';
@@ -334,7 +334,7 @@ function clientQueryPromise(client: pg.Client, text: string, values: any[]) {
     });
 }
 
-class SqlQueryExpr<T> {
+export class SqlQueryExpr<T> {
     constructor(private conn: Connection<T>, private literals: TemplateStringsArray, private placeholders: (SqlView | SqlFrag<string> | number | number[] | string | string[] | boolean | boolean[] | null | T)[]) {
     }
 
