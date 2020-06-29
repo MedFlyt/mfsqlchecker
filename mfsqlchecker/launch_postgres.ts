@@ -228,15 +228,25 @@ export async function downloadPostgres(platform: Platform, postgresVersion: Post
             });
         }
 
-        await new Promise<void>((resolve, reject) => {
-            fs.rename(extractDir, targetDir, (err) => {
-                if (<any>err) {
-                    reject(err);
-                    return;
-                }
-                resolve();
+        try {
+            await new Promise<void>((resolve, reject) => {
+                fs.rename(extractDir, targetDir, (err) => {
+                    if (<any>err) {
+                        reject(err);
+                        return;
+                    }
+                    resolve();
+                });
             });
-        });
+        } catch (err) {
+            if (err.code === "ENOTEMPTY") {
+                // The target directory already exists. We can ignore, because
+                // it means that some concurrent process was racing us to
+                // install it and finished before us
+            } else {
+                throw err;
+            }
+        }
     });
 
     console.log(`PostgreSQL ${postgresVersion} ready`);
