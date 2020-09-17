@@ -1056,6 +1056,15 @@ export function resolveFieldDefs(tableColsLibrary: TableColsLibrary, pgTypes: Ma
 }
 
 function sqlTypeToTypeScriptType(uniqueColumnTypes: Map<SqlType, TypeScriptType>, sqlType: SqlType): TypeScriptType {
+    // "The array type typically has the same name as the base type with the
+    // underscore character (_) prepended."
+    //
+    // See: <https://www.postgresql.org/docs/12/xtypes.html#id-1.8.3.16.13.1>
+    if (SqlType.unwrap(sqlType).startsWith("_")) {
+        const elemType = sqlTypeToTypeScriptType(uniqueColumnTypes, SqlType.wrap(SqlType.unwrap(sqlType).substring(1)));
+        return TypeScriptType.wrap(TypeScriptType.unwrap(elemType) + "[]");
+    }
+
     switch (SqlType.unwrap(sqlType)) {
         case "int2":
         case "int4":
