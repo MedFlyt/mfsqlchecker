@@ -1099,7 +1099,7 @@ function sqlTypeToTypeScriptType(uniqueColumnTypes: Map<SqlType, TypeScriptType>
         return uniqueType;
     }
 
-    throw new Error(`TODO sqlTypeToTypeScriptType ${sqlType}`);
+    return TypeScriptType.wrap(`/* sqlTypeToTypeScriptType Unknown/Invalid type: "${sqlType}" */`);
 }
 
 function colNullabilityStr(colNullability: ColNullability): string {
