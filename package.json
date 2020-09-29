@@ -27,6 +27,11 @@
     "url": "https://github.com/MedFlyt/mfsqlchecker/issues"
   },
   "homepage": "https://github.com/MedFlyt/mfsqlchecker#readme",
+  "files": [
+    "employees_demo.gif",
+    "build",
+    "TODO"
+  ],
   "dependencies": {
     "@types/adm-zip": "0.4.32",
     "@types/cli-progress": "1.8.1",
