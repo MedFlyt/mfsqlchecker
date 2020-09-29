@@ -42,7 +42,7 @@ export function start(context: vscode.ExtensionContext): State {
 
     context.subscriptions.push(state.diagnosticCollection);
 
-    vscode.workspace.findFiles("**/mfsqlchecker.json", undefined, 1).then(
+    vscode.workspace.findFiles("**/mfsqlchecker.json").then(
         value => {
             if (state.closing) {
                 return;
@@ -51,7 +51,7 @@ export function start(context: vscode.ExtensionContext): State {
             if (value.length === 0) {
                 vscode.window.showErrorMessage(`File mfsqlchecker.json does not exist`);
             } else if (value.length > 1) {
-                vscode.window.showErrorMessage(`Multiple mfsqlchecker.json files found`);
+                vscode.window.showErrorMessage(`Multiple mfsqlchecker.json files found:\n${value.join("\n")}`);
             } else {
                 const configPath = value[0].fsPath;
                 launch(state, configPath);
