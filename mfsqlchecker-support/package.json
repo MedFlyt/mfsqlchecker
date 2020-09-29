@@ -2,7 +2,7 @@
     "name": "mfsqlchecker-support",
     "displayName": "mfsqlchecker-support",
     "description": "mfsqlchecker integration for Visual Studio Code",
-    "version": "0.0.3",
+    "version": "0.1.0",
     "publisher": "medflyt",
     "engines": {
         "vscode": "^1.36.0"
