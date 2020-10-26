@@ -597,6 +597,11 @@ export class MigrationError extends Error {
     }
 }
 
+export interface MigrationHooks {
+    preMigrateHook?: (conn: pg.Client, logger: (message: string) => Promise<void>) => Promise<void>;
+    postMigrateHook?: (conn: pg.Client, logger: (message: string) => Promise<void>) => Promise<void>;
+}
+
 /**
  * Determines which migration files have not yet been run on the database, and
  * executes them. Will also create all of the mfsqlchecker views. Everything
@@ -605,8 +610,8 @@ export class MigrationError extends Error {
  * @throws `MigrationError` If the migration failed for any reason. The database
  * will be left in its original state
  */
-export async function migrateDatabase(conn: pg.Client, migrationsDir: string, logger: (message: string) => Promise<void>): Promise<void> {
-    await Migrate.migrate(conn, migrationsDir, allSqlViewCreateStatements.map(sqlViewPrivate), logger);
+export async function migrateDatabase(conn: pg.Client, migrationsDir: string, logger: (message: string) => Promise<void>, hooks?: MigrationHooks): Promise<void> {
+    await Migrate.migrate(conn, migrationsDir, allSqlViewCreateStatements.map(sqlViewPrivate), logger, hooks !== undefined ? hooks : {});
 }
 
 /**
@@ -826,7 +831,7 @@ namespace Migrate {
         return result;
     }
 
-    export async function migrate(conn: pg.Client, migrationsDir: string, views: SqlViewPrivate[], logger: (message: string) => Promise<void>): Promise<void> {
+    export async function migrate(conn: pg.Client, migrationsDir: string, views: SqlViewPrivate[], logger: (message: string) => Promise<void>, hooks: MigrationHooks): Promise<void> {
         const availableMigrations = await loadMigrationFiles(migrationsDir);
         await logger(`Found ${availableMigrations.length} migration files in current project`);
 
@@ -856,6 +861,13 @@ namespace Migrate {
                 }
             }
 
+            if (hooks.preMigrateHook !== undefined) {
+                const preMigrateHook = hooks.preMigrateHook;
+                await logger(`Running preMigrateHook...`);
+                await tryRunPg("run preMigrateHook", () => preMigrateHook(conn, logger));
+                await logger(`preMigrateHook done`);
+            }
+
             // Apply the migrations:
 
             for (const unappliedMigration of unappliedMigrations) {
@@ -878,6 +890,13 @@ namespace Migrate {
             // Create new views:
 
             await createNewViews(conn, views, logger);
+
+            if (hooks.postMigrateHook !== undefined) {
+                const postMigrateHook = hooks.postMigrateHook;
+                await logger(`Running postMigrateHook...`);
+                await tryRunPg("run postMigrateHook", () => postMigrateHook(conn, logger));
+                await logger(`postMigrateHook done`);
+            }
         });
 
         setViewsResolved(views);
