@@ -321,8 +321,8 @@ export function escapeIdentifier(str: string) {
  * Use this instead of the built-in promise support of pg.Client because
  * `connectionLogSQL` (currently) needs an actual callback
  */
-function clientQueryPromise(client: pg.Client, text: string, values: any[]) {
-    return new Promise<pg.QueryResult>((resolve, reject) => {
+async function clientQueryPromise(client: pg.Client, text: string, values: any[]): Promise<pg.QueryResult> {
+    return await new Promise<pg.QueryResult>((resolve, reject) => {
         client.query(text, values, (err: Error, result: pg.QueryResult): void => {
             if (<boolean>(<any>err)) {
                 reject(err);
@@ -1238,8 +1238,8 @@ async function withTransaction<A>(conn: pg.Client, action: () => Promise<A>): Pr
 /**
  * Generates a cryptographically random token
  */
-function randomSavepointName(): Promise<string> {
-    return new Promise<string>((resolve, reject) => {
+async function randomSavepointName(): Promise<string> {
+    return await new Promise<string>((resolve, reject) => {
         crypto.randomBytes(24, (err, buf) => {
             if (<boolean>(<any>err)) {
                 reject(err);
