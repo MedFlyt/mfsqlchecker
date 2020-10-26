@@ -918,7 +918,7 @@ namespace Migrate {
 
         await logger(`Database has ${existingViews.length} views. Code has ${views.length} views. Creating ${newViews.length} new views...`);
         await tryRunPg("run combined CREATE VIEW statements", () => createViews(conn, newViews));
-}
+    }
 
     export async function createViews(conn: pg.Client, views: SqlViewPrivate[]): Promise<void> {
         if (views.length === 0) {
@@ -1080,12 +1080,12 @@ namespace Migrate {
                 TRUE
             )
             `, [
-                migrationCols.version,
-                migrationCols.description,
-                metadata.fileName,
-                metadata.checksum,
-                executionTime
-            ]);
+            migrationCols.version,
+            migrationCols.description,
+            metadata.fileName,
+            metadata.checksum,
+            executionTime
+        ]);
     }
 
     export async function dropUnusedViews(conn: pg.Client, views: SqlViewPrivate[], logger: (message: string) => Promise<void>): Promise<void> {
