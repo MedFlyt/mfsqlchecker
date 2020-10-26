@@ -757,7 +757,7 @@ namespace Migrate {
         return result;
     }
 
-    async function runAndDropDependentViews<A>(conn: pg.Client, action: () => Promise<A>): Promise<A> {
+    async function runAndDropDependentViewsImpl<A>(conn: pg.Client, action: () => Promise<A>, droppingViewName: string | null): Promise<A> {
         const savepoint = await newSavepoint(conn);
         let result: A;
         try {
@@ -781,14 +781,14 @@ namespace Migrate {
                     if (pgErr.detail !== null) {
                         const viewName = extractViewName(pgErr.detail);
 
-                        if (viewName !== null) {
+                        if (viewName !== null && viewName !== droppingViewName) {
                             await rollbackToAndReleaseSavepoint(conn, savepoint);
 
-                            await runAndDropDependentViews(conn, async () => {
+                            await runAndDropDependentViewsImpl(conn, async () => {
                                 await conn.query(`DROP VIEW IF EXISTS ${escapeIdentifier(viewName)}`);
-                            });
+                            }, viewName);
 
-                            return runAndDropDependentViews(conn, action);
+                            return runAndDropDependentViewsImpl(conn, action, null);
                         }
                     }
                 }
@@ -798,6 +798,10 @@ namespace Migrate {
         }
         await releaseSavepoint(conn, savepoint);
         return result;
+    }
+
+    async function runAndDropDependentViews<A>(conn: pg.Client, action: () => Promise<A>): Promise<A> {
+        return await runAndDropDependentViewsImpl(conn, action, null);
     }
 
     async function tryRunPg<A>(description: string, action: () => Promise<A>): Promise<A> {
