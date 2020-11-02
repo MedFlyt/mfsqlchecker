@@ -890,6 +890,7 @@ namespace Migrate {
             // Create new views:
 
             await createNewViews(conn, views, logger);
+            setViewsResolved(views);
 
             if (hooks.postMigrateHook !== undefined) {
                 const postMigrateHook = hooks.postMigrateHook;
@@ -898,8 +899,6 @@ namespace Migrate {
                 await logger(`postMigrateHook done`);
             }
         });
-
-        setViewsResolved(views);
 
         await logger("Migration complete");
     }
