@@ -1,4 +1,4 @@
-import { Connection, Req, Opt } from "./lib/mfsqltool";
+import { Connection, Req, Opt } from "../lib/mfsqltool";
 import { EmployeeId, CarId, CustomerId } from "./types";
 
 export async function bloob() {

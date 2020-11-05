@@ -1,4 +1,4 @@
-import { defineSqlView, Opt, Req } from "../lib/mfsqltool";
+import { defineSqlView, Opt, Req } from "../../lib/mfsqltool";
 
 export const coolView = defineSqlView`SELECT 5`;
 

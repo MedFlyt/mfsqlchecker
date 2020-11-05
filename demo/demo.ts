@@ -1,5 +1,5 @@
 import * as pg from "pg";
-import { defineSqlView, Connection, Req, Opt, migrateDatabase, sqlFrag } from "./lib/mfsqltool";
+import { defineSqlView, Connection, Req, Opt, migrateDatabase, sqlFrag } from "../lib/mfsqltool";
 import { EmployeeId, CarId, CustomerId, DepartmentId } from "./types";
 
 // import { coolView } from "./blah";

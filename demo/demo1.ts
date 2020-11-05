@@ -1,4 +1,4 @@
-import { Connection, Opt, defineSqlView, Req } from "./lib/mfsqltool";
+import { Connection, Opt, defineSqlView, Req } from "../lib/mfsqltool";
 
 const myView = defineSqlView`SELECT fname, phonenumber FROM employee`;
 
