@@ -4,7 +4,7 @@ import * as ts from "typescript";
 import { Either } from "./either";
 import { ErrorDiagnostic, fileLineCol, nodeErrorDiagnostic } from "./ErrorDiagnostic";
 import { escapeIdentifier } from "./pg_extra";
-import { identifierImportedFrom, isIdentifierFromModule, ModuleId } from "./ts_extra";
+import { identifierImportedFrom, ModuleId } from "./ts_extra";
 import { calcViewName } from "./view_names";
 
 function viewNameLength(varName: string | null): number {
@@ -24,7 +24,7 @@ export function resolveViewIdentifier(projectDir: string, sourceFile: ts.SourceF
 }
 
 export class SqlViewDefinition {
-    static parseFromTemplateExpression(projectDir: string, sourceFile: ts.SourceFile, varName: string | null, node: ts.TemplateLiteral): Either<ErrorDiagnostic, SqlViewDefinition> {
+    static parseFromTemplateExpression(projectDir: string, sourceFile: ts.SourceFile, checker: ts.TypeChecker, varName: string | null, node: ts.TemplateLiteral): Either<ErrorDiagnostic, SqlViewDefinition> {
         if (ts.isNoSubstitutionTemplateLiteral(node)) {
             const sourceMap: [number, number, number][] = [[node.end - node.text.length, 0, node.text.length]];
             return {
@@ -49,17 +49,37 @@ export class SqlViewDefinition {
 
             for (let i = 0; i < node.templateSpans.length; ++i) {
                 const span = node.templateSpans[i];
-                if (!ts.isIdentifier(span.expression)) {
-                    return {
-                        type: "Left",
-                        value: nodeErrorDiagnostic(span, "defineSqlView template spans can only be identifiers (no other expressions allowed)")
-                    };
+
+                const type = checker.getTypeAtLocation(span.expression);
+                const maybeSqlFrag = tryTypeSqlFrag(type);
+                switch (maybeSqlFrag.type) {
+                    case "Left":
+                        return {
+                            type: "Left",
+                            value: nodeErrorDiagnostic(span, maybeSqlFrag.value)
+                        };
+                    case "Right":
+                        if (maybeSqlFrag.value !== null) {
+                            fragments.push({ type: "StringFragment", text: maybeSqlFrag.value });
+
+                            c += maybeSqlFrag.value.length;
+                        } else {
+                            if (!ts.isIdentifier(span.expression)) {
+                                return {
+                                    type: "Left",
+                                    value: nodeErrorDiagnostic(span, "defineSqlView template spans can only be identifiers (no other expressions allowed)")
+                                };
+                            }
+
+                            const qualifiedSqlViewName = resolveViewIdentifier(projectDir, sourceFile, span.expression);
+                            fragments.push({ type: "ViewReference", qualifiedSqlViewName: qualifiedSqlViewName });
+
+                            c += viewNameLength(span.expression.text);
+                        }
+                        break;
+                    default:
+                        assertNever(maybeSqlFrag);
                 }
-
-                const qualifiedSqlViewName = resolveViewIdentifier(projectDir, sourceFile, span.expression);
-                fragments.push({ type: "ViewReference", qualifiedSqlViewName: qualifiedSqlViewName });
-
-                c += viewNameLength(span.expression.text);
 
                 fragments.push({ type: "StringFragment", text: span.literal.text });
                 sourceMap.push([span.literal.end - span.literal.text.length -
@@ -340,7 +360,81 @@ function importedModuleName(projectDir: string, sourceFile: ts.SourceFile, impor
     return ModuleId.wrap(path.join(path.dirname(ModuleId.unwrap(sourceFileModuleName(projectDir, sourceFile))), importedModule));
 }
 
-export function sqlViewsLibraryAddFromSourceFile(projectDir: string, sourceFile: ts.SourceFile): [Map<QualifiedSqlViewName, SqlViewDefinition>, ErrorDiagnostic[]] {
+/**
+ * @returns `null` if the type is not an SqlFrag<T>
+ */
+export function tryTypeSqlFrag(type: ts.Type): Either<string, string | null> {
+    // TODO This should be more robust: make sure that it is the "SqlFrag" (or
+    // "SqlFragAuth") type defined in the sql library (and not some other
+    // user-defined type that happens to have the same name)
+
+    const symbol: ts.Symbol | undefined = <ts.Symbol | undefined>type.symbol;
+    if (symbol === undefined) {
+        return {
+            type: "Right",
+            value: null
+        };
+    }
+
+    if (symbol.name === "SqlFrag") {
+        const typeArguments = (<any>type).typeArguments;
+        if (Array.isArray(typeArguments)) {
+            if (typeArguments.length === 1) {
+                if (typeArguments[0].flags === ts.TypeFlags.String) {
+                    return {
+                        type: "Left",
+                        value: "Invalid call to `sqlFrag`: argument must be a String Literal (not a dynamic string)"
+                    };
+                } else if (typeArguments[0].flags === ts.TypeFlags.StringLiteral) {
+                    if (typeof typeArguments[0].value === "string") {
+                        return {
+                            type: "Right",
+                            value: typeArguments[0].value
+                        };
+                    }
+                }
+            }
+        }
+    }
+
+    if (symbol.name === "SqlFragAuth") {
+        const typeArguments = (<any>type).typeArguments;
+        if (Array.isArray(typeArguments)) {
+            if (typeArguments.length === 2) {
+                if (typeArguments[0].flags === ts.TypeFlags.String) {
+                    return {
+                        type: "Left",
+                        value: "Invalid call to `sqlFragAuth`: argument must be a String Literal (not a dynamic string)"
+                    };
+                } else if (typeArguments[0].flags === ts.TypeFlags.StringLiteral) {
+                    if (typeof typeArguments[0].value === "string") {
+                        return {
+                            type: "Right",
+                            value: typeArguments[0].value
+                        };
+                    }
+                }
+            }
+        }
+    }
+
+    return {
+        type: "Right",
+        value: null
+    };
+}
+
+function isSqlViewDefinition(checker: ts.TypeChecker, decl: ts.VariableDeclaration): boolean {
+    const name = checker.getTypeAtLocation(decl).symbol.name;
+
+    // TODO This should be more robust: make sure that it is the "SqlView" type
+    // defined in the sql library (and not some other user-defined type that
+    // happens to have the same name)
+
+    return name === "SqlView";
+}
+
+export function sqlViewsLibraryAddFromSourceFile(projectDir: string, checker: ts.TypeChecker, sourceFile: ts.SourceFile): [Map<QualifiedSqlViewName, SqlViewDefinition>, ErrorDiagnostic[]] {
     const viewLibrary = new Map<QualifiedSqlViewName, SqlViewDefinition>();
     const errorDiagnostics: ErrorDiagnostic[] = [];
 
@@ -349,17 +443,15 @@ export function sqlViewsLibraryAddFromSourceFile(projectDir: string, sourceFile:
             for (const decl of node.declarationList.declarations) {
                 if (decl.initializer !== undefined) {
                     if (ts.isTaggedTemplateExpression(decl.initializer)) {
-                        if (ts.isIdentifier(decl.initializer.tag) && isIdentifierFromModule(decl.initializer.tag, "defineSqlView", "./lib/sql_linter")) {
-                            if (!ts.isIdentifier(decl.name)) {
-                                errorDiagnostics.push(nodeErrorDiagnostic(decl.name, "defineSqlView not assigned to a variable"));
-                            } else {
+                        if (ts.isIdentifier(decl.initializer.tag) && isSqlViewDefinition(checker, decl)) {
+                            if (ts.isIdentifier(decl.name)) {
                                 // tslint:disable-next-line:no-bitwise
                                 if ((node.declarationList.flags & ts.NodeFlags.Const) === 0) {
                                     errorDiagnostics.push(nodeErrorDiagnostic(decl.name, "defineSqlView assigned to a non-const variable"));
                                 } else {
                                     const viewName = decl.name.text;
                                     const qualifiedSqlViewName = QualifiedSqlViewName.create(sourceFileModuleName(projectDir, sf), viewName);
-                                    const sqlViewDefinition = SqlViewDefinition.parseFromTemplateExpression(projectDir, sf, viewName, decl.initializer.template);
+                                    const sqlViewDefinition = SqlViewDefinition.parseFromTemplateExpression(projectDir, sf, checker, viewName, decl.initializer.template);
                                     switch (sqlViewDefinition.type) {
                                         case "Left":
                                             errorDiagnostics.push(sqlViewDefinition.value);

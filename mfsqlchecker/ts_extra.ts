@@ -15,18 +15,6 @@ export class ModuleId {
     protected _dummy: ModuleId[];
 }
 
-
-export function isIdentifierFromModule(node: ts.Identifier, identifierName: string, _moduleName: string): boolean {
-    if (node.text !== identifierName) {
-        return false;
-    }
-
-    // TODO validate that the identifier was imported from the moduleName (and
-    // not, for example, defined locally, or imported from some other module)
-
-    return true;
-}
-
 export function identifierImportedFrom(sourceFile: ts.SourceFile, ident: ts.Identifier): string | null {
     let moduleSpecifierText: string | null = null;
     let foundMultiple = false;

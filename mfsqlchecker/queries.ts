@@ -4,7 +4,7 @@ import * as ts from "typescript";
 import { Either } from "./either";
 import { ErrorDiagnostic, nodeErrorDiagnostic, SrcSpan } from "./ErrorDiagnostic";
 import { escapeIdentifier } from "./pg_extra";
-import { QualifiedSqlViewName, resolveViewIdentifier } from "./views";
+import { QualifiedSqlViewName, resolveViewIdentifier, tryTypeSqlFrag } from "./views";
 
 export interface QueryCallExpression {
     readonly fileName: string;
@@ -593,49 +593,6 @@ function isTypeSqlView(type: ts.Type): boolean {
         return false;
     }
     return symbol.name === "SqlView";
-}
-
-/**
- * @returns `null` if the type is not an SqlFrag<T>
- */
-function tryTypeSqlFrag(type: ts.Type): Either<string, string | null> {
-    // TODO This should be more robust: make sure that it is the "SqlFrag"
-    // type defined in the sql library (and not some other user-defined type
-    // that happens to have the same name)
-
-    const symbol: ts.Symbol | undefined = <ts.Symbol | undefined>type.symbol;
-    if (symbol === undefined) {
-        return {
-            type: "Right",
-            value: null
-        };
-    }
-
-    if (symbol.name === "SqlFrag") {
-        const typeArguments = (<any>type).typeArguments;
-        if (Array.isArray(typeArguments)) {
-            if (typeArguments.length === 1) {
-                if (typeArguments[0].flags === ts.TypeFlags.String) {
-                    return {
-                        type: "Left",
-                        value: "Invalid call to `sqlFrag`: argument must be a String Literal (not a dynamic string)"
-                    };
-                } else if (typeArguments[0].flags === ts.TypeFlags.StringLiteral) {
-                    if (typeof typeArguments[0].value === "string") {
-                        return {
-                            type: "Right",
-                            value: typeArguments[0].value
-                        };
-                    }
-                }
-            }
-        }
-    }
-
-    return {
-        type: "Right",
-        value: null
-    };
 }
 
 export function isNullableType(type: ts.Type): boolean {

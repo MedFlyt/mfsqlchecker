@@ -9,7 +9,7 @@ import { calcViewName, extractViewName } from "./view_names";
 
 export type ColumnParser<T> = (value: any) => T;
 
-export class Connection<T> {
+export class Connection<T, V> {
     /**
      * Used only to statically identify this type
      */
@@ -69,7 +69,7 @@ export class Connection<T> {
         }
     }
 
-    sql(literals: TemplateStringsArray, ...placeholders: (SqlView | SqlFrag<string> | number | number[] | string | string[] | boolean | boolean[] | null | T)[]): SqlQueryExpr<T> {
+    sql(literals: TemplateStringsArray, ...placeholders: (SqlView<V> | SqlFrag<string> | number | number[] | string | string[] | boolean | boolean[] | null | T)[]): SqlQueryExpr<T, V> {
         return new SqlQueryExpr(this, literals, placeholders);
     }
 
@@ -78,7 +78,7 @@ export class Connection<T> {
      * CONFLICT DO UPDATE ... WHERE' clause then you should use `insertMaybe`
      * instead
      */
-    async insert<Row extends object = any>(tableName: string, value: object, epilogue?: SqlQueryExpr<T>): Promise<ResultRow<Row>> {
+    async insert<Row extends object = any>(tableName: string, value: object, epilogue?: SqlQueryExpr<T, V>): Promise<ResultRow<Row>> {
         // Cast away the type of "this" so that "mfsqlchecker" doesn't detect
         // this line of code as query that should be analyzed
         const maybeRow: ResultRow<any> | null = (<any>this).insertMaybe(tableName, value, epilogue);
@@ -92,7 +92,7 @@ export class Connection<T> {
      * Use this only if your query contains an 'ON CONFLICT DO NOTHING' clause
      * or an 'ON CONFLICT DO UPDATE ... WHERE' clause
      */
-    async insertMaybe<Row extends object = any>(tableName: string, value: object, epilogue?: SqlQueryExpr<T>): Promise<ResultRow<Row | null>> {
+    async insertMaybe<Row extends object = any>(tableName: string, value: object, epilogue?: SqlQueryExpr<T, V>): Promise<ResultRow<Row | null>> {
         if (Array.isArray(value)) {
             throw new Error("Invalid insert call with value that is an Array (must be a single object)");
         }
@@ -157,7 +157,7 @@ export class Connection<T> {
         }
     }
 
-    async insertMany<Row extends object = any>(tableName: string, values: object[], epilogue?: SqlQueryExpr<T>): Promise<ResultRow<Row>[]> {
+    async insertMany<Row extends object = any>(tableName: string, values: object[], epilogue?: SqlQueryExpr<T, V>): Promise<ResultRow<Row>[]> {
         if (values.length === 0) {
             return [];
         }
@@ -258,7 +258,7 @@ export class Connection<T> {
         return await clientQueryPromise(this.client, text, values);
     }
 
-    async query<Row extends object = any>(query: SqlQueryExpr<T>): Promise<ResultRow<Row>[]> {
+    async query<Row extends object = any>(query: SqlQueryExpr<T, V>): Promise<ResultRow<Row>[]> {
         const [text, values] = query.render();
         const queryResult = await this.executeQuery(text, values);
         for (const row of queryResult.rows) {
@@ -276,7 +276,7 @@ export class Connection<T> {
         return queryResult.rows;
     }
 
-    async queryOne<Row extends object = any>(query: SqlQueryExpr<T>): Promise<ResultRow<Row>> {
+    async queryOne<Row extends object = any>(query: SqlQueryExpr<T, V>): Promise<ResultRow<Row>> {
         // Cast away the type of "this" so that "mfsqlchecker" doesn't detect
         // this line of code as query that should be analyzed
         const rows: ResultRow<any>[] = await (<any>this).query(query);
@@ -291,7 +291,7 @@ export class Connection<T> {
      * @param query SQL query string
      * @returns The first ROW of queried dataset or NULL if query didnt return rows
      */
-    async queryOneOrNone<Row extends object = any>(query: SqlQueryExpr<T>): Promise<ResultRow<Row> | null> {
+    async queryOneOrNone<Row extends object = any>(query: SqlQueryExpr<T, V>): Promise<ResultRow<Row> | null> {
         // Cast away the type of "this" so that "mfsqlchecker" doesn't detect
         // this line of code as query that should be analyzed
         const rows: ResultRow<any>[] = await (<any>this).query(query);
@@ -334,8 +334,8 @@ async function clientQueryPromise(client: pg.Client, text: string, values: any[]
     });
 }
 
-export class SqlQueryExpr<T> {
-    constructor(private conn: Connection<T>, private literals: TemplateStringsArray, private placeholders: (SqlView | SqlFrag<string> | number | number[] | string | string[] | boolean | boolean[] | null | T)[]) {
+export class SqlQueryExpr<T, V> {
+    constructor(private conn: Connection<T, V>, private literals: TemplateStringsArray, private placeholders: (SqlView<V> | SqlFrag<string> | number | number[] | string | string[] | boolean | boolean[] | null | T)[]) {
     }
 
     render(paramNumOffset: number = 0): [string, any[]] {
@@ -351,8 +351,8 @@ export class SqlQueryExpr<T> {
                     throw new Error(`View "${placeholder.getViewName()}" has not been created. Views are only allowed to be defined at module-level scope`);
                 }
                 text += escapeIdentifier(placeholder.getViewName());
-            } else if (placeholder instanceof SqlFrag) {
-                text += placeholder.text;
+            } else if (isSqlFrag(placeholder)) {
+                text += placeholder.runtimeText;
             } else {
                 values.push((<any>this.conn).preparePlaceholder(`query placeholder index ${i}`, placeholder));
                 text += "($" + (values.length + paramNumOffset) + ")";
@@ -364,7 +364,7 @@ export class SqlQueryExpr<T> {
         return [text, values];
     }
 
-    protected dummy: SqlQueryExpr<T>[];
+    protected dummy: [SqlQueryExpr<T, V>[], T, V];
 }
 
 export interface SqlParameter {
@@ -476,43 +476,59 @@ function stringifyRealValRow(obj: any): string {
 }
 
 export class SqlFrag<T extends string> {
-    private constructor(text: string) {
+    protected constructor(text: string, runtimeText: string | undefined) {
         this.text = text;
+        this.runtimeText = runtimeText !== undefined ? runtimeText : text;
     }
 
     readonly text: string;
+    readonly runtimeText: string;
 
-    protected dummy: SqlFrag<T>[];
+    protected dummy: [SqlFrag<T>[], T];
     protected tag: T;
 
-    private static Create<S extends string>(text: string): SqlFrag<S> {
+    protected static Create<S extends string>(text: string, runtimeText: string | undefined): SqlFrag<S> {
         SqlFrag.Create; // tslint:disable-line:no-unused-expression
-        return new SqlFrag<S>(text);
+        return new SqlFrag<S>(text, runtimeText);
     }
 }
 
-export function sqlFrag<T extends string>(text: T): SqlFrag<T> {
-    return (<any>SqlFrag).Create(text);
+export function sqlFrag<T extends string>(text: T, runtimeText?: string): SqlFrag<T> {
+    return (<any>SqlFrag).Create(text, runtimeText);
 }
 
-export abstract class SqlView {
+export class SqlFragAuth<T extends string, Auth> {
+    protected dummy: [SqlFragAuth<T, Auth>[], T, Auth];
+}
+
+export function sqlFragAuth<Auth>(): <T extends string>(text: T, runtimeText?: string) => SqlFragAuth<T, Auth> {
+    return <T extends string>(text: T, runtimeText?: string): SqlFragAuth<T, Auth> => {
+        return <any>sqlFrag(text, runtimeText);
+    };
+}
+
+function isSqlFrag(obj: any): obj is SqlFrag<string> {
+    return obj instanceof SqlFrag;
+}
+
+export abstract class SqlView<Auth> {
     private constructor() { }
 
     abstract getViewName(): string;
 
-    protected dummy: SqlView[];
+    protected dummy: [SqlView<Auth>[], Auth];
 }
 
-function isSqlView(obj: any): obj is SqlView {
+function isSqlView(obj: any): obj is SqlView<unknown> {
     return obj instanceof SqlViewPrivate;
 }
 
-function newSqlView(viewName: string, createQuery: string): SqlView {
+function newSqlView<V>(viewName: string, createQuery: string): SqlView<V> {
     const view = new SqlViewPrivate(viewName, createQuery);
     return <any>view;
 }
 
-function sqlViewPrivate(view: SqlView): SqlViewPrivate {
+function sqlViewPrivate(view: SqlView<unknown>): SqlViewPrivate {
     return <any>view;
 }
 
@@ -549,7 +565,7 @@ class SqlViewPrivate {
     private resolved: boolean = false;
 }
 
-const allSqlViewCreateStatements: SqlView[] = [];
+const allSqlViewCreateStatements: SqlView<unknown>[] = [];
 
 /**
  * Very hacky
@@ -573,18 +589,23 @@ function peekAssignedVariableName(): string | null {
     return null;
 }
 
-export function defineSqlView(x: TemplateStringsArray, ...placeholders: SqlView[]): SqlView {
+export function defineSqlViewPrimitive<V>(x: TemplateStringsArray, ...placeholders: (SqlView<unknown> | SqlFrag<string> | SqlFragAuth<string, unknown>)[]): SqlView<V> {
     const varName = peekAssignedVariableName();
 
     let query: string = x[0];
     for (let i = 0; i < placeholders.length; ++i) {
-        query += "\"" + placeholders[i].getViewName() + "\"";
+        const placeholder = placeholders[i];
+        if (isSqlView(placeholder)) {
+            query += escapeIdentifier(placeholder.getViewName());
+        } else if (isSqlFrag(placeholder)) {
+            query += placeholder.runtimeText;
+        }
         query += x[i + 1];
     }
 
     const viewName = calcViewName(varName, query);
 
-    const sqlView = newSqlView(viewName, `CREATE VIEW ${escapeIdentifier(viewName)} AS\n${query}`);
+    const sqlView = newSqlView<V>(viewName, `CREATE VIEW ${escapeIdentifier(viewName)} AS\n${query}`);
 
     allSqlViewCreateStatements.push(sqlView);
 

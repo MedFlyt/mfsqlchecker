@@ -27,7 +27,7 @@ export class SqlCheckerEngine {
             if (sf === undefined) {
                 throw new Error("SourceFile not found: " + sourceFile);
             }
-            const [views, errs] = sqlViewsLibraryAddFromSourceFile(projectDir, sf);
+            const [views, errs] = sqlViewsLibraryAddFromSourceFile(projectDir, checker, sf);
             errorDiagnostics = errorDiagnostics.concat(errs);
             for (const key of this.viewLibrary.keys()) {
                 if (QualifiedSqlViewName.moduleId(key) === sourceFileModuleName(projectDir, sf)) {

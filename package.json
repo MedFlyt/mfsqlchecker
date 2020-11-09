@@ -1,6 +1,6 @@
 {
   "name": "mfsqlchecker",
-  "version": "0.0.23",
+  "version": "0.1.3",
   "description": "Statically validate correctness of all your SQL queries. TypeScript, PostgreSQL",
   "main": "index.js",
   "bin": "./mfsqlchecker.js",
@@ -9,7 +9,8 @@
     "ts-watch": "tsc --project mfsqlchecker --watch",
     "check-demo": "node ./mfsqlchecker.js -p demo -c demo/mfsqlchecker.json",
     "lint": "tslint --project ./mfsqlchecker/tsconfig.json --format stylish",
-    "lint-fix": "tslint --project ./mfsqlchecker/tsconfig.json --format stylish --fix"
+    "lint-fix": "tslint --project ./mfsqlchecker/tsconfig.json --format stylish --fix",
+    "test": "node tests/run_tests.js"
   },
   "repository": {
     "type": "git",
@@ -60,5 +61,8 @@
     "tar": "4.4.10",
     "tslint": "5.18.0",
     "typescript": "3.5.3"
+  },
+  "devDependencies": {
+    "glob": "7.1.6"
   }
 }
