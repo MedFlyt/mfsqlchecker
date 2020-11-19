@@ -1,4 +1,3 @@
-
 import { sqlFrag, Connection, Opt, defineSqlViewPrimitive } from "../../lib/mfsqltool";
 
 const trueFrag = sqlFrag("true");

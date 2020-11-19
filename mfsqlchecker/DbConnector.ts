@@ -1062,7 +1062,7 @@ function sqlTypeToTypeScriptType(uniqueColumnTypes: Map<SqlType, TypeScriptType>
     // See: <https://www.postgresql.org/docs/12/xtypes.html#id-1.8.3.16.13.1>
     if (SqlType.unwrap(sqlType).startsWith("_")) {
         const elemType = sqlTypeToTypeScriptType(uniqueColumnTypes, SqlType.wrap(SqlType.unwrap(sqlType).substring(1)));
-        return TypeScriptType.wrap(TypeScriptType.unwrap(elemType) + "[]");
+        return TypeScriptType.wrap(`(${TypeScriptType.unwrap(elemType)} | null)[]`);
     }
 
     switch (SqlType.unwrap(sqlType)) {
