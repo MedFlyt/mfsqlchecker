@@ -7,7 +7,6 @@ const glob = require("glob");
 
 function main() {
     const dirs = process.argv.slice(2);
-    // TODO If dirs is non-empty then only run those tests
 
     glob("tests/test_*/", (err, files) => {
         if (err) {
@@ -15,7 +14,19 @@ function main() {
             return;
         }
 
-        const passed = runTests(files);
+        // TODO Better filtering of "dirs"
+        const filteredFiles = dirs.length === 0
+            ? files
+            : files.filter(file => {
+                for (const dir of dirs) {
+                    if (file.indexOf(dir) >= 0) {
+                        return true;
+                    }
+                }
+                return false;
+            });
+
+        const passed = runTests(filteredFiles);
         if (!passed) {
             process.exit(1);
         }
