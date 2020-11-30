@@ -838,18 +838,19 @@ function readTypeScriptType(checker: ts.TypeChecker, type: ts.Type): TypeScriptT
 }
 
 
-function getColNullability(symbol: ts.Symbol): ColNullability | null {
-    // This just does a crude string comparison on the "name". It is not robst
-    // because even if the name of the type is "Req" (or "Opt") it does not
+function getColNullability(memberType: ts.TypeReferenceNode): ColNullability | null {
+    // This just does a crude string comparison on the result of "getText()". It
+    // is not robust because even if the name is "Req" (or "Opt") it does not
     // necessarily refer to the same "Req" (or "Opt") type that we are talking
     // about.
     //
-    // But this crude check is acceptable, because in the unexpected case
-    // where it's referring to some other "Req" (or "Opt") type, then the
-    // regular TypeScript type-checker will catch the error.
-    if (symbol.name === "Req") {
+    // But this crude check is acceptable, because in the unexpected case where
+    // it's referring to some other "Req" (or "Opt") type, then the regular
+    // TypeScript type-checker will catch the error.
+    const name = memberType.typeName.getText();
+    if (name === "Req") {
         return ColNullability.REQ;
-    } else if (symbol.name === "Opt") {
+    } else if (name === "Opt") {
         return ColNullability.OPT;
     } else {
         return null;
@@ -883,11 +884,12 @@ function typeLiteralNodeToColTypes(checker: ts.TypeChecker, typeLiteral: ts.Type
             if (member.type === undefined) {
                 errorReporter(nodeErrorDiagnostic(member, "Property must have a type"));
             } else {
-                if (!ts.isIdentifier(member.name)) {
+                if (!ts.isTypeReferenceNode(member.type)) {
+                    errorReporter(nodeErrorDiagnostic(member, "Property type is not a TypeReferenceNode"));
+                } else if (!ts.isIdentifier(member.name)) {
                     errorReporter(nodeErrorDiagnostic(member, "Property name is not an identifier"));
                 } else {
-                    const memberType = checker.getTypeAtLocation(member.type);
-                    const colTypes = getTypeMemberColTypes(checker, member, member.name.text, memberType);
+                    const colTypes = getTypeMemberColTypes(checker, member, member.name.text, member.type);
                     switch (colTypes.type) {
                         case "Left":
                             errorReporter(colTypes.value);
@@ -908,57 +910,56 @@ function typeLiteralNodeToColTypes(checker: ts.TypeChecker, typeLiteral: ts.Type
 function typeSymbolMembersToColTypes(checker: ts.TypeChecker, node: ts.Node, members: Map<string, ts.Symbol>, errorReporter: (error: ErrorDiagnostic) => void): Map<string, [ColNullability, TypeScriptType]> {
     const results = new Map<string, [ColNullability, TypeScriptType]>();
     members.forEach((value, key) => {
-        const memberType = checker.getTypeAtLocation(value.valueDeclaration);
-
-        const colTypes = getTypeMemberColTypes(checker, node, key, memberType);
-        switch (colTypes.type) {
-            case "Left":
-                errorReporter(colTypes.value);
-                break;
-            case "Right":
-                results.set(key, colTypes.value);
-                break;
-            default:
-                assertNever(colTypes);
+        if (!ts.isPropertySignature(value.valueDeclaration)) {
+            errorReporter(nodeErrorDiagnostic(node, "valueDeclaration is not a PropertySignature"));
+        } else if (value.valueDeclaration.type === undefined) {
+            errorReporter(nodeErrorDiagnostic(node, "valueDeclaration is missing type"));
+        } else if (!ts.isTypeReferenceNode(value.valueDeclaration.type)) {
+            errorReporter(nodeErrorDiagnostic(node, "valueDeclaration type is not a TypeReferenceNode"));
+        } else {
+            const colTypes = getTypeMemberColTypes(checker, node, key, value.valueDeclaration.type);
+            switch (colTypes.type) {
+                case "Left":
+                    errorReporter(colTypes.value);
+                    break;
+                case "Right":
+                    results.set(key, colTypes.value);
+                    break;
+                default:
+                    assertNever(colTypes);
+            }
         }
     });
     return results;
 }
 
-function getTypeMemberColTypes(checker: ts.TypeChecker, node: ts.Node, propName: string, memberType: ts.Type): Either<ErrorDiagnostic, [ColNullability, TypeScriptType]> {
-    if (memberType.flags !== ts.TypeFlags.Object) {
+function getTypeMemberColTypes(checker: ts.TypeChecker, node: ts.Node, propName: string, memberType: ts.TypeReferenceNode): Either<ErrorDiagnostic, [ColNullability, TypeScriptType]> {
+    const colNullability = getColNullability(memberType);
+    if (colNullability === null) {
         return {
             type: "Left",
             value: nodeErrorDiagnostic(node, `Invalid type for property "${propName}", it must be \`Req<T>\` or \`Opt<T>\``)
         };
     } else {
-        const colNullability = getColNullability(memberType.symbol);
-        if (colNullability === null) {
+        if (memberType.typeArguments === undefined || memberType.typeArguments.length < 1) {
             return {
                 type: "Left",
                 value: nodeErrorDiagnostic(node, `Invalid type for property "${propName}", it must be \`Req<T>\` or \`Opt<T>\``)
             };
         } else {
-            const typeArguments: ts.Type[] | undefined = (<any>memberType).typeArguments;
-            if (typeArguments === undefined || typeArguments.length < 1) {
+            const typeArgument = memberType.typeArguments[0];
+            const typeArgumentType = checker.getTypeFromTypeNode(typeArgument);
+            const type = readTypeScriptType(checker, typeArgumentType);
+            if (type === null) {
                 return {
                     type: "Left",
-                    value: nodeErrorDiagnostic(node, `Invalid type for property "${propName}", it must be \`Req<T>\` or \`Opt<T>\``)
+                    value: nodeErrorDiagnostic(node, `Invalid type for property "${propName}": ${checker.typeToString(typeArgumentType)}`)
                 };
             } else {
-                const typeArgument = typeArguments[0];
-                const type = readTypeScriptType(checker, typeArgument);
-                if (type === null) {
-                    return {
-                        type: "Left",
-                        value: nodeErrorDiagnostic(node, `Invalid type for property "${propName}": ${checker.typeToString(typeArgument)}`)
-                    };
-                } else {
-                    return {
-                        type: "Right",
-                        value: [colNullability, type]
-                    };
-                }
+                return {
+                    type: "Right",
+                    value: [colNullability, type]
+                };
             }
         }
     }

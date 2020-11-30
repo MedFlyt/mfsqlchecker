@@ -388,36 +388,65 @@ export type ResultRow<T> = {
     );
 };
 
-export abstract class Req<T> {
+export type Req<T> = {
     /**
      * Retrieve the value of the column
      */
-    abstract val(): T;
+    val(): T;
 
     /**
      * Retrieve the value of the column when it may be null. Use this when the
      * column is the result of a LEFT JOIN
      */
-    abstract forceNullable(): T | null;
+    forceNullable(): T | null;
+} &
+    (T extends (infer K | null)[]
+        ? {
+            /**
+             * Retrieve the value of the column, assuming that none of the elements
+             * in the array are null. It is an error if any of the elements are null.
+             */
+            forceArrayNoNulls(): K[];
 
-    protected dummy: Req<T>[];
-}
+            /**
+             * Retrieve the (possible NULL) value of the column, assuming that
+             * none of the elements in the array are null. It is an error if any
+             * of the elements are null.
+             */
+            forceNullableArrayNoNulls(): K[] | null;
+        }
+        : {});
 
-export abstract class Opt<T> {
+export type Opt<T> = {
     /**
      * Retreive the value of the column
      */
-    abstract valOpt(): T | null;
+    valOpt(): T | null;
 
     /**
      * Retreive the value of the column when you are sure that it cannot be
      * null. This is appropriate to use on columns that are a result of some
      * computation that you know cannot return a null result.
      */
-    abstract forceNotNull(): T;
+    forceNotNull(): T;
+} &
+    (T extends (infer K | null)[]
+        ? {
+            /**
+             * Retrieve the (possible NULL) value of the column, assuming that
+             * none of the elements in the array are null. It is an error if any
+             * of the elements are null.
+             */
+            optForceArrayNoNulls(): K[] | null;
 
-    protected dummy: Opt<T>[];
-}
+            /**
+             * Retrieve the value of the column when you are sure that it cannot
+             * be null, and assuming that none of the elements in the array are
+             * null. It is an error if any of the elements are null.
+             */
+            forceNotNullArrayNoNulls(): K[];
+        }
+        : {});
 
 /**
  * A bizarre hybrid implementation of both `Req` and `Opt`
@@ -447,6 +476,44 @@ class RealVal {
     }
 
     /**
+     * Implementation of Req<T>.forceArrayNoNulls
+     */
+    forceArrayNoNulls(): any[] {
+        if (this.v === null) {
+            throw new Error(`Column "${this.c}" is NULL!\nTwo fixes:\n1. Use "forceNullableArrayNoNulls" (instead of "forceArrayNoNulls")\n2. Modify your SQL query to return an "Opt<T>" column\nFull row:\n${stringifyRealValRow(this.r)}`);
+        }
+        if (!Array.isArray(this.v)) {
+            throw new Error(`Column "${this.c}" is not an array!\nThis is a bug in mfsqlchecker\nFull row:\n${stringifyRealValRow(this.r)}`);
+        }
+        const l = this.v.length;
+        for (let i = 0; i < l; ++i) {
+            if (this.v[i] === null) {
+                throw new Error(`Column "${this.c} contains a NULL value (at index ${i})!\nUse "val" (instead of "forceArrayNoNulls")\nFull row:\n${stringifyRealValRow(this.r)}`);
+            }
+        }
+        return this.v;
+    }
+
+    /**
+     * Implementation of Req<T>.forceNullableArrayNoNulls
+     */
+    forceNullableArrayNoNulls(): any[] | null {
+        if (this.v === null) {
+            return null;
+        }
+        if (!Array.isArray(this.v)) {
+            throw new Error(`Column "${this.c}" is not an array!\nThis is a bug in mfsqlchecker\nFull row:\n${stringifyRealValRow(this.r)}`);
+        }
+        const l = this.v.length;
+        for (let i = 0; i < l; ++i) {
+            if (this.v[i] === null) {
+                throw new Error(`Column "${this.c}" contains a NULL value (at index ${i})!\nUse "forceNullable" (instead of "forceNullableArrayNoNulls")\nFull row:\n${stringifyRealValRow(this.r)}`);
+            }
+        }
+        return this.v;
+    }
+
+    /**
      * Implementation of Opt<T>.valOpt
      */
     valOpt(): any | null {
@@ -459,6 +526,44 @@ class RealVal {
     forceNotNull(): any {
         if (this.v === null) {
             throw new Error(`Column "${this.c}" is NULL!\nUse "valOpt" (instead of "forceNotNull")\nFull row:\n${stringifyRealValRow(this.r)}`);
+        }
+        return this.v;
+    }
+
+    /**
+     * Implementation of Opt<T>.optForceArrayNoNulls
+     */
+    optForceArrayNoNulls(): any[] | null {
+        if (this.v === null) {
+            return null;
+        }
+        if (!Array.isArray(this.v)) {
+            throw new Error(`Column "${this.c}" is not an array!\nThis is a bug in mfsqlchecker\nFull row:\n${stringifyRealValRow(this.r)}`);
+        }
+        const l = this.v.length;
+        for (let i = 0; i < l; ++i) {
+            if (this.v[i] === null) {
+                throw new Error(`Column "${this.c}" contains a NULL value (at index ${i})!\nUse "valOpt" (instead of "optForceArrayNoNulls")\nFull row:\n${stringifyRealValRow(this.r)}`);
+            }
+        }
+        return this.v;
+    }
+
+    /**
+     * Implementation of Opt<T>.forceNotNullArrayNoNulls
+     */
+    forceNotNullArrayNoNulls(): any[] {
+        if (this.v === null) {
+            throw new Error(`Column "${this.c}" is NULL!\nUse "optForceArrayNoNulls" (instead of "forceNotNullArrayNoNulls")\nFull row:\n${stringifyRealValRow(this.r)}`);
+        }
+        if (!Array.isArray(this.v)) {
+            throw new Error(`Column "${this.c}" is not an array!\nThis is a bug in mfsqlchecker\nFull row:\n${stringifyRealValRow(this.r)}`);
+        }
+        const l = this.v.length;
+        for (let i = 0; i < l; ++i) {
+            if (this.v[i] === null) {
+                throw new Error(`Column "${this.c}" contains a NULL value (at index ${i})!\nUse "forceNotNull" (instead of "forceNotNullArrayNoNulls")\nFull row:\n${stringifyRealValRow(this.r)}`);
+            }
         }
         return this.v;
     }
