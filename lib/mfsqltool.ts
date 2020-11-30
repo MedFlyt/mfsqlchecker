@@ -571,7 +571,9 @@ const allSqlViewCreateStatements: SqlView<unknown>[] = [];
  * Very hacky
  */
 function peekAssignedVariableName(): string | null {
-    const stackFrame = stackTrace.parse(new Error())[2];
+    // TODO Instead of hardcoding index 3, we need to search the stacktrace for
+    // "defineSqlViewPrimitive" and then take one above that
+    const stackFrame = stackTrace.parse(new Error())[3];
     const file = fs.readFileSync(stackFrame.getFileName(), { encoding: "utf8" });
     const lines = file.split("\n");
     const line = lines[stackFrame.getLineNumber() - 1];
