@@ -115,7 +115,7 @@ export class SqlViewDefinition {
         let result: string = "";
         for (const frag of this.fragments) {
             if (frag.type === "ViewReference") {
-                throw new Error("SqlViewDefinition is not fully resolved");
+                throw new Error(`SqlViewDefinition "${frag.qualifiedSqlViewName}" is not fully resolved`);
             }
             result += frag.text;
         }
