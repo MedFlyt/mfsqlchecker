@@ -815,6 +815,8 @@ function typescriptTypeToSqlType(typeScriptUniqueColumnTypes: Map<TypeScriptType
         return SqlType.wrap("date");
     } else if (type.symbol.name === "LocalTime") {
         return SqlType.wrap("time");
+    } else if (type.symbol.name === "UUID") {
+        return SqlType.wrap("uuid");
     }
 
     return null;

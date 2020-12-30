@@ -1089,6 +1089,8 @@ function sqlTypeToTypeScriptType(uniqueColumnTypes: Map<SqlType, TypeScriptType>
             return TypeScriptType.wrap("LocalDate");
         case "time":
             return TypeScriptType.wrap("LocalTime");
+        case "uuid":
+            return TypeScriptType.wrap("UUID");
 
         default:
     }
