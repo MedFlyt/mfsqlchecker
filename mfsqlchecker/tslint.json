@@ -106,6 +106,7 @@
         "static-this": true,
         "no-async-without-await": true,
         "await-promise": true,
+        "no-return-await": false,
         "match-default-export-name": true,
         "no-unnecessary-qualifier": true,
         "no-for-in-array": true,

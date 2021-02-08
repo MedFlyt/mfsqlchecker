@@ -142,6 +142,26 @@ function downloadFile(url: string, filePath: string): Promise<void> {
     });
 }
 
+async function mkdtemp(prefix: string): Promise<string> {
+    return await new Promise<string>((resolve, reject) => {
+        fs.mkdtemp(prefix, (err, folder) => {
+            if (<any>err) {
+                reject(err);
+                return;
+            }
+            resolve(folder);
+        });
+    });
+}
+
+async function rimrafIgnoreErrors(filePath: string): Promise<void> {
+    return new Promise<void>((resolve) => {
+        rimraf(filePath, () => {
+            resolve();
+        });
+    });
+}
+
 class TempDir {
     static async create(): Promise<TempDir> {
         await new Promise<void>((resolve, reject) => {
@@ -153,25 +173,13 @@ class TempDir {
                 resolve();
             });
         });
-        const directory = await new Promise<string>((resolve, reject) => {
-            fs.mkdtemp(path.join(os.tmpdir(), APP_NAME) + path.sep, (err, folder) => {
-                if (<any>err) {
-                    reject(err);
-                    return;
-                }
-                resolve(folder);
-            });
-        });
+        const directory = await mkdtemp(path.join(os.tmpdir(), APP_NAME) + path.sep + "tmp-");
         return new TempDir(directory);
     }
 
-    close(): Promise<void> {
-        return new Promise<void>((resolve) => {
-            rimraf(this.directory, () => {
-                // Ignore any errors since there is nothing we can do about them
-                resolve();
-            });
-        });
+    async close(): Promise<void> {
+        // Ignore any errors since there is nothing we can do about them
+        await rimrafIgnoreErrors(this.directory);
     }
 
     readonly directory: string;
@@ -200,7 +208,7 @@ export async function downloadPostgres(platform: Platform, postgresVersion: Post
 
     console.log("Downloading", url);
 
-    const extractDir = targetDir + "-tmp";
+    const extractDir = await mkdtemp(targetDir + "-tmp-");
 
     await withTempDir(async tmpDir => {
         const file = path.join(tmpDir, "tmp.tar.gz");
@@ -243,6 +251,10 @@ export async function downloadPostgres(platform: Platform, postgresVersion: Post
                 // The target directory already exists. We can ignore, because
                 // it means that some concurrent process was racing us to
                 // install it and finished before us
+                console.log(`Target directory already exists (created by a concurrent process)`);
+
+                // Cleanup after ourselves:
+                await rimrafIgnoreErrors(extractDir);
             } else {
                 throw err;
             }
