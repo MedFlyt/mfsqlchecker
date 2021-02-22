@@ -142,6 +142,36 @@ function downloadFile(url: string, filePath: string): Promise<void> {
     });
 }
 
+async function downloadFileWithRetry(url: string, filePath: string): Promise<void> {
+    const MAX_RETRIES = 10;
+
+    let retryCount = 0;
+    while (true) {
+        try {
+            console.log("Downloading:", url);
+            const result = await downloadFile(url, filePath);
+            return result;
+        } catch (err) {
+            retryCount++;
+            if (retryCount === MAX_RETRIES) {
+                throw err;
+            }
+            console.log("Error downloading:", url);
+            console.log();
+            console.log(err);
+            console.log();
+            console.log("Sleeping...");
+            await delay(10000);
+        }
+    }
+}
+
+function delay(millis: number): Promise<void> {
+    return new Promise<void>((resolve, _reject) => {
+        setTimeout(resolve, millis);
+    });
+}
+
 async function mkdtemp(prefix: string): Promise<string> {
     return await new Promise<string>((resolve, reject) => {
         fs.mkdtemp(prefix, (err, folder) => {
@@ -214,7 +244,7 @@ export async function downloadPostgres(platform: Platform, postgresVersion: Post
 
     await withTempDir(async tmpDir => {
         const file = path.join(tmpDir, "tmp.tar.gz");
-        await downloadFile(url, file);
+        await downloadFileWithRetry(url, file);
 
         await makeDir(extractDir);
 
