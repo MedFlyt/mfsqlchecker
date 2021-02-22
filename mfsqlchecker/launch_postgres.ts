@@ -208,6 +208,8 @@ export async function downloadPostgres(platform: Platform, postgresVersion: Post
 
     console.log("Downloading", url);
 
+    await makeDir(path.dirname(targetDir));
+
     const extractDir = await mkdtemp(targetDir + "-tmp-");
 
     await withTempDir(async tmpDir => {
