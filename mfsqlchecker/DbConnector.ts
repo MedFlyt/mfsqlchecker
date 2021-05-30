@@ -931,90 +931,163 @@ class TableColsLibrary {
     public async refreshViews(client: pg.Client): Promise<void> {
         this.viewLookupTable = new Map<string, boolean>();
 
-        // TODO Detect pg version from the `client` object (issue "select
-        // version()" query?)
-        const PG_VERSION_LT_100 = false;
-
-        const subselectRegex = PG_VERSION_LT_100
-            ? `:subselect {.*?:constraintDeps <>} :location \\d+} :res(no|ult)`
-            : `:subselect {.*?:stmt_len 0} :location \\d+} :res(no|ult)`;
-
         // This query was taken from here and (slightly) adapted:
-        // <https://github.com/PostgREST/postgrest/blob/e83144ce7fc239b3161f53f17ecaf80fbb9e19f8/src/PostgREST/DbStructure.hs#L725>
+        // <https://github.com/PostgREST/postgrest/blob/5c75f0dcc295e6bd847af6d9703fad5b9c3d76c9/src/PostgREST/DbStructure.hs#L782>
+        //
+        // Changes from the original query:
+        //   1. Changed returned columns to oid format instead of names
+        //   2. Return all columns (not just primary and foreign keys)
         const queryResult = await client.query(
             `
-            with views as (
-                select
-                  n.nspname   as view_schema,
-                  c.oid       as view_oid,
-                  c.relname   as view_name,
-                  r.ev_action as view_definition
-                from pg_class c
-                join pg_namespace n on n.oid = c.relnamespace
-                join pg_rewrite r on r.ev_class = c.oid
-                where (c.relkind in ('v', 'm')) and n.nspname = 'public'
-              ),
-              removed_subselects as(
-                select
-                  view_schema, view_name, view_oid,
-                  regexp_replace(view_definition, '${subselectRegex}', '', 'g') as x
-                from views
-              ),
-              target_lists as(
-                select
-                  view_schema, view_name, view_oid,
-                  regexp_split_to_array(x, 'targetList') as x
-                from removed_subselects
-              ),
-              last_target_list_wo_tail as(
-                select
-                  view_schema, view_name, view_oid,
-                  (regexp_split_to_array(x[array_upper(x, 1)], ':onConflict'))[1] as x
-                from target_lists
-              ),
-              target_entries as(
-                select
-                  view_schema, view_name, view_oid,
-                  unnest(regexp_split_to_array(x, 'TARGETENTRY')) as entry
-                from last_target_list_wo_tail
-              ),
-              results as(
-                select
-                  view_schema, view_name, view_oid,
-                  substring(entry from ':resname (.*?) :') as view_colum_name,
-                  substring(entry from ':resorigtbl (.*?) :') as resorigtbl,
-                  substring(entry from ':resorigcol (.*?) :') as resorigcol
-                from target_entries
-              )
+            with recursive
+            views as (
               select
-                -- sch.nspname as table_schema,
-                -- tbl.relname as table_name,
-                tbl.oid     as table_oid,
-                -- col.attname as table_column_name,
-                col.attnum  as table_column_num,
-                -- res.view_schema,
-                -- res.view_name,
-                res.view_oid,
-                -- res.view_colum_name,
-                vcol.attnum as view_colum_num
-              from results res
-              join pg_class tbl on tbl.oid::text = res.resorigtbl
-              join pg_attribute col on col.attrelid = tbl.oid and col.attnum::text = res.resorigcol
-              -- join pg_namespace sch on sch.oid = tbl.relnamespace
-              join pg_attribute vcol on vcol.attrelid = res.view_oid and vcol.attname::text = res.view_colum_name
-              where resorigtbl <> '0'
-              order by view_oid;
+                c.oid       as view_id,
+                n.nspname   as view_schema,
+                c.relname   as view_name,
+                c.oid       as view_oid,
+                r.ev_action as view_definition
+              from pg_class c
+              join pg_namespace n on n.oid = c.relnamespace
+              join pg_rewrite r on r.ev_class = c.oid
+              where c.relkind in ('v', 'm') and n.nspname = 'public'
+            ),
+            transform_json as (
+              select
+                view_id, view_schema, view_name, view_oid,
+                -- the following formatting is without indentation on purpose
+                -- to allow simple diffs, with less whitespace noise
+                replace(
+                  replace(
+                  replace(
+                  replace(
+                  replace(
+                  replace(
+                  replace(
+                  replace(
+                  regexp_replace(
+                  replace(
+                  replace(
+                  replace(
+                  replace(
+                  replace(
+                  replace(
+                  replace(
+                  replace(
+                  replace(
+                  replace(
+                    view_definition::text,
+                  -- This conversion to json is heavily optimized for performance.
+                  -- The general idea is to use as few regexp_replace() calls as possible.
+                  -- Simple replace() is a lot faster, so we jump through some hoops
+                  -- to be able to use regexp_replace() only once.
+                  -- This has been tested against a huge schema with 250+ different views.
+                  -- The unit tests do NOT reflect all possible inputs. Be careful when changing this!
+                  -- -----------------------------------------------
+                  -- pattern           | replacement         | flags
+                  -- -----------------------------------------------
+                  -- "," is not part of the pg_node_tree format, but used in the regex.
+                  -- This removes all "," that might be part of column names.
+                      ','               , ''
+                  -- The same applies for "{" and "}", although those are used a lot in pg_node_tree.
+                  -- We remove the escaped ones, which might be part of column names again.
+                  ), '\\{'              , ''
+                  ), '\\}'              , ''
+                  -- The fields we need are formatted as json manually to protect them from the regex.
+                  ), ' :targetList '   , ',"targetList":'
+                  ), ' :resno '        , ',"resno":'
+                  ), ' :resorigtbl '   , ',"resorigtbl":'
+                  ), ' :resorigcol '   , ',"resorigcol":'
+                  -- Make the regex also match the node type, e.g. "{QUERY ...", to remove it in one pass.
+                  ), '{'               , '{ :'
+                  -- Protect node lists, which start with "({" or "((" from the greedy regex.
+                  -- The extra "{" is removed again later.
+                  ), '(('              , '{(('
+                  ), '({'              , '{({'
+                  -- This regex removes all unused fields to avoid the need to format all of them correctly.
+                  -- This leads to a smaller json result as well.
+                  -- Removal stops at "," for used fields (see above) and "}" for the end of the current node.
+                  -- Nesting can't be parsed correctly with a regex, so we stop at "{" as well and
+                  -- add an empty key for the followig node.
+                  ), ' :[^}{,]+'       , ',"":'              , 'g'
+                  -- For performance, the regex also added those empty keys when hitting a "," or "}".
+                  -- Those are removed next.
+                  ), ',"":}'           , '}'
+                  ), ',"":,'           , ','
+                  -- This reverses the "node list protection" from above.
+                  ), '{('              , '('
+                  -- Every key above has been added with a "," so far. The first key in an object doesn't need it.
+                  ), '{,'              , '{'
+                  -- pg_node_tree has "()" around lists, but JSON uses "[]"
+                  ), '('               , '['
+                  ), ')'               , ']'
+                  -- pg_node_tree has " " between list items, but JSON uses ","
+                  ), ' '             , ','
+                  -- "<>" in pg_node_tree is the same as "null" in JSON, but due to very poor performance of json_typeof
+                  -- we need to make this an empty array here to prevent json_array_elements from throwing an error
+                  -- when the targetList is null.
+                  ), '<>'              , '[]'
+                )::json as view_definition
+              from views
+            ),
+            target_entries as(
+              select
+                view_id, view_schema, view_name, view_oid,
+                json_array_elements(view_definition->0->'targetList') as entry
+              from transform_json
+            ),
+            results as(
+              select
+                view_id, view_schema, view_name, view_oid,
+                (entry->>'resno')::int as view_column,
+                (entry->>'resorigtbl')::oid as resorigtbl,
+                (entry->>'resorigcol')::int as resorigcol
+              from target_entries
+            ),
+            recursion as(
+              select r.*
+              from results r
+              where view_schema = 'public'
+              union all
+              select
+                view.view_id,
+                view.view_schema,
+                view.view_name,
+                view.view_oid,
+                view.view_column,
+                tab.resorigtbl,
+                tab.resorigcol
+              from recursion view
+              join results tab on view.resorigtbl=tab.view_id and view.resorigcol=tab.view_column
+            )
+            select
+              -- sch.nspname as table_schema,
+              -- tbl.relname as table_name,
+              tbl.oid as table_oid,
+              -- col.attname as table_column_name,
+              col.attnum as table_column_num,
+              -- rec.view_schema,
+              -- rec.view_name,
+              rec.view_oid,
+              -- vcol.attname as view_column_name,
+              vcol.attnum as view_column_num
+            from recursion rec
+            join pg_class tbl on tbl.oid = rec.resorigtbl
+            join pg_attribute col on col.attrelid = tbl.oid and col.attnum = rec.resorigcol
+            join pg_attribute vcol on vcol.attrelid = rec.view_id and vcol.attnum = rec.view_column
+            join pg_namespace sch on sch.oid = tbl.relnamespace
+            order by view_oid, view_column_num
             `);
 
         for (const row of queryResult.rows) {
             const viewOid: number = row["view_oid"];
-            const viewColumNum: number = row["view_colum_num"];
+            const viewColumnNum: number = row["view_column_num"];
             const tableOid: number = row["table_oid"];
             const tableColumnNum: number = row["table_column_num"];
 
 
             const isNotNull = this.isNotNull(tableOid, tableColumnNum);
-            this.viewLookupTable.set(`${viewOid}-${viewColumNum}`, isNotNull);
+            this.viewLookupTable.set(`${viewOid}-${viewColumnNum}`, isNotNull);
         }
     }
 
