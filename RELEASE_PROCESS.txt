@@ -1,0 +1,2 @@
+$ npm install && npm run build && npm run lint
+$ npm publish
