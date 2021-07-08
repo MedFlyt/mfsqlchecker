@@ -1,0 +1,38 @@
+{
+  "fileTypes": [
+    "js,
+    "jsx",
+    "ts",
+    "tsx"
+  ],
+  "injectionSelector": "L:source.js -comment -string, L:source.jsx -comment -string,  L:source.js.jsx -comment -string, L:source.ts -comment -string, L:source.tsx -comment -string",
+  "injections": {
+    "L:source": {
+      "patterns": [
+        {
+          "match": "<",
+          "name": "invalid.illegal.bad-angle-bracket.html"
+        }
+      ]
+    }
+  },
+  "patterns": [
+    {
+      "begin": "conn(?i)(.?(sql))(`)",
+      "end": "(`)",
+      "beginCaptures": {
+        "1": {
+          "name": "variable.parameter"
+        }
+      },
+      "patterns": [
+        { "include": "source.ts#template-substitution-element" },
+        { "include": "source.ts#string-character-escape" },
+        { "include": "source.sql" },
+        { "include": "source.plpgsql.postgres" },
+        { "match": "." }
+      ]
+    },
+  ],
+  "scopeName": "inline.mfsql"
+}
