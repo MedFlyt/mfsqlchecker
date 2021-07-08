@@ -18,7 +18,7 @@
   },
   "patterns": [
     {
-      "begin": "conn(?i)(.?(sql))(`)",
+      "begin": "(?i)((conn.sql))(`)",
       "end": "(`)",
       "beginCaptures": {
         "1": {
@@ -32,7 +32,7 @@
         { "include": "source.plpgsql.postgres" },
         { "match": "." }
       ]
-    },
+    }
   ],
   "scopeName": "inline.mfsql"
 }
