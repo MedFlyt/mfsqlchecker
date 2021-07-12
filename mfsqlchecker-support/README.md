@@ -23,3 +23,14 @@ This extension contributes the following settings:
 ## Known Issues
 
 None yet
+
+## Publishing a new Version of the Extension to Visual Studio Marketplace
+
+Edit the package.json file to increment the "version"
+
+Get a "Personal Access Token" from: <https://dev.azure.com/MedFlyt/_usersSettings/tokens>
+
+    $ git clone ...
+    $ cd mfsqlchecker/mfsqlchecker-support
+    $ npm install
+    $ ./node_modules/.bin/vsce publish
