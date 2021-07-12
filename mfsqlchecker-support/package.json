@@ -14,7 +14,21 @@
         "workspaceContains:**/mfsqlchecker.json"
     ],
     "main": "./out/extension.js",
-    "contributes": {},
+    "contributes": {
+        "grammars": [
+            {
+                "injectTo": [
+                    "source.ts",
+                    "source.sql"
+                ],
+                "scopeName": "inline.mfsql",
+                "path": "./syntaxes/sql.json",
+                "embeddedLanguages": {
+                    "meta.embedded.block.sql": "sql"
+                }
+            }
+        ]
+    },
     "scripts": {
         "vscode:prepublish": "npm run compile",
         "compile": "tsc -p ./",
