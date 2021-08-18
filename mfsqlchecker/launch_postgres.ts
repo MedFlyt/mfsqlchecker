@@ -307,11 +307,12 @@ export async function getPostgresBinaryPath(platform: Platform, postgresVersion:
     return path.join(postgresDirectory(platform, postgresVersion), "pgsql", "bin", binaryName + ext);
 }
 
+// See: <https://en.wikipedia.org/wiki/Ephemeral_port>
 const MIN_PORT = 49152;
 const MAX_PORT = 65534;
 
 function randomPort(): number {
-    return MIN_PORT + Math.floor(Math.random() * MAX_PORT - MIN_PORT);
+    return MIN_PORT + Math.floor(Math.random() * (MAX_PORT - MIN_PORT));
 }
 
 /**
