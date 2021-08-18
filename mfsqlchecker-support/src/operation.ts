@@ -12,12 +12,18 @@ interface QuickFix {
 }
 
 export interface State {
+    outputChannel: vscode.OutputChannel;
     closing: boolean;
     childP: childProcess.ChildProcess | null;
     nextDiagnosticId: number;
     quickFixes: Map<DiagnosticId, QuickFix>;
     readonly status: vscode.StatusBarItem;
     readonly diagnosticCollection: vscode.DiagnosticCollection;
+}
+
+function log(state: State, msg: string) {
+    console.log(msg);
+    state.outputChannel.appendLine(msg);
 }
 
 function nextDiagnosticId(state: State): number {
@@ -27,6 +33,7 @@ function nextDiagnosticId(state: State): number {
 
 export function start(context: vscode.ExtensionContext): State {
     let state: State = {
+        outputChannel: vscode.window.createOutputChannel("mfsqlchecker"),
         closing: false,
         childP: null,
         nextDiagnosticId: 0,
@@ -34,6 +41,8 @@ export function start(context: vscode.ExtensionContext): State {
         status: vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 200),
         diagnosticCollection: vscode.languages.createDiagnosticCollection("mfsqlchecker")
     };
+
+    log(state, "Starting mfsqlchecker extension");
 
     state.status.text = "mfsqlchecker $(database) $(sync)";
     state.status.tooltip = "mfsqlchecker checking...";
@@ -102,12 +111,13 @@ export function start(context: vscode.ExtensionContext): State {
 }
 
 function launch(state: State, configPath: string) {
-    console.log("spawning");
+    log(state, "spawning");
     state.childP = childProcess.spawn("node", [path.join(workspacePath(), "node_modules", ".bin", "mfsqlchecker"), "-p", path.dirname(configPath), "-c", configPath, "--format", "json", "--watch"], {
         stdio: ["ignore", "pipe", "pipe"]
     });
 
     state.childP.on("error", (err: Error) => {
+        log(state, `error: ${err.message}`);
         console.log("error", err);
         vscode.window.showErrorMessage("Error launching \"node\" process:\n" + err.message);
 
@@ -120,13 +130,13 @@ function launch(state: State, configPath: string) {
 
     const stderrLines = readline.createInterface(state.childP.stderr);
     stderrLines.on("line", (line: string) => {
-        console.log("[stderr] " + line);
+        log(state, "[stderr] " + line);
         stderr += line + "\n";
     });
 
     const stdoutLines = readline.createInterface(state.childP.stdout);
     stdoutLines.on("line", (line: string) => {
-        console.log("Received line:", line);
+        log(state, "Received line: " + line);
         if (line === "[DIAGNOSTICS START]") {
             state.status.text = "mfsqlchecker $(database) $(sync)";
             state.status.tooltip = "mfsqlchecker checking...";
@@ -177,7 +187,8 @@ function launch(state: State, configPath: string) {
     });
 
     state.childP.on("exit", (code: number) => {
-        console.log("exit", code);
+        log(state, stderr);
+        log(state, "exit: " + code);
         vscode.window.showErrorMessage("mfsqlchecker emitted an error:\n" + stderr);
 
         state.status.text = "mfsqlchecker $(database) $(flame)";
@@ -187,6 +198,8 @@ function launch(state: State, configPath: string) {
 }
 
 export function stop(state: State): Promise<void> {
+    state.outputChannel.dispose();
+
     state.closing = true;
 
     if (state.childP !== null) {
