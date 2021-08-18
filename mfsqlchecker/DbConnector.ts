@@ -114,7 +114,9 @@ export class DbConnector {
             this.prevUniqueTableColumnTypes = manifest.uniqueTableColumnTypes;
 
             this.uniqueColumnTypes = makeUniqueColumnTypes(this.prevUniqueTableColumnTypes);
+            console.log("applyUniqueTableColumnTypes...");
             await applyUniqueTableColumnTypes(this.client, this.prevUniqueTableColumnTypes);
+            console.log("applyUniqueTableColumnTypes done");
 
             await this.tableColsLibrary.refreshTables(this.client);
 
@@ -1336,6 +1338,34 @@ async function dropTableConstraints(client: pg.Client) {
     }
 }
 
+async function dropTableIndexes(client: pg.Client) {
+    const queryResult = await client.query(
+        `
+        SELECT
+            pg_class.relname AS indexname
+        FROM
+            pg_index,
+            pg_class,
+            pg_namespace
+        WHERE
+            pg_class.oid = pg_index.indexrelid
+            AND pg_namespace.oid = pg_class.relnamespace
+            AND pg_namespace.nspname = 'public'
+            AND (
+                indpred IS NOT NULL
+                OR indexprs IS NOT NULL);
+        `);
+
+    for (const row of queryResult.rows) {
+        const indexname: string = row["indexname"];
+
+        await client.query(
+            `
+            DROP INDEX IF EXISTS ${escapeIdentifier(indexname)} CASCADE
+            `);
+    }
+}
+
 export async function applyUniqueTableColumnTypes(client: pg.Client, uniqueTableColumnTypes: UniqueTableColumnType[]): Promise<void> {
     // We need to drop all table constraints before converting the id columns.
     // This is because some constraints might refer to these table columns and
@@ -1344,6 +1374,7 @@ export async function applyUniqueTableColumnTypes(client: pg.Client, uniqueTable
     // Remember that for our purposes constraints serve no purpose because we
     // never actually insert or update any data in the database.
     await dropTableConstraints(client);
+    await dropTableIndexes(client);
 
     for (const uniqueTableColumnType of uniqueTableColumnTypes) {
         const tableColumn = await queryTableColumn(client, uniqueTableColumnType.tableName, uniqueTableColumnType.columnName);

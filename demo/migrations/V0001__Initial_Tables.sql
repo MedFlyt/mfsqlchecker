@@ -31,3 +31,5 @@ CREATE TABLE car (
     status TEXT NOT NULL,
     total_cost INT NOT NULL
 );
+
+CREATE INDEX weird_index ON employee(COALESCE(manager_id, 0));
