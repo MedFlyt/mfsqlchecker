@@ -1,9 +1,10 @@
-import { Connection, Opt, defineSqlView, Req } from "../lib/mfsqltool";
+import { Opt, Req } from "../lib/mfsqltool";
+import { Conn, defineSqlView } from "./core";
 
 const myView = defineSqlView`SELECT fname, phonenumber FROM employee`;
 
 async function main() {
-    const conn: Connection<{}> = null as any;
+    const conn: Conn<{}> = null as any;
 
     const rows = await conn.query<{
         fname: Req<string>,

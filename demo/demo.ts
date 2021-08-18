@@ -1,5 +1,6 @@
 import * as pg from "pg";
-import { defineSqlView, Connection, Req, Opt, migrateDatabase, sqlFrag } from "../lib/mfsqltool";
+import { Req, Opt, migrateDatabase, sqlFrag } from "../lib/mfsqltool";
+import { Conn, defineSqlView } from "./core";
 import { EmployeeId, CarId, CustomerId, DepartmentId } from "./types";
 
 // import { coolView } from "./blah";
@@ -13,7 +14,7 @@ const employeeName2 = defineSqlView`SELECT employee_fname AS fname, lname1 AS ln
 const badView = defineSqlView`SELECT 'cool' AS num UNION ALL SELECT NULL`;
 
 export async function test() {
-    const conn: Connection<EmployeeId | EmployeeId[]> = null as any;
+    const conn: Conn<EmployeeId | EmployeeId[]> = null as any;
 
     // const blah: "blah" | null = "blah";
 
@@ -149,7 +150,7 @@ export async function main() {
             // { id: id1, name: "hi" }
         ];
 
-        const conn = new Connection(client);
+        const conn = new Conn(client);
         const ret = await conn.insertMany("department", values, conn.sql`
         ON CONFLICT(name) DO UPDATE SET id = NULL`);
 

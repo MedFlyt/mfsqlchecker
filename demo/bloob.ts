@@ -1,8 +1,9 @@
-import { Connection, Req, Opt } from "../lib/mfsqltool";
+import { Req, Opt } from "../lib/mfsqltool";
+import { Conn } from "./core";
 import { EmployeeId, CarId, CustomerId } from "./types";
 
 export async function bloob() {
-    const conn: Connection<number> = null as any;
+    const conn: Conn<number> = null as any;
 
     const rows = await conn.query<{
         fname: Req<string>,
