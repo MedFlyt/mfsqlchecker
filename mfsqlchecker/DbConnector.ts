@@ -1313,6 +1313,7 @@ async function queryTableColumn(client: pg.Client, tableName: string, columnName
 }
 
 async function dropTableConstraints(client: pg.Client) {
+    // Reference: <https://www.postgresql.org/docs/10/catalog-pg-constraint.html>
     const queryResult = await client.query(
         `
         select
@@ -1324,7 +1325,7 @@ async function dropTableConstraints(client: pg.Client) {
         WHERE TRUE
         AND pg_constraint.conrelid = pg_class.oid
         AND pg_constraint.conrelid > 0
-        AND pg_constraint.contype = 'c';
+        AND pg_constraint.contype IN ('c', 'x');
         `);
 
     for (const row of queryResult.rows) {
