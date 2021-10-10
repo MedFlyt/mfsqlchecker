@@ -571,6 +571,15 @@ function queryAnswerToErrorDiagnostics(query: ResolvedSelect, queryAnswer: Selec
             let replacementText: string;
 
             let colTypes = queryAnswer.renderedColTypes.split("\n");
+
+            // `colTypes` looks something like:
+            //
+            //     [ "{",
+            //       "    foo: Req<number>,",
+            //       "    bar: Opt<string>",
+            //       "}"
+            //     ]
+
             if (colTypes.length <= 2) {
                 // {
                 // }
@@ -589,20 +598,17 @@ function queryAnswerToErrorDiagnostics(query: ResolvedSelect, queryAnswer: Selec
                 //   bar: Opt<string>
                 // }
                 colTypes = colTypes.map(c => c.trimLeft());
-                if (colTypesFormat.includeRegionMarker) {
-                    colTypes[0] = " ".repeat(query.indentLevel + 4) + colTypes[0];
-                    for (let i = 1; i < colTypes.length - 1; ++i) {
-                        colTypes[i] = " ".repeat(query.indentLevel + 8) + colTypes[i];
-                    }
-                    colTypes[colTypes.length - 1] = " ".repeat(query.indentLevel + 4) + colTypes[colTypes.length - 1];
-                    replacementText = "<\n" + " ".repeat(query.indentLevel + 4) + "//#region ColTypes\n" + colTypes.join("\n") + "\n" + " ".repeat(query.indentLevel) + "//#endregion\n" + " ".repeat(query.indentLevel) + ">";
-                } else {
-                    for (let i = 1; i < colTypes.length - 1; ++i) {
-                        colTypes[i] = " ".repeat(query.indentLevel + 4) + colTypes[i];
-                    }
-                    colTypes[colTypes.length - 1] = " ".repeat(query.indentLevel) + colTypes[colTypes.length - 1];
-                    replacementText = "<" + colTypes.join("\n") + ">";
+                for (let i = 1; i < colTypes.length - 1; ++i) {
+                    colTypes[i] = " ".repeat(query.indentLevel + 4) + colTypes[i];
                 }
+                colTypes[colTypes.length - 1] = " ".repeat(query.indentLevel) + colTypes[colTypes.length - 1];
+
+                if (colTypesFormat.includeRegionMarker) {
+                    colTypes.splice(1, 0, " ".repeat(query.indentLevel + 4) + "//#region ColTypes");
+                    colTypes.splice(colTypes.length - 1, 0, " ".repeat(query.indentLevel + 4) + "//#endregion");
+                }
+
+                replacementText = "<" + colTypes.join("\n") + ">";
             } else {
                 throw new Error(`Invalid colTypes.length: ${queryAnswer.renderedColTypes}`);
             }
