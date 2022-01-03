@@ -10,10 +10,12 @@ import { ErrorDiagnostic } from "./ErrorDiagnostic";
 import { codeFrameFormatter } from "./formatters/codeFrameFormatter";
 import { jsonFormatter } from "./formatters/jsonFormatter";
 import { vscodeFormatter } from "./formatters/vscodeFormatter";
-import { PostgresServer } from "./launch_postgres";
+import { PostgresServer, PostgresVersion } from "./launch_postgres";
 import { parsePostgreSqlError } from "./pg_extra";
 import { isTestDatabaseCluster } from "./pg_test_db";
 import { SqlCheckerEngine, typeScriptSingleRunCheck, TypeScriptWatcher } from "./sqlchecker_engine";
+
+const DEFAULT_POSTGRES_VERSION: PostgresVersion = "10.10";
 
 interface PostgresConnection {
     readonly url: string;
@@ -141,6 +143,7 @@ async function main(): Promise<void> {
     }
 
     let migrationsDir: string | null = null;
+    let postgresVersion: PostgresVersion = DEFAULT_POSTGRES_VERSION;
     if (options.configFile !== null) {
         const config = loadConfigFile(options.configFile);
         switch (config.type) {
@@ -151,6 +154,9 @@ async function main(): Promise<void> {
                 }
                 return process.exit(1);
             case "Right":
+                if (config.value.postgresVersion !== null) {
+                    postgresVersion = config.value.postgresVersion as PostgresVersion;
+                }
                 if (config.value.migrationsDir !== null) {
                     if (path.isAbsolute(config.value.migrationsDir)) {
                         migrationsDir = config.value.migrationsDir;
@@ -195,7 +201,7 @@ async function main(): Promise<void> {
         url = options.postgresConnection.url;
         dbName = options.postgresConnection.databaseName;
     } else {
-        pgServer = await PostgresServer.start("10.10");
+        pgServer = await PostgresServer.start(postgresVersion);
         url = pgServer.url;
         dbName = undefined;
     }
