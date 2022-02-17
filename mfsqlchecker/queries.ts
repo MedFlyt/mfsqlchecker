@@ -693,7 +693,10 @@ function getObjectFieldTypes(checker: ts.TypeChecker, type: ts.Type): Either<str
     };
 
     type.getProperties().forEach((value) => {
-        addResult(value.name, checker.getTypeAtLocation(value.valueDeclaration));
+        if (value.valueDeclaration !== undefined) {
+            addResult(value.name, checker.getTypeAtLocation(value.valueDeclaration));
+        }
+
     });
 
     if (errors.length > 0) {
@@ -912,7 +915,9 @@ function typeLiteralNodeToColTypes(checker: ts.TypeChecker, typeLiteral: ts.Type
 function typeSymbolMembersToColTypes(checker: ts.TypeChecker, node: ts.Node, members: Map<string, ts.Symbol>, errorReporter: (error: ErrorDiagnostic) => void): Map<string, [ColNullability, TypeScriptType]> {
     const results = new Map<string, [ColNullability, TypeScriptType]>();
     members.forEach((value, key) => {
-        if (!ts.isPropertySignature(value.valueDeclaration)) {
+        if (value.valueDeclaration === undefined) {
+            errorReporter(nodeErrorDiagnostic(node, "Type argument member must have a value declaration"));
+        } else if (!ts.isPropertySignature(value.valueDeclaration)) {
             errorReporter(nodeErrorDiagnostic(node, "valueDeclaration is not a PropertySignature"));
         } else if (value.valueDeclaration.type === undefined) {
             errorReporter(nodeErrorDiagnostic(node, "valueDeclaration is missing type"));
