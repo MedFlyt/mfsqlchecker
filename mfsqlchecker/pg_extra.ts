@@ -39,15 +39,13 @@ export function escapeIdentifier(str: string) {
  * <https://www.postgresql.org/docs/current/libpq-exec.html#LIBPQ-PQPREPARE>
  */
 export function pgPrepareQueryCB(client: pg.Client, name: string, text: string, cb: (err: Error | null) => void) {
-    const PrepareQuery: any = function (this: pg.Query): void {
-        pg.Query.call(this, <any>{});
-    };
 
-    PrepareQuery.prototype = Object.create(pg.Query.prototype);
-    PrepareQuery.prototype.constructor = PrepareQuery;
+    const query = new pg.Query({
+        name: name,
+        text: text
+    });
 
-    // tslint:disable-next-line:only-arrow-functions
-    PrepareQuery.prototype.submit = function (connection: pg.Connection) {
+    query.submit = (connection: pg.Connection) => {
         connection.parse({
             name: name,
             text: text,
@@ -57,7 +55,10 @@ export function pgPrepareQueryCB(client: pg.Client, name: string, text: string, 
         connection.sync();
     };
 
-    client.query(new PrepareQuery(), cb);
+    query.on("error", (error) => cb(error));
+    query.on("end", () => cb(null));
+
+    client.query(query);
 }
 
 export function pgPrepareQuery(client: pg.Client, name: string, text: string): Promise<void> {
@@ -97,61 +98,40 @@ export function pgMonkeyPatchClient(client: pg.Client): void {
     };
 }
 
+class DescribePrepared extends pg.Query {
+    constructor(private name: string, private cb: (res: pg.FieldDef[] | null , err: Error | null) => void) {
+      super(<any>{});
+    }
 
-/**
- * Submits a request to obtain information about the specified prepared
- * statement
- *
- * See:
- * <https://www.postgresql.org/docs/current/libpq-exec.html#LIBPQ-PQDESCRIBEPREPARED>
- */
-export function pgDescribePreparedCB(client: pg.Client, name: string, cb: (err: Error | null, res: pg.FieldDef[] | null) => void) {
-    let rowDescription: pg.QueryResultBase | null = null;
+    submit = (connection: pg.Connection) => {
+      connection.describe({
+        type: "S",
+        name: this.name
+      }, true);
 
-    const DescribePrepared: any = function (this: pg.Query): void {
-        pg.Query.call(this, <any>{}, <any>((err: Error): void => {
-            if (<boolean><any>err) {
-                cb(err, null);
-            } else {
-                if (rowDescription === null) {
-                    cb(null, null);
-                } else {
-                    cb(null, rowDescription.fields);
-                }
-            }
-        }));
-    };
+      connection.sync();
+    }
 
-    DescribePrepared.prototype = Object.create(pg.Query.prototype);
-    DescribePrepared.prototype.constructor = DescribePrepared;
+    handleError = (err: Error) => {
+      this.cb(null, err);
+    }
 
-    // tslint:disable-next-line:only-arrow-functions
-    DescribePrepared.prototype.submit = function (connection: pg.Connection) {
-        (<any>connection).describe({
-            type: "S",
-            name: name
-        });
-
-        connection.sync();
-    };
-
-    // tslint:disable-next-line:only-arrow-functions
-    DescribePrepared.prototype.handleRowDescription = function (msg: pg.QueryResultBase | null) {
-        rowDescription = msg;
-    };
-
-    client.query(new DescribePrepared());
-}
+    handleRowDescription = (msg: { fields: pg.FieldDef[] }) => {
+      this.cb(msg.fields, null);
+    }
+  }
 
 export function pgDescribePrepared(client: pg.Client, name: string): Promise<pg.FieldDef[] | null> {
     return new Promise<pg.FieldDef[] | null>((resolve, reject) => {
-        pgDescribePreparedCB(client, name, (err, res) => {
-            if (<boolean><any>err) {
-                reject(err);
-            } else {
-                resolve(res);
-            }
-        });
+        client.query(
+            new DescribePrepared(name, (res, err) => {
+                if (<boolean><any>err) {
+                    reject(err);
+                } else {
+                    resolve(res);
+                }
+            })
+        );
     });
 }
 
