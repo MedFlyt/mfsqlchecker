@@ -30,5 +30,6 @@
         "noStrictGenericChecks": false,
         "suppressExcessPropertyErrors": false,
         "suppressImplicitAnyIndexErrors": false,
+        "skipLibCheck": true
     }
 }
