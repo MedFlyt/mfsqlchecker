@@ -43,7 +43,7 @@
     "@types/stack-trace": "0.0.29",
     "@types/tar": "4.0.3",
     "adm-zip": "0.4.13",
-    "ajv": "6.10.2",
+    "ajv": "8.11.0",
     "assert-never": "1.2.0",
     "chalk": "2.4.2",
     "cli-progress": "3.0.0",
@@ -58,7 +58,7 @@
     "rimraf": "3.0.0",
     "source-map-support": "0.5.13",
     "stack-trace": "0.0.10",
-    "tar": "4.4.10",
+    "tar": "^4.4.19",
     "tslint": "5.18.0",
     "typescript": "3.5.3"
   },
