@@ -693,7 +693,9 @@ function getObjectFieldTypes(checker: ts.TypeChecker, type: ts.Type): Either<str
     };
 
     type.getProperties().forEach((value) => {
+
         addResult(value.name, checker.getTypeAtLocation(value.valueDeclaration));
+
     });
 
     if (errors.length > 0) {
