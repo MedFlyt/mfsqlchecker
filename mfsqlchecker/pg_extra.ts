@@ -1,8 +1,11 @@
 import * as crypto from "crypto";
 import * as pg from "pg";
+import * as postgres from "postgres";
+import { text } from "stream/consumers";
+import { ResolvedSelect, ResolvedInsert } from "./queries";
 
 export function connectPg(url: string): Promise<pg.Client> {
-    const client = new pg.Client(url);
+    const client = new pg.Client({ connectionString: url, keepAlive: true });
     return new Promise<pg.Client>((resolve, reject) => {
         client.connect(err => {
             if (<boolean>(<any>err)) {
@@ -74,75 +77,55 @@ export function pgPrepareQuery(client: pg.Client, name: string, text: string): P
 }
 
 
-/**
- * Patches the connection object so that it won't crash when it receives a
- * `ParameterDescription (B)` message from the backend. (The message will be
- * ignored)
- */
-export function pgMonkeyPatchClient(client: pg.Client): void {
-    const connection: pg.Connection = (<any>client).connection;
+let connection: postgres.Sql<{}> | null = null;
 
-    const origParseMessage = (<any>connection).parseMessage;
-    (<any>connection).parseMessage = function (buffer: Buffer) {
-        if (this._reader.header === 0x74) { // 't'
-            this.offset = 0;
-            const length = buffer.length + 4;
+export async function pgDescribeQuery(client: pg.Client, query: ResolvedSelect | ResolvedInsert): Promise<Pick<pg.FieldDef, "name" | "tableID" | "columnID" | "dataTypeID">[]> {
+    if (connection === null) {
+        connection = postgres({
+            database: client.database,
+            host: client.host,
+            port: client.port,
+            user: client.user,
+            password: client.password
+        });
+    }
 
-            return {
-                name: "parameterDescription",
-                length: length
-            };
-        } else {
-            return origParseMessage.call(this, buffer);
+    const { fields, text } = (() => {
+        if (!("insertColumns" in query)) {
+            return { text: query.text, fields: (query.text.match(/\$\d+/g) ?? []).map(() => null) };
         }
-    };
-}
 
-class DescribePrepared extends pg.Query {
-    constructor(private name: string, private cb: (res: pg.FieldDef[] | null , err: Error | null) => void) {
-      super(<any>{});
+        const cols = [...query.insertColumns.keys()];
+        const fieldsSqlFragment: string = cols.map(escapeIdentifier).join(", ");
+        const paramsSqlFragment: string = cols.map((_f, index) => "$" + (index + 1)).join(", ");
+
+        return {
+            text: `INSERT INTO ${escapeIdentifier(query.tableName)} (${fieldsSqlFragment})\n` +
+            `VALUES (${paramsSqlFragment}) RETURNING *`,
+            // text: query.text.replace(/DEFAULT VALUES/, `(${fieldsSqlFragment}) VALUES (${paramsSqlFragment})`),
+            fields: cols.map(() => null)
+        };
+    })();
+
+
+    try {
+        const { columns } = await connection.unsafe(text, fields).describe();
+
+        if (<any>columns === null) {
+            return [];
+        }
+
+        return columns.map(c => ({
+            name: c.name,
+            tableID: c.table,
+            columnID: c.number,
+            dataTypeID: c.type
+        }));
+    } catch (e) {
+        // TODO we need to figure out how to fix inserts query.
+        // console.error(e);
+        return [];
     }
-
-    submit = (connection: pg.Connection) => {
-      connection.describe({
-        type: "S",
-        name: this.name
-      }, true);
-
-      connection.sync();
-    }
-
-    handleError = (err: Error) => {
-      this.cb(null, err);
-    }
-
-    handleRowDescription = (msg: { fields: pg.FieldDef[] }) => {
-      this.cb(msg.fields, null);
-    }
-  }
-
-export function pgDescribePrepared(client: pg.Client, name: string): Promise<pg.FieldDef[] | null> {
-    return new Promise<pg.FieldDef[] | null>((resolve, reject) => {
-        client.query(
-            new DescribePrepared(name, (res, err) => {
-                if (<boolean><any>err) {
-                    reject(err);
-                } else {
-                    resolve(res);
-                }
-            })
-        );
-    });
-}
-
-export async function pgDescribeQuery(client: pg.Client, text: string): Promise<pg.FieldDef[] | null> {
-    // Use the unnamed statement. See:
-    // <https://www.postgresql.org/docs/current/libpq-exec.html#LIBPQ-PQPREPARE>
-    const stmtName = "";
-
-    await pgPrepareQuery(client, stmtName, text);
-    const result = await pgDescribePrepared(client, stmtName);
-    return result;
 }
 
 /**

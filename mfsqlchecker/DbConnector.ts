@@ -6,7 +6,7 @@ import * as path from "path";
 import * as pg from "pg";
 import { ColTypesFormat, equalsUniqueTableColumnTypes, makeUniqueColumnTypes, sqlUniqueTypeName, UniqueTableColumnType } from "./ConfigFile";
 import { ErrorDiagnostic, postgresqlErrorDiagnostic, SrcSpan, toSrcSpan } from "./ErrorDiagnostic";
-import { closePg, connectPg, dropAllFunctions, dropAllSequences, dropAllTables, dropAllTypes, escapeIdentifier, newSavepoint, parsePostgreSqlError, pgDescribeQuery, pgMonkeyPatchClient, PostgreSqlError, rollbackToAndReleaseSavepoint } from "./pg_extra";
+import { closePg, connectPg, dropAllFunctions, dropAllSequences, dropAllTables, dropAllTypes, escapeIdentifier, newSavepoint, parsePostgreSqlError, pgDescribeQuery, PostgreSqlError, rollbackToAndReleaseSavepoint } from "./pg_extra";
 import { calcDbMigrationsHash, connReplaceDbName, createBlankDatabase, dropDatabase, isMigrationFile, readdirAsync, testDatabaseName } from "./pg_test_db";
 import { ColNullability, ResolvedInsert, ResolvedQuery, ResolvedSelect, SqlType, TypeScriptType } from "./queries";
 import { resolveFromSourceMap } from "./source_maps";
@@ -38,7 +38,6 @@ export class DbConnector {
     private constructor(migrationsDir: string, client: pg.Client) {
         this.migrationsDir = migrationsDir;
         this.client = client;
-        pgMonkeyPatchClient(this.client);
     }
 
     static async Connect(migrationsDir: string, adminUrl: string, name?: string): Promise<DbConnector> {
@@ -675,11 +674,11 @@ function insertAnswerToErrorDiagnostics(query: ResolvedInsert, queryAnswer: Inse
     }
 }
 
-async function processQuery(client: pg.Client, colTypesFormat: ColTypesFormat, pgTypes: Map<number, SqlType>, tableColsLibrary: TableColsLibrary, uniqueColumnTypes: Map<SqlType, TypeScriptType>, query: ResolvedSelect): Promise<SelectAnswer> {
-    let fields: pg.FieldDef[] | null;
+async function processQuery(client: pg.Client, colTypesFormat: ColTypesFormat, pgTypes: Map<number, SqlType>, tableColsLibrary: TableColsLibrary, uniqueColumnTypes: Map<SqlType, TypeScriptType>, query: ResolvedSelect | ResolvedInsert): Promise<SelectAnswer> {
+    let fields: Pick<pg.FieldDef, "name" | "tableID" | "columnID" | "dataTypeID">[] | null;
     const savepoint = await newSavepoint(client);
     try {
-        fields = await pgDescribeQuery(client, query.text);
+        fields = await pgDescribeQuery(client, query);
     } catch (err) {
         const perr = parsePostgreSqlError(err);
         if (perr === null) {
