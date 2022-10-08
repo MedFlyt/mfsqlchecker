@@ -1,29 +1,17 @@
 import * as crypto from "crypto";
-import * as pg from "pg";
+import * as postgres from "postgres";
 
-export function connectPg(url: string): Promise<pg.Client> {
-    const client = new pg.Client(url);
-    return new Promise<pg.Client>((resolve, reject) => {
-        client.connect(err => {
-            if (<boolean>(<any>err)) {
-                reject(err);
-                return;
-            }
-            resolve(client);
-        });
+export function connectPg(url: string): postgres.Sql {
+    return postgres(url, {
+        max: 1,
+        onnotice: () => {
+            /* do nothing */
+        }
     });
 }
 
-export function closePg(conn: pg.Client): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-        conn.end(err => {
-            if (<boolean>(<any>err)) {
-                reject(err);
-                return;
-            }
-            resolve();
-        });
-    });
+export function closePg(conn: postgres.Sql): Promise<void> {
+    return conn.end();
 }
 
 export function escapeIdentifier(str: string) {
@@ -32,137 +20,9 @@ export function escapeIdentifier(str: string) {
     return '"' + str.replace(/"/g, '""') + '"';
 }
 
-/**
- * Submits a request to create a prepared statement
- *
- * See:
- * <https://www.postgresql.org/docs/current/libpq-exec.html#LIBPQ-PQPREPARE>
- */
-export function pgPrepareQueryCB(client: pg.Client, name: string, text: string, cb: (err: Error | null) => void) {
-    const PrepareQuery: any = function (this: pg.Query): void {
-        pg.Query.call(this, <any>{});
-    };
-
-    PrepareQuery.prototype = Object.create(pg.Query.prototype);
-    PrepareQuery.prototype.constructor = PrepareQuery;
-
-    // tslint:disable-next-line:only-arrow-functions
-    PrepareQuery.prototype.submit = function (connection: pg.Connection) {
-        connection.parse({
-            name: name,
-            text: text,
-            types: []
-        }, false);
-
-        connection.sync();
-    };
-
-    client.query(new PrepareQuery(), cb);
-}
-
-export function pgPrepareQuery(client: pg.Client, name: string, text: string): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-        pgPrepareQueryCB(client, name, text, (err) => {
-            if (<boolean><any>err) {
-                reject(err);
-            } else {
-                resolve();
-            }
-        });
-    });
-}
-
-
-/**
- * Patches the connection object so that it won't crash when it receives a
- * `ParameterDescription (B)` message from the backend. (The message will be
- * ignored)
- */
-export function pgMonkeyPatchClient(client: pg.Client): void {
-    const connection: pg.Connection = (<any>client).connection;
-
-    const origParseMessage = (<any>connection).parseMessage;
-    (<any>connection).parseMessage = function (buffer: Buffer) {
-        if (this._reader.header === 0x74) { // 't'
-            this.offset = 0;
-            const length = buffer.length + 4;
-
-            return {
-                name: "parameterDescription",
-                length: length
-            };
-        } else {
-            return origParseMessage.call(this, buffer);
-        }
-    };
-}
-
-
-/**
- * Submits a request to obtain information about the specified prepared
- * statement
- *
- * See:
- * <https://www.postgresql.org/docs/current/libpq-exec.html#LIBPQ-PQDESCRIBEPREPARED>
- */
-export function pgDescribePreparedCB(client: pg.Client, name: string, cb: (err: Error | null, res: pg.FieldDef[] | null) => void) {
-    let rowDescription: pg.QueryResultBase | null = null;
-
-    const DescribePrepared: any = function (this: pg.Query): void {
-        pg.Query.call(this, <any>{}, <any>((err: Error): void => {
-            if (<boolean><any>err) {
-                cb(err, null);
-            } else {
-                if (rowDescription === null) {
-                    cb(null, null);
-                } else {
-                    cb(null, rowDescription.fields);
-                }
-            }
-        }));
-    };
-
-    DescribePrepared.prototype = Object.create(pg.Query.prototype);
-    DescribePrepared.prototype.constructor = DescribePrepared;
-
-    // tslint:disable-next-line:only-arrow-functions
-    DescribePrepared.prototype.submit = function (connection: pg.Connection) {
-        (<any>connection).describe({
-            type: "S",
-            name: name
-        });
-
-        connection.sync();
-    };
-
-    // tslint:disable-next-line:only-arrow-functions
-    DescribePrepared.prototype.handleRowDescription = function (msg: pg.QueryResultBase | null) {
-        rowDescription = msg;
-    };
-
-    client.query(new DescribePrepared());
-}
-
-export function pgDescribePrepared(client: pg.Client, name: string): Promise<pg.FieldDef[] | null> {
-    return new Promise<pg.FieldDef[] | null>((resolve, reject) => {
-        pgDescribePreparedCB(client, name, (err, res) => {
-            if (<boolean><any>err) {
-                reject(err);
-            } else {
-                resolve(res);
-            }
-        });
-    });
-}
-
-export async function pgDescribeQuery(client: pg.Client, text: string): Promise<pg.FieldDef[] | null> {
-    // Use the unnamed statement. See:
-    // <https://www.postgresql.org/docs/current/libpq-exec.html#LIBPQ-PQPREPARE>
-    const stmtName = "";
-
-    await pgPrepareQuery(client, stmtName, text);
-    const result = await pgDescribePrepared(client, stmtName);
-    return result;
+export async function pgDescribeQuery(client: postgres.Sql, text: string): Promise<postgres.ColumnList<string> | null> {
+    const result = await client.unsafe(text).describe();
+    return result.columns;
 }
 
 /**
@@ -173,10 +33,10 @@ export async function pgDescribeQuery(client: pg.Client, text: string): Promise<
  * to delete routines, need to run manually:
  * http://www.postgresonline.com/journal/archives/74-How-to-delete-many-functions.html
  */
-export async function dropAllTables(client: pg.Client) {
+export async function dropAllTables(client: postgres.Sql) {
     // http://stackoverflow.com/questions/3327312/drop-all-tables-in-postgresql/36023359#36023359
 
-    await client.query(
+    await client.unsafe(
         `
         DO $$ DECLARE
             r RECORD;
@@ -191,8 +51,8 @@ export async function dropAllTables(client: pg.Client) {
         `);
 }
 
-export async function dropAllSequences(client: pg.Client) {
-    await client.query(
+export async function dropAllSequences(client: postgres.Sql) {
+    await client.unsafe(
         `
         DO $$ DECLARE
             r RECORD;
@@ -207,8 +67,8 @@ export async function dropAllSequences(client: pg.Client) {
         `);
 }
 
-export async function dropAllFunctions(client: pg.Client) {
-    await client.query(
+export async function dropAllFunctions(client: postgres.Sql) {
+    await client.unsafe(
         `
         DO $$ DECLARE
             r RECORD;
@@ -223,8 +83,8 @@ export async function dropAllFunctions(client: pg.Client) {
         `);
 }
 
-export async function dropAllTypes(client: pg.Client) {
-    await client.query(
+export async function dropAllTypes(client: postgres.Sql) {
+    await client.unsafe(
         `
         DO $$ DECLARE
             r RECORD;
@@ -338,14 +198,14 @@ function randomSavepointName(): Promise<string> {
     });
 }
 
-export async function newSavepoint(conn: pg.Client): Promise<Savepoint> {
+export async function newSavepoint(conn: postgres.Sql): Promise<Savepoint> {
     const savepointName = await randomSavepointName();
 
-    await conn.query(`SAVEPOINT ${savepointName}`);
+    await conn.unsafe(`SAVEPOINT ${savepointName}`);
 
     return new Savepoint(savepointName);
 }
 
-export async function rollbackToAndReleaseSavepoint(conn: pg.Client, savepoint: Savepoint): Promise<void> {
-    await conn.query(`ROLLBACK TO SAVEPOINT ${savepoint.name}; RELEASE SAVEPOINT ${savepoint.name}`);
+export async function rollbackToAndReleaseSavepoint(conn: postgres.Sql, savepoint: Savepoint): Promise<void> {
+    await conn.unsafe(`ROLLBACK TO SAVEPOINT ${savepoint.name}; RELEASE SAVEPOINT ${savepoint.name}`);
 }

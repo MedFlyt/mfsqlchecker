@@ -3,10 +3,11 @@ import chalk from "chalk";
 import { Bar, Presets } from "cli-progress";
 import * as fs from "fs";
 import * as path from "path";
-import * as pg from "pg";
+import * as postgres from "postgres";
+
 import { ColTypesFormat, equalsUniqueTableColumnTypes, makeUniqueColumnTypes, sqlUniqueTypeName, UniqueTableColumnType } from "./ConfigFile";
 import { ErrorDiagnostic, postgresqlErrorDiagnostic, SrcSpan, toSrcSpan } from "./ErrorDiagnostic";
-import { closePg, connectPg, dropAllFunctions, dropAllSequences, dropAllTables, dropAllTypes, escapeIdentifier, newSavepoint, parsePostgreSqlError, pgDescribeQuery, pgMonkeyPatchClient, PostgreSqlError, rollbackToAndReleaseSavepoint } from "./pg_extra";
+import { closePg, connectPg, dropAllFunctions, dropAllSequences, dropAllTables, dropAllTypes, escapeIdentifier, newSavepoint, parsePostgreSqlError, pgDescribeQuery, PostgreSqlError, rollbackToAndReleaseSavepoint } from "./pg_extra";
 import { calcDbMigrationsHash, connReplaceDbName, createBlankDatabase, dropDatabase, isMigrationFile, readdirAsync, testDatabaseName } from "./pg_test_db";
 import { ColNullability, ResolvedInsert, ResolvedQuery, ResolvedSelect, SqlType, TypeScriptType } from "./queries";
 import { resolveFromSourceMap } from "./source_maps";
@@ -35,20 +36,13 @@ namespace QueryCheckResult {
 }
 
 export class DbConnector {
-    private constructor(migrationsDir: string, client: pg.Client) {
+    private constructor(migrationsDir: string, client: postgres.Sql) {
         this.migrationsDir = migrationsDir;
         this.client = client;
-        pgMonkeyPatchClient(this.client);
     }
 
     static async Connect(migrationsDir: string, adminUrl: string, name?: string): Promise<DbConnector> {
         const client = await newConnect(adminUrl, name);
-        client.on("error", () => {
-            // Ignore the error. We get an error event here if the database
-            // server shuts down (This happens when using "launch-postgres".
-            // If we don't handle (ignore) the error event here, then it
-            // bubbles up and hard-crashes the program */
-        });
         return new DbConnector(migrationsDir, client);
     }
 
@@ -59,7 +53,7 @@ export class DbConnector {
     private migrationsDir: string;
     private prevStrictDateTimeChecking: boolean | null = null;
     private prevUniqueTableColumnTypes: UniqueTableColumnType[] = [];
-    private client: pg.Client;
+    private client: postgres.Sql;
 
     private viewNames: [string, ViewAnswer][] = [];
 
@@ -99,7 +93,7 @@ export class DbConnector {
                 console.log("Migration file", matchingFile);
                 const text = await readFileAsync(path.join(this.migrationsDir, matchingFile));
                 try {
-                    await this.client.query(text);
+                    await this.client.unsafe(text);
                 } catch (err) {
                     const perr = parsePostgreSqlError(err);
                     if (perr === null) {
@@ -121,7 +115,7 @@ export class DbConnector {
             await this.tableColsLibrary.refreshTables(this.client);
 
             this.pgTypes = new Map<number, SqlType>();
-            const pgTypesResult = await this.client.query(
+            const pgTypesResult = await this.client.unsafe(
                 `
                 SELECT
                     oid,
@@ -129,7 +123,7 @@ export class DbConnector {
                 FROM pg_type
                 ORDER BY oid
                 `);
-            for (const row of pgTypesResult.rows) {
+            for (const row of pgTypesResult) {
                 const oid: number = row["oid"];
                 const typname: string = row["typname"];
                 this.pgTypes.set(oid, SqlType.wrap(typname));
@@ -168,7 +162,7 @@ export class DbConnector {
         // can ROLLBACK the changes later. This is needed so that in the
         // future if we need to run our migrations again, they can be run on
         // the original system catalogs.
-        await this.client.query("BEGIN");
+        await this.client.unsafe("BEGIN");
 
         if (manifest.strictDateTimeChecking) {
             await modifySystemCatalogs(this.client);
@@ -216,7 +210,7 @@ export class DbConnector {
             queriesProgressBar.stop();
         }
 
-        await this.client.query("ROLLBACK");
+        await this.client.unsafe("ROLLBACK");
 
         this.queryCache = newQueryCache;
         this.insertCache = newInsertCache;
@@ -238,15 +232,15 @@ export class DbConnector {
     }
 }
 
-async function dropView(client: pg.Client, viewName: string): Promise<void> {
-    await client.query(`DROP VIEW IF EXISTS ${escapeIdentifier(viewName)}`);
+async function dropView(client: postgres.Sql, viewName: string): Promise<void> {
+    await client.unsafe(`DROP VIEW IF EXISTS ${escapeIdentifier(viewName)}`);
 }
 
 /**
  * @returns Array with the same length as `newViews`, with a matching element
  * for each view in `newViews`
  */
-async function updateViews(client: pg.Client, strictDateTimeChecking: boolean, oldViews: [string, ViewAnswer][], newViews: SqlCreateView[]): Promise<[boolean, [string, ViewAnswer][]]> {
+async function updateViews(client: postgres.Sql, strictDateTimeChecking: boolean, oldViews: [string, ViewAnswer][], newViews: SqlCreateView[]): Promise<[boolean, [string, ViewAnswer][]]> {
     let updated: boolean = false;
 
     const newViewNames = new Set<string>();
@@ -308,19 +302,19 @@ function validateViewFeatures(view: SqlCreateView): ViewAnswer {
     };
 }
 
-async function processCreateView(client: pg.Client, strictDateTimeChecking: boolean, view: SqlCreateView): Promise<ViewAnswer> {
-    await client.query("BEGIN");
+async function processCreateView(client: postgres.Sql, strictDateTimeChecking: boolean, view: SqlCreateView): Promise<ViewAnswer> {
+    await client.unsafe("BEGIN");
     if (strictDateTimeChecking) {
         await modifySystemCatalogs(client);
     }
     try {
-        await client.query(`CREATE OR REPLACE VIEW ${escapeIdentifier(view.viewName)} AS ${view.createQuery}`);
+        await client.unsafe(`CREATE OR REPLACE VIEW ${escapeIdentifier(view.viewName)} AS ${view.createQuery}`);
     } catch (err) {
         const perr = parsePostgreSqlError(err);
         if (perr === null) {
             throw err;
         } else {
-            await client.query("ROLLBACK");
+            await client.unsafe("ROLLBACK");
             if (perr.position !== null) {
                 // A bit hacky but does the trick:
                 perr.position -= `CREATE OR REPLACE VIEW ${escapeIdentifier(view.viewName)} AS `.length;
@@ -339,8 +333,8 @@ async function processCreateView(client: pg.Client, strictDateTimeChecking: bool
     // should also succeed the second time (the modifications we make to the
     // system catalogs only make things more restrictive)
 
-    await client.query("ROLLBACK");
-    await client.query(`CREATE OR REPLACE VIEW ${escapeIdentifier(view.viewName)} AS ${view.createQuery}`);
+    await client.unsafe("ROLLBACK");
+    await client.unsafe(`CREATE OR REPLACE VIEW ${escapeIdentifier(view.viewName)} AS ${view.createQuery}`);
 
     const invalidFeatureError = validateViewFeatures(view);
     if (invalidFeatureError.type !== "NoErrors") {
@@ -675,8 +669,8 @@ function insertAnswerToErrorDiagnostics(query: ResolvedInsert, queryAnswer: Inse
     }
 }
 
-async function processQuery(client: pg.Client, colTypesFormat: ColTypesFormat, pgTypes: Map<number, SqlType>, tableColsLibrary: TableColsLibrary, uniqueColumnTypes: Map<SqlType, TypeScriptType>, query: ResolvedSelect): Promise<SelectAnswer> {
-    let fields: pg.FieldDef[] | null;
+async function processQuery(client: postgres.Sql, colTypesFormat: ColTypesFormat, pgTypes: Map<number, SqlType>, tableColsLibrary: TableColsLibrary, uniqueColumnTypes: Map<SqlType, TypeScriptType>, query: ResolvedSelect): Promise<SelectAnswer> {
+    let fields: postgres.ColumnList<string> | null;
     const savepoint = await newSavepoint(client);
     try {
         fields = await pgDescribeQuery(client, query.text);
@@ -731,8 +725,8 @@ async function processQuery(client: pg.Client, colTypesFormat: ColTypesFormat, p
     };
 }
 
-async function processInsert(client: pg.Client, colTypesFormat: ColTypesFormat, pgTypes: Map<number, SqlType>, tableColsLibrary: TableColsLibrary, uniqueColumnTypes: Map<SqlType, TypeScriptType>, query: ResolvedInsert): Promise<InsertAnswer> {
-    const tableQuery = await client.query(
+async function processInsert(client: postgres.Sql, colTypesFormat: ColTypesFormat, pgTypes: Map<number, SqlType>, tableColsLibrary: TableColsLibrary, uniqueColumnTypes: Map<SqlType, TypeScriptType>, query: ResolvedInsert): Promise<InsertAnswer> {
+    const tableQuery = await client.unsafe(
         `
         select
             pg_attribute.attname,
@@ -752,7 +746,7 @@ async function processInsert(client: pg.Client, colTypesFormat: ColTypesFormat, 
         `, [query.tableName]);
 
     // Assume that tables with no columns cannot exist
-    if (tableQuery.rowCount === 0) {
+    if (tableQuery.count === 0) {
         return {
             type: "InvalidTableName"
         };
@@ -776,7 +770,7 @@ async function processInsert(client: pg.Client, colTypesFormat: ColTypesFormat, 
 
         const [suppliedTypeName, suppliedTypeNotNull] = suppliedType;
 
-        const row = tableQuery.rows.find(r => r["attname"] === field);
+        const row = tableQuery.find(r => r["attname"] === field);
         if (row === undefined) {
             invalidInsertCols.push({
                 type: "ColNotFound",
@@ -811,7 +805,7 @@ async function processInsert(client: pg.Client, colTypesFormat: ColTypesFormat, 
         }
     }
 
-    for (const row of tableQuery.rows) {
+    for (const row of tableQuery) {
         const attname: string = row["attname"];
         const typname: string = row["typname"];
         const atthasdef: boolean = row["atthasdef"];
@@ -896,7 +890,7 @@ class TableColsLibrary {
     /**
      * After calling this method, you should also call `refreshViews`
      */
-    public async refreshTables(client: pg.Client): Promise<void> {
+    public async refreshTables(client: postgres.Sql): Promise<void> {
         this.tableLookupTable = new Map<string, boolean>();
 
         // <https://www.postgresql.org/docs/current/catalog-pg-class.html>
@@ -912,7 +906,7 @@ class TableColsLibrary {
         //     p = partitioned table
         //     I = partitioned index
 
-        const queryResult = await client.query(
+        const queryResult = await client.unsafe(
             `
             SELECT
                 a.attrelid,
@@ -927,7 +921,7 @@ class TableColsLibrary {
             AND c.relkind = 'r'
             `);
 
-        for (const row of queryResult.rows) {
+        for (const row of queryResult) {
             const attrelid: number = row["attrelid"];
             const attnum: number = row["attnum"];
             const attnotnull: boolean = row["attnotnull"];
@@ -936,7 +930,7 @@ class TableColsLibrary {
         }
     }
 
-    public async refreshViews(client: pg.Client): Promise<void> {
+    public async refreshViews(client: postgres.Sql): Promise<void> {
         this.viewLookupTable = new Map<string, boolean>();
 
         // This query was taken from here and (slightly) adapted:
@@ -945,7 +939,7 @@ class TableColsLibrary {
         // Changes from the original query:
         //   1. Changed returned columns to oid format instead of names
         //   2. Return all columns (not just primary and foreign keys)
-        const queryResult = await client.query(
+        const queryResult = await client.unsafe(
             `
             with recursive
             views as (
@@ -1087,7 +1081,7 @@ class TableColsLibrary {
             order by view_oid, view_column_num
             `);
 
-        for (const row of queryResult.rows) {
+        for (const row of queryResult) {
             const viewOid: number = row["view_oid"];
             const viewColumnNum: number = row["view_column_num"];
             const tableOid: number = row["table_oid"];
@@ -1117,14 +1111,14 @@ class TableColsLibrary {
     private viewLookupTable = new Map<string, boolean>();
 }
 
-export function resolveFieldDefs(tableColsLibrary: TableColsLibrary, pgTypes: Map<number, SqlType>, uniqueColumnTypes: Map<SqlType, TypeScriptType>, fields: pg.FieldDef[]): Map<string, [ColNullability, TypeScriptType]> {
+export function resolveFieldDefs(tableColsLibrary: TableColsLibrary, pgTypes: Map<number, SqlType>, uniqueColumnTypes: Map<SqlType, TypeScriptType>, fields: postgres.ColumnList<string>): Map<string, [ColNullability, TypeScriptType]> {
     const result = new Map<string, [ColNullability, TypeScriptType]>();
 
     for (const field of fields) {
-        const sqlType = psqlOidSqlType(pgTypes, field.dataTypeID);
+        const sqlType = psqlOidSqlType(pgTypes, field.type);
         let colNullability: ColNullability = ColNullability.OPT;
-        if (field.tableID > 0) {
-            const notNull = tableColsLibrary.isNotNull(field.tableID, field.columnID);
+        if (field.table > 0) {
+            const notNull = tableColsLibrary.isNotNull(field.table, field.number);
             if (notNull) {
                 colNullability = ColNullability.REQ;
             }
@@ -1249,12 +1243,12 @@ function stringifyColTypes(colTypes: Map<string, [ColNullability, TypeScriptType
     return result;
 }
 
-async function newConnect(adminUrl: string, name?: string): Promise<pg.Client> {
+async function newConnect(adminUrl: string, name?: string): Promise<postgres.Sql> {
     const newDbName = name !== undefined
         ? name
         : await testDatabaseName();
 
-    const adminConn1 = await connectPg(adminUrl);
+    const adminConn1 = connectPg(adminUrl);
     try {
         if (name !== undefined) {
             await dropDatabase(adminConn1, name);
@@ -1265,7 +1259,7 @@ async function newConnect(adminUrl: string, name?: string): Promise<pg.Client> {
         await closePg(adminConn1);
     }
 
-    const client = await connectPg(connReplaceDbName(adminUrl, newDbName));
+    const client = connectPg(connReplaceDbName(adminUrl, newDbName));
     return client;
 }
 
@@ -1287,8 +1281,8 @@ interface TableColumn {
     typeName: string;
 }
 
-async function queryTableColumn(client: pg.Client, tableName: string, columnName: string): Promise<TableColumn | null> {
-    const result = await client.query(
+async function queryTableColumn(client: postgres.Sql, tableName: string, columnName: string): Promise<TableColumn | null> {
+    const result = await client.unsafe(
         `
         SELECT
         pg_class.oid AS tbloid,
@@ -1305,22 +1299,22 @@ async function queryTableColumn(client: pg.Client, tableName: string, columnName
         AND pg_attribute.attname = $2
         `, [tableName, columnName]);
 
-    if (result.rows.length === 0) {
+    if (result.length === 0) {
         return null;
-    } else if (result.rows.length > 1) {
+    } else if (result.length > 1) {
         throw new Error(`Multiple pg_attribute results found for Table "${tableName}" Column "${columnName}"`);
     }
 
     return {
-        tableOid: result.rows[0].tbloid,
-        colAttnum: result.rows[0].attnum,
-        typeName: result.rows[0].typname
+        tableOid: result[0].tbloid,
+        colAttnum: result[0].attnum,
+        typeName: result[0].typname
     };
 }
 
-async function dropTableConstraints(client: pg.Client) {
+async function dropTableConstraints(client: postgres.Sql) {
     // Reference: <https://www.postgresql.org/docs/10/catalog-pg-constraint.html>
-    const queryResult = await client.query(
+    const queryResult = await client.unsafe(
         `
         select
             pg_class.relname,
@@ -1334,19 +1328,19 @@ async function dropTableConstraints(client: pg.Client) {
         AND pg_constraint.contype IN ('c', 'x');
         `);
 
-    for (const row of queryResult.rows) {
+    for (const row of queryResult) {
         const relname: string = row["relname"];
         const conname: string = row["conname"];
 
-        await client.query(
+        await client.unsafe(
             `
             ALTER TABLE ${escapeIdentifier(relname)} DROP CONSTRAINT IF EXISTS ${escapeIdentifier(conname)} CASCADE
             `);
     }
 }
 
-async function dropTableIndexes(client: pg.Client) {
-    const queryResult = await client.query(
+async function dropTableIndexes(client: postgres.Sql) {
+    const queryResult = await client.unsafe(
         `
         SELECT
             pg_class.relname AS indexname
@@ -1363,17 +1357,17 @@ async function dropTableIndexes(client: pg.Client) {
                 OR indexprs IS NOT NULL);
         `);
 
-    for (const row of queryResult.rows) {
+    for (const row of queryResult) {
         const indexname: string = row["indexname"];
 
-        await client.query(
+        await client.unsafe(
             `
             DROP INDEX IF EXISTS ${escapeIdentifier(indexname)} CASCADE
             `);
     }
 }
 
-export async function applyUniqueTableColumnTypes(client: pg.Client, uniqueTableColumnTypes: UniqueTableColumnType[]): Promise<void> {
+export async function applyUniqueTableColumnTypes(client: postgres.Sql, uniqueTableColumnTypes: UniqueTableColumnType[]): Promise<void> {
     // We need to drop all table constraints before converting the id columns.
     // This is because some constraints might refer to these table columns and
     // they might not like it if the column type changes.
@@ -1388,7 +1382,7 @@ export async function applyUniqueTableColumnTypes(client: pg.Client, uniqueTable
 
         if (tableColumn !== null) {
 
-            const queryResult = await client.query(
+            const queryResult = await client.unsafe(
                 `
                 SELECT
                     pg_constraint.conname,
@@ -1414,11 +1408,11 @@ export async function applyUniqueTableColumnTypes(client: pg.Client, uniqueTable
                     AND ta.attname = $2
                 `, [uniqueTableColumnType.tableName, uniqueTableColumnType.columnName]);
 
-            for (const row of queryResult.rows) {
+            for (const row of queryResult) {
                 const conname: string = row["conname"];
                 const relname: string = row["relname"];
 
-                await client.query(
+                await client.unsafe(
                     `
                     ALTER TABLE ${escapeIdentifier(relname)} DROP CONSTRAINT ${escapeIdentifier(conname)}
                     `);
@@ -1426,7 +1420,7 @@ export async function applyUniqueTableColumnTypes(client: pg.Client, uniqueTable
 
             const typeName = sqlUniqueTypeName(uniqueTableColumnType.tableName, uniqueTableColumnType.columnName);
 
-            await client.query(
+            await client.unsafe(
                 `
                 CREATE TYPE ${escapeIdentifier(typeName)} AS RANGE (SUBTYPE = ${escapeIdentifier(tableColumn.typeName)})
                 `);
@@ -1435,7 +1429,7 @@ export async function applyUniqueTableColumnTypes(client: pg.Client, uniqueTable
 
             const colHasDefault = await tableColHasDefault(client, uniqueTableColumnType.tableName, colName);
 
-            await client.query(
+            await client.unsafe(
                 `
                 ALTER TABLE ${escapeIdentifier(uniqueTableColumnType.tableName)}
                     ALTER COLUMN ${escapeIdentifier(colName)} DROP DEFAULT,
@@ -1444,20 +1438,20 @@ export async function applyUniqueTableColumnTypes(client: pg.Client, uniqueTable
 
             if (colHasDefault) {
                 // Restore the column so that it has a default value
-                await client.query(
+                await client.unsafe(
                     `
                     ALTER TABLE ${escapeIdentifier(uniqueTableColumnType.tableName)}
                         ALTER COLUMN ${escapeIdentifier(colName)} SET DEFAULT 'empty'
                     `);
             }
 
-            for (const row of queryResult.rows) {
+            for (const row of queryResult) {
                 const relname: string = row["relname"];
                 const attname: string = row["attname"];
 
                 const refColHasDefault = await tableColHasDefault(client, relname, attname);
 
-                await client.query(
+                await client.unsafe(
                     `
                     ALTER TABLE ${escapeIdentifier(relname)}
                         ALTER COLUMN ${escapeIdentifier(attname)} DROP DEFAULT,
@@ -1466,7 +1460,7 @@ export async function applyUniqueTableColumnTypes(client: pg.Client, uniqueTable
 
                 if (refColHasDefault) {
                     // Restore the column so that it has a default value
-                    await client.query(
+                    await client.unsafe(
                         `
                         ALTER TABLE ${escapeIdentifier(relname)}
                             ALTER COLUMN ${escapeIdentifier(attname)} SET DEFAULT 'empty'
@@ -1477,8 +1471,8 @@ export async function applyUniqueTableColumnTypes(client: pg.Client, uniqueTable
     }
 }
 
-async function tableColHasDefault(client: pg.Client, tableName: string, colName: string): Promise<boolean> {
-    const result = await client.query(
+async function tableColHasDefault(client: postgres.Sql, tableName: string, colName: string): Promise<boolean> {
+    const result = await client.unsafe(
         `
         select pg_attribute.atthasdef
         from
@@ -1491,18 +1485,18 @@ async function tableColHasDefault(client: pg.Client, tableName: string, colName:
         and pg_attribute.attname = $2
         `, [tableName, colName]);
 
-    if (result.rowCount === 0) {
+    if (result.count === 0) {
         throw new Error(`No pg_attribute row found for "${tableName}"."${colName}"`);
     }
-    if (result.rowCount > 1) {
+    if (result.count > 1) {
         throw new Error(`Multiple pg_attribute rows found for "${tableName}"."${colName}"`);
     }
 
-    const atthasdef: boolean = result.rows[0]["atthasdef"];
+    const atthasdef: boolean = result[0]["atthasdef"];
     return atthasdef;
 }
 
-async function modifySystemCatalogs(client: pg.Client): Promise<void> {
+async function modifySystemCatalogs(client: postgres.Sql): Promise<void> {
     const operatorOids: number[] = [
         2345, // date_lt_timestamp
         2346, // date_le_timestamp
@@ -1564,20 +1558,20 @@ async function modifySystemCatalogs(client: pg.Client): Promise<void> {
         [1184, 1266] // timestamptz -> timetz
     ];
 
-    await client.query(
+    await client.unsafe(
         `
         delete from pg_operator
         where oid = any($1)
         `, [operatorOids]);
 
-    await client.query(
+    await client.unsafe(
         `
         update pg_cast
         set castcontext = 'e'
         where (castsource, casttarget) in (select * from unnest($1::oid[], $2::oid[]));
         `, [explicitCasts.map(c => c[0]), explicitCasts.map(c => c[1])]);
 
-    await client.query(
+    await client.unsafe(
         `
         delete from pg_cast
         where (castsource, casttarget) in (select * from unnest($1::oid[], $2::oid[]));
