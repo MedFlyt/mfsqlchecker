@@ -1,6 +1,6 @@
 {
   "name": "mfsqlchecker",
-  "version": "0.1.15",
+  "version": "0.1.16",
   "description": "Statically validate correctness of all your SQL queries. TypeScript, PostgreSQL",
   "main": "index.js",
   "bin": "./mfsqlchecker.js",
