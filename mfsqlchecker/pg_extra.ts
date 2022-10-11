@@ -162,15 +162,14 @@ export interface PostgreSqlError {
  *
  * If `err` is not a PostgreSQL error, then returns `null`
  */
-export function parsePostgreSqlError(err: any): PostgreSqlError | null {
-    const code = getPostgreSqlErrorCode(err);
-    if (code === null) {
+export function parsePostgreSqlError(err: unknown): PostgreSqlError | null {
+    if (!(err instanceof postgres.PostgresError)) {
         return null;
     }
 
     return {
-        code: code,
-        position: err.position !== undefined ? parseInt(err.position, 10) : null,
+        code: err.code,
+        position: parseInt(err.position, 10),
         message: err.message,
         detail: err.detail !== undefined ? err.detail : null,
         hint: err.hint !== undefined ? err.hint : null
