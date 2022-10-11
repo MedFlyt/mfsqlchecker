@@ -52,6 +52,6 @@
         "vscode-test": "^1.2.0"
     },
     "dependencies": {
-        "vsce": "^1.66.0"
+        "vsce": "^1.103.1"
     }
 }
