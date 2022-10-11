@@ -1,8 +1,8 @@
 import * as crypto from "crypto";
 import * as fs from "fs";
 import * as path from "path";
-import * as pg from "pg";
 import { parse } from "pg-connection-string";
+import * as postgres from "postgres";
 import { closePg, connectPg } from "./pg_extra";
 
 const migrationsRegex = /^V\d+__.*\.sql$/;
@@ -87,7 +87,7 @@ export function validateTestDatabaseCluster(url: string): void {
 export async function destroyTestDb(adminUrl: string, testDb: string): Promise<void> {
     validateTestDatabaseCluster(adminUrl);
 
-    const adminConn2 = await connectPg(adminUrl);
+    const adminConn2 = connectPg(adminUrl);
     try {
         await logWithTiming(`Drop test db: ${testDb}`, async () => {
             await dropDatabase(adminConn2, testDb);
@@ -97,25 +97,25 @@ export async function destroyTestDb(adminUrl: string, testDb: string): Promise<v
     }
 }
 
-export async function databaseExists(conn: pg.Client, dbName: string): Promise<boolean> {
-    const rows = await conn.query("SELECT 1 FROM pg_database WHERE datname=$1", [dbName]);
+export async function databaseExists(conn: postgres.Sql, dbName: string): Promise<boolean> {
+    const rows = await conn.unsafe("SELECT 1 FROM pg_database WHERE datname=$1", [dbName]);
 
-    return rows.rowCount > 0;
+    return rows.count > 0;
 }
 
-export async function createBlankDatabase(conn: pg.Client, dbName: string): Promise<void> {
-    await conn.query(`CREATE DATABASE ${dbName} WITH TEMPLATE template0`);
+export async function createBlankDatabase(conn: postgres.Sql, dbName: string): Promise<void> {
+    await conn.unsafe(`CREATE DATABASE ${dbName} WITH TEMPLATE template0`);
 }
 
-export async function dropDatabase(conn: pg.Client, dbName: string): Promise<void> {
-    await conn.query(
+export async function dropDatabase(conn: postgres.Sql, dbName: string): Promise<void> {
+    await conn.unsafe(
         `
         SELECT pg_terminate_backend(pg_stat_activity.pid)
         FROM pg_stat_activity
         WHERE pg_stat_activity.datname = '${dbName}'
         `);
 
-    await conn.query(`DROP DATABASE IF EXISTS ${dbName}`);
+    await conn.unsafe(`DROP DATABASE IF EXISTS ${dbName}`);
 }
 
 export function readdirAsync(dir: string): Promise<string[]> {
