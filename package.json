@@ -1,6 +1,6 @@
 {
   "name": "mfsqlchecker",
-  "version": "0.1.16",
+  "version": "0.1.17",
   "description": "Statically validate correctness of all your SQL queries. TypeScript, PostgreSQL",
   "main": "index.js",
   "bin": "./mfsqlchecker.js",
@@ -36,7 +36,7 @@
   "dependencies": {
     "@types/adm-zip": "0.4.32",
     "@types/cli-progress": "1.8.1",
-    "@types/node": "18.8.3",
+    "@types/node": "18.11.13",
     "@types/pg": "7.11.0",
     "@types/request": "2.48.2",
     "@types/rimraf": "2.0.2",
@@ -61,7 +61,7 @@
     "stack-trace": "0.0.10",
     "tar": "^4.4.19",
     "tslint": "5.18.0",
-    "typescript": "4.8.4"
+    "typescript": "4.9.4"
   },
   "devDependencies": {
     "glob": "7.1.6"
