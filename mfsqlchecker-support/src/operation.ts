@@ -1,5 +1,4 @@
 import * as vscode from 'vscode';
-import * as fs from 'fs';
 import * as readline from "readline";
 import * as childProcess from "child_process";
 import * as path from "path";

@@ -1,0 +1,1 @@
+module.exports = require("./dist/eslint-local-rules").default;
