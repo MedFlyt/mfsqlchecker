@@ -1,6 +1,6 @@
-import * as Ajv from "ajv";
+import Ajv from "ajv";
 import { assertNever } from "assert-never";
-import * as fs from "fs";
+import fs from "fs";
 import { Either } from "./either";
 import { ErrorDiagnostic } from "./ErrorDiagnostic";
 import { SqlType, TypeScriptType } from "./queries";

@@ -1,5 +1,5 @@
 import * as crypto from "crypto";
-import * as postgres from "postgres";
+import postgres from "postgres";
 
 export function connectPg(url: string): postgres.Sql {
     return postgres(url, {

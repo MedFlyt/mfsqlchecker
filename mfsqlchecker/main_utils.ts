@@ -119,7 +119,7 @@ function parseOptions(): Options {
     return options;
 }
 
-function initOptions() {
+export function initOptions() {
     const options = parseOptions();
 
     if (
@@ -190,7 +190,7 @@ function initOptions() {
 }
 
 const startOrGetPgServer = (
-    options: Options & { postgresVersion: PostgresVersion }
+    options: Pick<Options, "postgresConnection"> & { postgresVersion: PostgresVersion }
 ): TE.TaskEither<
     Error,
     { url: string; dbName: string | undefined; pgServer: PostgresServer | null }
@@ -213,7 +213,7 @@ const startOrGetPgServer = (
     }
 };
 
-function initPgServerTE(options: Options & { postgresVersion: PostgresVersion }) {
+export function initPgServerTE(options: Options & { postgresVersion: PostgresVersion }) {
     return pipe(
         startOrGetPgServer(options),
         TE.chain((result) => {
@@ -270,7 +270,7 @@ export const initialize = pipe(
     TE.Do,
     TE.bindW("options", () => TE.fromEither(initOptions())),
     TE.bindW("pgServer", ({ options }) => initPgServerTE(options)),
-    TE.bindW("dbConnector", ({ options, pgServer }) => {
+    TE.bindW("queryRunner", ({ options, pgServer }) => {
         return initDbConnectorTE({
             migrationsDir: options.migrationsDir,
             url: pgServer.url,

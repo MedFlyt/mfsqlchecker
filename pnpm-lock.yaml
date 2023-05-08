@@ -82,6 +82,9 @@ dependencies:
   tar:
     specifier: ^4.4.19
     version: 4.4.19
+  tiny-invariant:
+    specifier: ^1.3.1
+    version: 1.3.1
   tslint:
     specifier: 5.18.0
     version: 5.18.0(typescript@4.9.4)
@@ -3742,6 +3745,10 @@ packages:
 
   /through@2.3.8:
     resolution: {integrity: sha512-w89qg7PI8wAdvX60bMDP+bFoD5Dvhm9oLheFp5O4a2QF0cSBGsBX4qZmadPMvVqlLJBBci+WqGGOAPvcDeNSVg==}
+    dev: false
+
+  /tiny-invariant@1.3.1:
+    resolution: {integrity: sha512-AD5ih2NlSssTCwsMznbvwMZpJ1cbhkGd2uueNxzv2jDlEeZdU04JQfRnggJQ8DrcVBGjAsCKwFBbDlVNtEMlzw==}
     dev: false
 
   /titleize@3.0.0:

@@ -1,15 +1,15 @@
-import * as AdmZip from "adm-zip";
+import AdmZip from "adm-zip";
 import { assertNever } from "assert-never";
 import * as childProcess from "child_process";
-import * as envPaths from "env-paths";
+import envPaths from "env-paths";
 import * as fs from "fs";
-import * as makeDir from "make-dir";
+import makeDir from "make-dir";
 import * as os from "os";
 import * as path from "path";
 import { ChildProcessPromise, spawn } from "promisify-child-process";
 import * as readline from "readline";
-import * as request from "request";
-import * as rimraf from "rimraf";
+import request from "request";
+import rimraf from "rimraf";
 import * as tar from "tar";
 
 const APP_NAME = "launch-postgres";
