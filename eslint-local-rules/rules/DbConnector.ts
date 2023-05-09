@@ -7,6 +7,7 @@ import * as postgres from "postgres";
 import invariant from "tiny-invariant";
 import * as TE from "fp-ts/TaskEither";
 import * as E from "fp-ts/Either";
+import { pipe } from "fp-ts/function";
 
 import {
     ColTypesFormat,
@@ -79,7 +80,39 @@ export class QueryRunner {
     }
 
     static ConnectTE(params: { adminUrl: string; name?: string; migrationsDir: string }) {
-        return TE.tryCatch(() => QueryRunner.Connect(params), E.toError);
+        return pipe(
+            TE.tryCatch(() => QueryRunner.Connect(params), E.toError),
+            TE.mapLeft((err: Error | postgres.PostgresError) => {
+                const errors: string[] = [];
+                const pgError = parsePostgreSqlError(err);
+
+                if (pgError !== null) {
+                    errors.push(
+                        "Error connecting to database cluster:",
+                        pgError.message,
+                        `code: ${pgError.code}`
+                    );
+
+                    if (pgError.detail !== null && pgError.detail !== pgError.message) {
+                        errors.push("detail: " + pgError.detail);
+                    }
+
+                    if (pgError.hint !== null) {
+                        errors.push("hint: " + pgError.hint);
+                    }
+
+                    return new Error(errors.join("\n"));
+                }
+
+                if ("code" in err) {
+                    errors.push("Error connecting to database cluster:", err.message);
+
+                    return new Error(errors.join("\n"));
+                }
+
+                return err;
+            })
+        );
     }
 
     private dbMigrationsHash: string = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
@@ -216,7 +249,7 @@ export class QueryRunner {
         const description = await this.client
             .unsafe(params.query, [], { prepare: true })
             .describe();
-        
+
         return description;
     }
 

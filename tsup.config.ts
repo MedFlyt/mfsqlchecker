@@ -2,9 +2,11 @@ import { defineConfig } from "tsup";
 
 export default defineConfig({
     entry: {
-        "eslint-local-rules": "./eslint-local-rules/index.ts"
+        "eslint-local-rules": "./eslint-local-rules/index.ts",
+        "sql-check.worker": "./eslint-local-rules/rules/sql-check.worker.ts",
     },
-    external: ["eslint"],
+    target: "esnext",
+    external: ["eslint", "./sql-check.worker", "synckit"],
     clean: true,
-    bundle: true
+    // bundle: true
 });
