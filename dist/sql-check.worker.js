@@ -25,16 +25,109 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 // eslint-local-rules/rules/sql-check.worker.ts
 var sql_check_worker_exports = {};
 module.exports = __toCommonJS(sql_check_worker_exports);
-var import_function3 = require("fp-ts/function");
 var TE3 = __toESM(require("fp-ts/TaskEither"));
 var E3 = __toESM(require("fp-ts/Either"));
-var import_synckit = require("synckit");
+var import_function3 = require("fp-ts/function");
+
+// node_modules/.pnpm/tslib@2.5.0/node_modules/tslib/tslib.es6.js
+function __awaiter(thisArg, _arguments, P, generator) {
+  function adopt(value) {
+    return value instanceof P ? value : new P(function(resolve) {
+      resolve(value);
+    });
+  }
+  return new (P || (P = Promise))(function(resolve, reject) {
+    function fulfilled(value) {
+      try {
+        step(generator.next(value));
+      } catch (e) {
+        reject(e);
+      }
+    }
+    function rejected(value) {
+      try {
+        step(generator["throw"](value));
+      } catch (e) {
+        reject(e);
+      }
+    }
+    function step(result) {
+      result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected);
+    }
+    step((generator = generator.apply(thisArg, _arguments || [])).next());
+  });
+}
+
+// node_modules/.pnpm/synckit@0.8.5/node_modules/synckit/lib/index.js
+var import_node_fs = __toESM(require("fs"), 1);
+var import_node_module = require("module");
+var import_node_path = __toESM(require("path"), 1);
+var import_node_url = require("url");
+var import_node_worker_threads = require("worker_threads");
+var import_meta = {};
+var TsRunner = {
+  TsNode: "ts-node",
+  EsbuildRegister: "esbuild-register",
+  EsbuildRunner: "esbuild-runner",
+  SWC: "swc",
+  TSX: "tsx"
+};
+var { SYNCKIT_BUFFER_SIZE, SYNCKIT_TIMEOUT, SYNCKIT_EXEC_ARGV, SYNCKIT_TS_RUNNER, NODE_OPTIONS } = process.env;
+var DEFAULT_BUFFER_SIZE = SYNCKIT_BUFFER_SIZE ? +SYNCKIT_BUFFER_SIZE : void 0;
+var DEFAULT_TIMEOUT = SYNCKIT_TIMEOUT ? +SYNCKIT_TIMEOUT : void 0;
+var DEFAULT_EXEC_ARGV = (SYNCKIT_EXEC_ARGV === null || SYNCKIT_EXEC_ARGV === void 0 ? void 0 : SYNCKIT_EXEC_ARGV.split(",")) || [];
+var DEFAULT_TS_RUNNER = SYNCKIT_TS_RUNNER || TsRunner.TsNode;
+function extractProperties(object) {
+  if (object && typeof object === "object") {
+    const properties = {};
+    for (const key in object) {
+      properties[key] = object[key];
+    }
+    return properties;
+  }
+}
+var cjsRequire = typeof require === "undefined" ? (0, import_node_module.createRequire)(import_meta.url) : require;
+function runAsWorker(fn) {
+  if (!import_node_worker_threads.workerData) {
+    return;
+  }
+  const { workerPort } = import_node_worker_threads.workerData;
+  try {
+    import_node_worker_threads.parentPort.on("message", ({ sharedBuffer, id, args }) => {
+      ;
+      (() => __awaiter(this, void 0, void 0, function* () {
+        const sharedBufferView = new Int32Array(sharedBuffer);
+        let msg;
+        try {
+          msg = { id, result: yield fn(...args) };
+        } catch (error) {
+          msg = { id, error, properties: extractProperties(error) };
+        }
+        workerPort.postMessage(msg);
+        Atomics.add(sharedBufferView, 0, 1);
+        Atomics.notify(sharedBufferView, 0);
+      }))();
+    });
+  } catch (error) {
+    import_node_worker_threads.parentPort.on("message", ({ sharedBuffer, id }) => {
+      const sharedBufferView = new Int32Array(sharedBuffer);
+      workerPort.postMessage({
+        id,
+        error,
+        properties: extractProperties(error)
+      });
+      Atomics.add(sharedBufferView, 0, 1);
+      Atomics.notify(sharedBufferView, 0);
+    });
+  }
+}
 
 // eslint-local-rules/rules/sql-check.utils.ts
-var import_assert_never6 = __toESM(require("assert-never"));
+var import_assert_never5 = __toESM(require("assert-never"));
 var E2 = __toESM(require("fp-ts/Either"));
-var import_function2 = require("fp-ts/function");
 var TE2 = __toESM(require("fp-ts/TaskEither"));
+var import_function2 = require("fp-ts/function");
+var import_fs2 = __toESM(require("fs"));
 var import_path = __toESM(require("path"));
 
 // mfsqlchecker/ConfigFile.ts
@@ -453,401 +546,6 @@ var configFileSchema = {
   "$ref": "#/definitions/ConfigFile"
 };
 
-// mfsqlchecker/launch_postgres.ts
-var import_adm_zip = __toESM(require("adm-zip"));
-var import_assert_never4 = require("assert-never");
-var childProcess = __toESM(require("child_process"));
-var import_env_paths = __toESM(require("env-paths"));
-var fs2 = __toESM(require("fs"));
-var import_make_dir = __toESM(require("make-dir"));
-var os = __toESM(require("os"));
-var path = __toESM(require("path"));
-var import_promisify_child_process = require("promisify-child-process");
-var readline = __toESM(require("readline"));
-var import_request = __toESM(require("request"));
-var import_rimraf = __toESM(require("rimraf"));
-var tar = __toESM(require("tar"));
-var APP_NAME = "launch-postgres";
-var appEnvPaths = (0, import_env_paths.default)(APP_NAME);
-function getCurrentPlatform() {
-  switch (process.platform) {
-    case "darwin":
-      return "mac_os_x";
-    case "linux":
-      const output = childProcess.execSync("getconf LONG_BIT", { encoding: "utf8" });
-      return output === "64\n" ? "linux_x86-64" : "linux_x86-32";
-    case "cygwin":
-    case "win32":
-      let useEnv = false;
-      try {
-        useEnv = !!(process.env.SYSTEMROOT && fs2.statSync(process.env.SYSTEMROOT));
-      } catch (err) {
-      }
-      const sysRoot = useEnv ? process.env.SYSTEMROOT : "C:\\Windows";
-      let isWOW64 = false;
-      try {
-        isWOW64 = !!fs2.statSync(path.join(sysRoot, "sysnative"));
-      } catch (err) {
-      }
-      return isWOW64 ? "win_x86-64" : "win_x86-32";
-    default:
-      throw new Error(`Unsupported platform: ${process.platform}`);
-  }
-}
-function postgresDownloadUrl(platform, postgresVersion) {
-  switch (postgresVersion) {
-    case "9.4.24":
-      switch (platform) {
-        case "linux_x86-32":
-          return "http://get.enterprisedb.com/postgresql/postgresql-9.4.24-1-linux-binaries.tar.gz";
-        case "linux_x86-64":
-          return "http://get.enterprisedb.com/postgresql/postgresql-9.4.24-1-linux-x64-binaries.tar.gz";
-        case "win_x86-32":
-          return "http://get.enterprisedb.com/postgresql/postgresql-9.4.24-1-windows-binaries.zip";
-        case "win_x86-64":
-          return "http://get.enterprisedb.com/postgresql/postgresql-9.4.24-1-windows-x64-binaries.zip";
-        case "mac_os_x":
-          return "http://get.enterprisedb.com/postgresql/postgresql-9.4.24-1-osx-binaries.zip";
-        default:
-          return (0, import_assert_never4.assertNever)(platform);
-      }
-    case "9.5.19":
-      switch (platform) {
-        case "linux_x86-32":
-          return null;
-        case "linux_x86-64":
-          return null;
-        case "win_x86-32":
-          return "http://get.enterprisedb.com/postgresql/postgresql-9.5.19-1-windows-binaries.zip";
-        case "win_x86-64":
-          return "http://get.enterprisedb.com/postgresql/postgresql-9.5.19-1-windows-x64-binaries.zip";
-        case "mac_os_x":
-          return "http://get.enterprisedb.com/postgresql/postgresql-9.5.19-1-osx-binaries.zip";
-        default:
-          return (0, import_assert_never4.assertNever)(platform);
-      }
-    case "9.6.15":
-      switch (platform) {
-        case "linux_x86-32":
-          return "http://get.enterprisedb.com/postgresql/postgresql-9.6.15-1-linux-binaries.tar.gz";
-        case "linux_x86-64":
-          return "http://get.enterprisedb.com/postgresql/postgresql-9.6.15-1-linux-x64-binaries.tar.gz";
-        case "win_x86-32":
-          return "http://get.enterprisedb.com/postgresql/postgresql-9.6.15-1-windows-binaries.zip";
-        case "win_x86-64":
-          return "http://get.enterprisedb.com/postgresql/postgresql-9.6.15-1-windows-x64-binaries.zip";
-        case "mac_os_x":
-          return "http://get.enterprisedb.com/postgresql/postgresql-9.6.15-1-osx-binaries.zip";
-        default:
-          return (0, import_assert_never4.assertNever)(platform);
-      }
-    case "10.10":
-      switch (platform) {
-        case "linux_x86-32":
-          return "https://get.enterprisedb.com/postgresql/postgresql-10.10-1-linux-binaries.tar.gz";
-        case "linux_x86-64":
-          return "https://get.enterprisedb.com/postgresql/postgresql-10.10-1-linux-x64-binaries.tar.gz";
-        case "win_x86-32":
-          return "https://get.enterprisedb.com/postgresql/postgresql-10.10-1-windows-binaries.zip";
-        case "win_x86-64":
-          return "https://get.enterprisedb.com/postgresql/postgresql-10.10-1-windows-x64-binaries.zip";
-        case "mac_os_x":
-          return "https://get.enterprisedb.com/postgresql/postgresql-10.10-1-osx-binaries.zip";
-        default:
-          return (0, import_assert_never4.assertNever)(platform);
-      }
-    case "11.5":
-      switch (platform) {
-        case "linux_x86-32":
-          return null;
-        case "linux_x86-64":
-          return null;
-        case "win_x86-32":
-          return null;
-        case "win_x86-64":
-          return "https://get.enterprisedb.com/postgresql/postgresql-11.5-1-windows-x64-binaries.zip";
-        case "mac_os_x":
-          return "https://get.enterprisedb.com/postgresql/postgresql-11.5-1-osx-binaries.zip";
-        default:
-          return (0, import_assert_never4.assertNever)(platform);
-      }
-    default:
-      return (0, import_assert_never4.assertNever)(postgresVersion);
-  }
-}
-function postgresDirectory(platform, postgresVersion) {
-  return path.join(appEnvPaths.cache, postgresVersion + "-" + platform);
-}
-function checkPostgresInstalled(platform, postgresVersion) {
-  return new Promise((resolve) => {
-    fs2.stat(postgresDirectory(platform, postgresVersion), (err, stats) => {
-      if (err) {
-        resolve(false);
-        return;
-      }
-      resolve(stats.isDirectory());
-    });
-  });
-}
-function downloadFile(url, filePath) {
-  return new Promise((resolve, reject) => {
-    const stream = (0, import_request.default)(url).pipe(fs2.createWriteStream(filePath));
-    stream.on("finish", () => {
-      resolve();
-    });
-    stream.on("error", (err) => {
-      reject(err);
-    });
-  });
-}
-async function downloadFileWithRetry(url, filePath) {
-  const MAX_RETRIES = 10;
-  let retryCount = 0;
-  while (true) {
-    try {
-      console.log("Downloading:", url);
-      const result = await downloadFile(url, filePath);
-      return result;
-    } catch (err) {
-      retryCount++;
-      if (retryCount === MAX_RETRIES) {
-        throw err;
-      }
-      console.log("Error downloading:", url);
-      console.log();
-      console.log(err);
-      console.log();
-      console.log("Sleeping...");
-      await delay(1e4);
-    }
-  }
-}
-function delay(millis) {
-  return new Promise((resolve, _reject) => {
-    setTimeout(resolve, millis);
-  });
-}
-async function mkdtemp2(prefix) {
-  return await new Promise((resolve, reject) => {
-    fs2.mkdtemp(prefix, (err, folder) => {
-      if (err) {
-        reject(err);
-        return;
-      }
-      resolve(folder);
-    });
-  });
-}
-async function rimrafIgnoreErrors(filePath) {
-  return new Promise((resolve) => {
-    (0, import_rimraf.default)(filePath, () => {
-      resolve();
-    });
-  });
-}
-var TempDir = class {
-  static async create() {
-    await new Promise((resolve, reject) => {
-      fs2.mkdir(path.join(os.tmpdir(), APP_NAME), (err) => {
-        if (err && err !== null && err.code !== "EEXIST") {
-          reject(err);
-          return;
-        }
-        resolve();
-      });
-    });
-    const directory = await mkdtemp2(path.join(os.tmpdir(), APP_NAME) + path.sep + "tmp-");
-    return new TempDir(directory);
-  }
-  async close() {
-    await rimrafIgnoreErrors(this.directory);
-  }
-  directory;
-  constructor(directory) {
-    this.directory = directory;
-  }
-};
-async function withTempDir(action) {
-  const tempDir = await TempDir.create();
-  try {
-    const result = await action(tempDir.directory);
-    return result;
-  } finally {
-    await tempDir.close();
-  }
-}
-async function downloadPostgres(platform, postgresVersion, targetDir) {
-  const url = postgresDownloadUrl(platform, postgresVersion);
-  if (url === null) {
-    throw new Error(`Binary Download of PostgreSQL version ${postgresVersion} not available for ${platform}`);
-  }
-  console.log("Downloading", url);
-  await (0, import_make_dir.default)(path.dirname(targetDir));
-  const extractDir = await mkdtemp2(targetDir + "-tmp-");
-  await withTempDir(async (tmpDir) => {
-    const file = path.join(tmpDir, "tmp.tar.gz");
-    await downloadFileWithRetry(url, file);
-    await (0, import_make_dir.default)(extractDir);
-    console.log("extracting to", extractDir);
-    if (url.endsWith(".zip")) {
-      await new Promise((resolve, reject) => {
-        const zip = new import_adm_zip.default(file);
-        zip.extractAllToAsync(extractDir, true, (err) => {
-          if (err) {
-            reject(err);
-            return;
-          }
-          resolve();
-        });
-      });
-    } else {
-      await tar.x({
-        file,
-        C: extractDir
-      });
-    }
-    try {
-      await new Promise((resolve, reject) => {
-        fs2.rename(extractDir, targetDir, (err) => {
-          if (err) {
-            reject(err);
-            return;
-          }
-          resolve();
-        });
-      });
-    } catch (err) {
-      if (err.code === "ENOTEMPTY") {
-        console.log(`Target directory already exists (created by a concurrent process)`);
-        await rimrafIgnoreErrors(extractDir);
-      } else {
-        throw err;
-      }
-    }
-  });
-  console.log(`PostgreSQL ${postgresVersion} ready`);
-}
-async function getPostgresBinaryPath(platform, postgresVersion, binaryName) {
-  const isInstalled = await checkPostgresInstalled(platform, postgresVersion);
-  if (!isInstalled) {
-    await downloadPostgres(platform, postgresVersion, postgresDirectory(platform, postgresVersion));
-  }
-  const ext = platform === "win_x86-32" || platform === "win_x86-64" ? ".exe" : "";
-  return path.join(postgresDirectory(platform, postgresVersion), "pgsql", "bin", binaryName + ext);
-}
-var MIN_PORT = 49152;
-var MAX_PORT = 65534;
-function randomPort() {
-  return MIN_PORT + Math.floor(Math.random() * (MAX_PORT - MIN_PORT));
-}
-function tryLaunchPostgres(postgres2, dataDir, port) {
-  return new Promise((resolve, reject) => {
-    const postgresChild = childProcess.spawn(postgres2, ["-F", "-D", dataDir, "-p", `${port}`], { detached: true, env: {} });
-    process.on("exit", () => {
-      postgresChild.kill();
-    });
-    let handled = false;
-    readline.createInterface({
-      input: postgresChild.stderr
-    }).on("line", (line) => {
-      if (handled) {
-        return;
-      }
-      if (/database system is ready to accept connections/.test(line)) {
-        handled = true;
-        resolve(postgresChild);
-      } else if (/could not bind/.test(line)) {
-        handled = true;
-        postgresChild.kill();
-        resolve(null);
-      }
-    });
-    postgresChild.on("error", (err) => {
-      if (handled) {
-        return;
-      }
-      reject(err);
-    });
-  });
-}
-var USERNAME = "test";
-var PASSWORD = "test";
-var PostgresServer = class {
-  static async start(postgresVersion) {
-    const platform = getCurrentPlatform();
-    const initDb = await getPostgresBinaryPath(platform, postgresVersion, "initdb");
-    const postgres2 = await getPostgresBinaryPath(platform, postgresVersion, "postgres");
-    const tempDir = await TempDir.create();
-    try {
-      await withTempDir(async (pwTmpDir) => {
-        const pwFile = path.join(pwTmpDir, "password.txt");
-        await new Promise((resolve, reject) => {
-          fs2.writeFile(pwFile, PASSWORD, { encoding: "utf8" }, (err) => {
-            if (err) {
-              reject(err);
-              return;
-            }
-            resolve();
-          });
-        });
-        let initDbChild;
-        try {
-          initDbChild = (0, import_promisify_child_process.spawn)(initDb, ["-D", tempDir.directory, "-N", "-U", USERNAME, "--pwfile", pwFile], { encoding: "utf8", env: {} });
-        } catch (err) {
-          throw new Error(`initdb failed, error running command "${initDb}": ${err.message}`);
-        }
-        if (initDbChild.stdout === null) {
-          throw new Error("initdb stdout is null");
-        }
-        if (initDbChild.stderr === null) {
-          throw new Error("initdb stdout is null");
-        }
-        let output = "";
-        initDbChild.stdout.on("data", (msg) => {
-          output += msg.toString();
-        });
-        initDbChild.stderr.on("data", (msg) => {
-          output += msg.toString();
-        });
-        try {
-          await initDbChild;
-        } catch (err) {
-          throw new Error(`initdb failed:
-${output}`);
-        }
-      });
-      let postgresProc = null;
-      let port = 0;
-      while (postgresProc === null) {
-        port = randomPort();
-        postgresProc = await tryLaunchPostgres(postgres2, tempDir.directory, port);
-      }
-      return new PostgresServer(tempDir, postgresProc, port);
-    } catch (err) {
-      await tempDir.close();
-      throw err;
-    }
-  }
-  async close() {
-    const SIGQUIT = 3;
-    this.postgresProc.kill(SIGQUIT);
-    await new Promise((resolve) => {
-      this.postgresProc.on("close", resolve);
-    });
-    await this.tempDir.close();
-  }
-  port;
-  url;
-  tempDir;
-  postgresProc;
-  constructor(tempDir, postgresProc, port) {
-    this.tempDir = tempDir;
-    this.postgresProc = postgresProc;
-    this.port = port;
-    this.url = `postgres://${USERNAME}:${PASSWORD}@127.0.0.1:${this.port}/postgres`;
-  }
-};
-
 // mfsqlchecker/pg_test_db.ts
 var crypto2 = __toESM(require("crypto"));
 var fs3 = __toESM(require("fs"));
@@ -938,7 +636,7 @@ function testDatabaseName() {
 }
 
 // eslint-local-rules/rules/DbConnector.ts
-var import_assert_never5 = require("assert-never");
+var import_assert_never4 = require("assert-never");
 var import_chalk3 = __toESM(require("chalk"));
 var import_cli_progress = require("cli-progress");
 var fs4 = __toESM(require("fs"));
@@ -1048,13 +746,11 @@ var QueryRunner = class {
       await dropAllSequences(this.client);
       await dropAllTypes(this.client);
       await dropAllFunctions(this.client);
-      const allFiles = await readdirAsync(this.config.migrationsDir);
+      const allFiles = await readdirAsync(this.migrationsDir);
       const matchingFiles = allFiles.filter(isMigrationFile).sort();
       for (const matchingFile of matchingFiles) {
         runnerLog("running migration", matchingFile);
-        const text = await readFileAsync(
-          path3.join(this.config.migrationsDir, matchingFile)
-        );
+        const text = await readFileAsync(path3.join(this.migrationsDir, matchingFile));
         try {
           await this.client.unsafe(text);
         } catch (err) {
@@ -1063,7 +759,7 @@ var QueryRunner = class {
             throw err;
           }
           const errorDiagnostic = postgresqlErrorDiagnostic(
-            path3.join(this.config.migrationsDir, matchingFile),
+            path3.join(this.migrationsDir, matchingFile),
             text,
             postgresError,
             postgresError.position !== null ? toSrcSpan(text, postgresError.position) : { type: "File" },
@@ -1111,7 +807,7 @@ var QueryRunner = class {
     }
     this.viewNames = newViewNames;
     for (const [viewName, viewAnswer] of this.viewNames) {
-      const createView = params.viewLibrary.find((x2) => x2.viewName === viewName);
+      const createView = params.viewLibrary.find((x) => x.viewName === viewName);
       (0, import_tiny_invariant.default)(createView !== void 0, `view ${viewName} not found (probably a bug).`);
       queryErrors2 = queryErrors2.concat(viewAnswerToErrorDiagnostics(createView, viewAnswer));
     }
@@ -1120,8 +816,20 @@ var QueryRunner = class {
     }
   }
   async runQuery(params) {
-    const description = await this.client.unsafe(params.query, [], { prepare: true }).describe();
-    return description;
+    return processQuery(
+      this.client,
+      defaultColTypesFormat,
+      this.pgTypes,
+      this.tableColsLibrary,
+      this.uniqueColumnTypes,
+      {
+        colTypes: params.query.colTypes,
+        text: params.query.text
+      }
+    );
+  }
+  async end() {
+    await this.client.end();
   }
   async x() {
     const queriesProgressBar = new import_cli_progress.Bar(
@@ -1219,7 +927,7 @@ var QueryRunner = class {
             break;
           }
           default:
-            (0, import_assert_never5.assertNever)(query);
+            (0, import_assert_never4.assertNever)(query);
         }
         queriesProgressBar.update(++i);
       }
@@ -1239,7 +947,7 @@ var QueryRunner = class {
           finalErrors = finalErrors.concat(query.value.errors);
           break;
         default:
-          (0, import_assert_never5.assertNever)(query);
+          (0, import_assert_never4.assertNever)(query);
       }
     }
     return finalErrors.concat(queryErrors);
@@ -1389,7 +1097,7 @@ function viewAnswerToErrorDiagnostics(createView, viewAnswer) {
       ];
     }
     default:
-      return (0, import_assert_never5.assertNever)(viewAnswer);
+      return (0, import_assert_never4.assertNever)(viewAnswer);
   }
 }
 var QueryMap = class {
@@ -1536,7 +1244,7 @@ ${JSON.stringify(
         }
       ];
     default:
-      return (0, import_assert_never5.assertNever)(queryAnswer);
+      return (0, import_assert_never4.assertNever)(queryAnswer);
   }
 }
 function insertAnswerToErrorDiagnostics(query, queryAnswer, colTypesFormat) {
@@ -1574,7 +1282,7 @@ function insertAnswerToErrorDiagnostics(query, queryAnswer, colTypesFormat) {
                 case "ColNotFound":
                   return `Column "${e.colName}" does not exist on table "${e.tableName}"`;
                 default:
-                  return (0, import_assert_never5.assertNever)(e);
+                  return (0, import_assert_never4.assertNever)(e);
               }
             })
           ),
@@ -1583,7 +1291,7 @@ function insertAnswerToErrorDiagnostics(query, queryAnswer, colTypesFormat) {
         }
       ];
     default:
-      return (0, import_assert_never5.assertNever)(queryAnswer);
+      return (0, import_assert_never4.assertNever)(queryAnswer);
   }
 }
 async function processQuery(client, colTypesFormat, pgTypes, tableColsLibrary, uniqueColumnTypes, query) {
@@ -2012,7 +1720,7 @@ function colNullabilityStr(colNullability) {
     case 1 /* OPT */:
       return "Opt";
     default:
-      return (0, import_assert_never5.assertNever)(colNullability);
+      return (0, import_assert_never4.assertNever)(colNullability);
   }
 }
 function renderIdentifier(ident) {
@@ -2038,7 +1746,7 @@ function renderColTypesType(colTypesFormat, colTypes) {
       result = result.substr(0, result.length - 1);
       break;
     default:
-      return (0, import_assert_never5.assertNever)(delim);
+      return (0, import_assert_never4.assertNever)(delim);
   }
   result += "\n}";
   return result;
@@ -2429,17 +2137,14 @@ async function modifySystemCatalogs(client) {
 }
 
 // eslint-local-rules/rules/sql-check.utils.ts
-var DEFAULT_POSTGRES_VERSION = "10.10";
+var import_embedded_postgres = __toESM(require("embedded-postgres"));
+var DEFAULT_POSTGRES_VERSION = "14.6.0";
 var QUERY_METHOD_NAMES = /* @__PURE__ */ new Set(["query", "queryOne", "queryOneOrNone"]);
 var INSERT_METHOD_NAMES = /* @__PURE__ */ new Set(["insert", "insertMaybe"]);
 var VALID_METHOD_NAMES = /* @__PURE__ */ new Set([...QUERY_METHOD_NAMES, ...INSERT_METHOD_NAMES]);
 function initializeTE(params) {
   return (0, import_function2.pipe)(
     TE2.Do,
-    TE2.chainFirstW(() => {
-      console.log("init");
-      return TE2.of(void 0);
-    }),
     TE2.bindW(
       "options",
       () => initOptionsTE({
@@ -2452,7 +2157,7 @@ function initializeTE(params) {
     TE2.bindW("server", ({ options }) => initPgServerTE(options)),
     TE2.bindW("runner", ({ server, options }) => {
       return QueryRunner.ConnectTE({
-        adminUrl: server.url,
+        adminUrl: server.adminUrl,
         name: server.dbName,
         migrationsDir: options.migrationsDir
       });
@@ -2502,7 +2207,7 @@ function initOptionsE(options) {
         }
         break;
       default:
-        return (0, import_assert_never6.default)(config2);
+        return (0, import_assert_never5.default)(config2);
     }
   }
   if (options.migrationsDir !== null) {
@@ -2517,40 +2222,60 @@ function initOptionsE(options) {
     postgresVersion
   });
 }
-var startOrGetPgServer = (options) => {
-  if (options.postgresConnection !== null) {
-    return TE2.right({
-      url: options.postgresConnection.url,
-      dbName: options.postgresConnection.databaseName,
-      pgServer: null
-    });
-  } else {
-    return (0, import_function2.pipe)(
-      TE2.tryCatch(() => PostgresServer.start(options.postgresVersion), E2.toError),
-      TE2.map((pgServer) => ({
-        url: pgServer.url,
-        dbName: void 0,
-        pgServer
-      }))
-    );
-  }
-};
+function createEmbeddedPostgresTE(options) {
+  const databaseDir = import_path.default.join(options.projectDir, "embedded-pg");
+  const postgresOptions = {
+    user: "postgres",
+    password: "password",
+    port: 5431
+  };
+  const pg = new import_embedded_postgres.default({
+    ...postgresOptions,
+    database_dir: databaseDir,
+    persistent: true
+  });
+  const adminUrl = `postgres://${postgresOptions.user}:${postgresOptions.password}@localhost:${postgresOptions.port}/postgres`;
+  const testDbName = "test_eliya";
+  const shouldInitialize = !import_fs2.default.existsSync(databaseDir);
+  const initializeAndStartTE = (0, import_function2.pipe)(
+    TE2.Do,
+    TE2.chain(() => TE2.tryCatch(() => pg.initialise(), E2.toError)),
+    TE2.chain(() => TE2.tryCatch(() => pg.start(), E2.toError))
+  );
+  const conditionalInitializeAndStartTE = shouldInitialize ? initializeAndStartTE : TE2.right(void 0);
+  const recreateDatabaseTE = (client) => (0, import_function2.pipe)(
+    TE2.Do,
+    TE2.bind("dbName", () => TE2.right(client.escapeIdentifier(testDbName))),
+    TE2.chainFirst(
+      ({ dbName }) => TE2.tryCatch(() => client.query(`DROP DATABASE IF EXISTS ${dbName}`), E2.toError)
+    ),
+    TE2.chainFirst(
+      ({ dbName }) => TE2.tryCatch(() => client.query(`CREATE DATABASE ${dbName}`), E2.toError)
+    )
+  );
+  return (0, import_function2.pipe)(
+    TE2.Do,
+    TE2.chain(() => conditionalInitializeAndStartTE),
+    TE2.bind("client", () => TE2.right(pg.getPgClient())),
+    TE2.chainFirst(({ client }) => TE2.tryCatch(() => client.connect(), E2.toError)),
+    TE2.chainFirst(({ client }) => recreateDatabaseTE(client)),
+    TE2.map(() => ({ pg, options: postgresOptions, adminUrl, dbName: testDbName }))
+  );
+}
 function initPgServerTE(options) {
   return (0, import_function2.pipe)(
-    startOrGetPgServer(options),
-    TE2.chain((result) => {
-      process.on("crash", () => result.pgServer?.close());
-      process.on("SIGINT", () => result.pgServer?.close());
-      return TE2.right(result);
+    createEmbeddedPostgresTE(options),
+    TE2.map((result) => {
+      process.on("crash", () => result.pg.stop());
+      process.on("SIGINT", () => result.pg.stop());
+      return result;
     })
   );
 }
 
 // eslint-local-rules/rules/sql-check.worker.ts
 var config = null;
-console.log("a");
-(0, import_synckit.runAsWorker)(async (params) => {
-  console.log("runAsWorker");
+runAsWorker(async (params) => {
   switch (params.action) {
     case "INITIALIZE":
       return runInitialize(params)();
@@ -2561,12 +2286,10 @@ console.log("a");
   }
 });
 function runInitialize(params) {
-  console.log("runInitialize");
   return (0, import_function3.pipe)(
     initializeTE({ projectDir: params.projectDir }),
     TE3.map((result) => {
       config = result;
-      return result;
     }),
     TE3.mapLeft((error) => ({ type: "INTERNAL_ERROR", error }))
   );
@@ -2578,13 +2301,14 @@ function runCheck(params) {
   const runner = config.runner;
   return (0, import_function3.pipe)(
     TE3.tryCatch(() => runner.runQuery({ query: params.query }), E3.toError),
-    TE3.mapLeft((error) => ({ type: "RUNNER_ERROR", error }))
+    TE3.mapLeft((error) => ({ type: "RUNNER_ERROR", error: error.message }))
   );
 }
 function runEnd(params) {
   return (0, import_function3.pipe)(
-    TE3.tryCatch(() => config?.server.pgServer?.close() ?? Promise.resolve(), E3.toError),
+    TE3.Do,
+    TE3.chain(() => TE3.tryCatch(() => config?.runner.end() ?? Promise.resolve(), E3.toError)),
+    TE3.chain(() => TE3.tryCatch(() => config?.server.pg.stop() ?? Promise.resolve(), E3.toError)),
     TE3.mapLeft((error) => ({ type: "INTERNAL_ERROR", error }))
   );
 }
-var program = (0, import_function3.flow)((projectDir) => initializeTE({ projectDir }));

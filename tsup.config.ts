@@ -6,7 +6,6 @@ export default defineConfig({
         "sql-check.worker": "./eslint-local-rules/rules/sql-check.worker.ts",
     },
     target: "esnext",
-    external: ["eslint", "./sql-check.worker", "synckit"],
+    external: ["eslint", "./sql-check.worker"],
     clean: true,
-    // bundle: true
 });

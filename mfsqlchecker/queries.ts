@@ -255,7 +255,7 @@ function getIndentLevel(sourceFile: ts.SourceFile, node: ts.Node): number {
  * @param node Must be a call expression to the "query" function (from the sql
  * checker lib)
  */
-function buildQueryCallExpression(methodName: string, node: ts.CallExpression): Either<ErrorDiagnostic[], QueryCallExpression> {
+export function buildQueryCallExpression(methodName: string, node: ts.CallExpression): Either<ErrorDiagnostic[], QueryCallExpression> {
     if (node.arguments.length < 1) {
         // The TypeScript typechecker will catch this error, so we don't need
         // to emit our own error message
@@ -974,7 +974,7 @@ function getTypeMemberColTypes(checker: ts.TypeChecker, node: ts.Node, propName:
     }
 }
 
-function resolveQueryFragment(typeScriptUniqueColumnTypes: Map<TypeScriptType, SqlType>, projectDir: string, checker: ts.TypeChecker, query: QueryCallExpression, lookupViewName: (qualifiedSqlViewName: QualifiedSqlViewName) => string | undefined): Either<ErrorDiagnostic[], ResolvedSelect> {
+export function resolveQueryFragment(typeScriptUniqueColumnTypes: Map<TypeScriptType, SqlType>, projectDir: string, checker: ts.TypeChecker, query: QueryCallExpression, lookupViewName: (qualifiedSqlViewName: QualifiedSqlViewName) => string | undefined): Either<ErrorDiagnostic[], ResolvedSelect> {
     const errors: ErrorDiagnostic[] = [];
 
     let text = "";

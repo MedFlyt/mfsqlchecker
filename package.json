@@ -50,6 +50,7 @@
     "chalk": "2.4.2",
     "cli-progress": "3.0.0",
     "commander": "3.0.0",
+    "embedded-postgres": "14.6.0-beta.6",
     "env-paths": "2.2.0",
     "esbuild": "^0.17.18",
     "esbuild-register": "^3.4.2",

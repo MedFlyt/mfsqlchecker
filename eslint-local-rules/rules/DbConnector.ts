@@ -11,6 +11,7 @@ import { pipe } from "fp-ts/function";
 
 import {
     ColTypesFormat,
+    defaultColTypesFormat,
     equalsUniqueTableColumnTypes,
     makeUniqueColumnTypes,
     sqlUniqueTypeName,
@@ -152,13 +153,11 @@ export class QueryRunner {
             await dropAllTypes(this.client);
             await dropAllFunctions(this.client);
 
-            const allFiles = await readdirAsync(this.config.migrationsDir);
+            const allFiles = await readdirAsync(this.migrationsDir);
             const matchingFiles = allFiles.filter(isMigrationFile).sort();
             for (const matchingFile of matchingFiles) {
                 runnerLog("running migration", matchingFile);
-                const text = await readFileAsync(
-                    path.join(this.config.migrationsDir, matchingFile)
-                );
+                const text = await readFileAsync(path.join(this.migrationsDir, matchingFile));
                 try {
                     await this.client.unsafe(text);
                 } catch (err) {
@@ -168,7 +167,7 @@ export class QueryRunner {
                     }
 
                     const errorDiagnostic = postgresqlErrorDiagnostic(
-                        path.join(this.config.migrationsDir, matchingFile),
+                        path.join(this.migrationsDir, matchingFile),
                         text,
                         postgresError,
                         postgresError.position !== null
@@ -245,12 +244,22 @@ export class QueryRunner {
         }
     }
 
-    async runQuery(params: { query: string }) {
-        const description = await this.client
-            .unsafe(params.query, [], { prepare: true })
-            .describe();
+    async runQuery(params: { query: ResolvedSelect }) {
+        return processQuery(
+            this.client,
+            defaultColTypesFormat,
+            this.pgTypes,
+            this.tableColsLibrary,
+            this.uniqueColumnTypes,
+            {
+                colTypes: params.query.colTypes,
+                text: params.query.text
+            }
+        );
+    }
 
-        return description;
+    async end() {
+        await this.client.end();
     }
 
     async x() {
@@ -1247,7 +1256,7 @@ async function processQuery(
     pgTypes: Map<number, SqlType>,
     tableColsLibrary: TableColsLibrary,
     uniqueColumnTypes: Map<SqlType, TypeScriptType>,
-    query: ResolvedSelect
+    query: Pick<ResolvedSelect, "colTypes" | "text">
 ): Promise<SelectAnswer> {
     let fields: postgres.ColumnList<string> | null;
     const savepoint = await newSavepoint(client);

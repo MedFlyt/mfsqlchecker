@@ -1,17 +1,19 @@
-import { flow, pipe } from "fp-ts/function";
+import type EmbeddedPostgres from "embedded-postgres";
 import * as TE from "fp-ts/TaskEither";
 import * as E from "fp-ts/Either";
+import { pipe } from "fp-ts/function";
 import { runAsWorker } from "synckit";
-import { PostgresServer } from "../../mfsqlchecker/launch_postgres";
 import { QueryRunner } from "./DbConnector";
-import { initializeTE, Options } from "./sql-check.utils";
+import { Options, PostgresOptions, initializeTE } from "./sql-check.utils";
+import { ResolvedSelect } from "../../mfsqlchecker/queries";
 
 let config: {
     readonly options: Options;
     readonly server: {
-        url: string;
-        dbName: string | undefined;
-        pgServer: PostgresServer | null;
+        pg: EmbeddedPostgres;
+        options: Pick<PostgresOptions, "port" | "user" | "password">;
+        adminUrl: string;
+        dbName: string;
     };
     readonly runner: QueryRunner;
 } | null = null;
@@ -21,12 +23,10 @@ export type WorkerParams =
           action: "INITIALIZE";
           projectDir: string;
       }
-    | { action: "CHECK", query: string }
+    | { action: "CHECK"; query: ResolvedSelect }
     | { action: "END" };
 
-console.log("a");
 runAsWorker(async (params: WorkerParams) => {
-    console.log("runAsWorker");
     switch (params.action) {
         case "INITIALIZE":
             return runInitialize(params)();
@@ -38,12 +38,10 @@ runAsWorker(async (params: WorkerParams) => {
 });
 
 function runInitialize(params: Extract<WorkerParams, { action: "INITIALIZE" }>) {
-    console.log("runInitialize");
     return pipe(
         initializeTE({ projectDir: params.projectDir }),
         TE.map((result) => {
             config = result;
-            return result;
         }),
         TE.mapLeft((error) => ({ type: "INTERNAL_ERROR", error }))
     );
@@ -58,15 +56,17 @@ function runCheck(params: Extract<WorkerParams, { action: "CHECK" }>) {
 
     return pipe(
         TE.tryCatch(() => runner.runQuery({ query: params.query }), E.toError),
-        TE.mapLeft((error) => ({ type: "RUNNER_ERROR", error }))
-    )
+        TE.mapLeft((error) => ({ type: "RUNNER_ERROR", error: error.message }))
+    );
 }
 
 function runEnd(params: Extract<WorkerParams, { action: "END" }>) {
     return pipe(
-        TE.tryCatch(() => config?.server.pgServer?.close() ?? Promise.resolve(), E.toError),
+        TE.Do,
+        TE.chain(() => TE.tryCatch(() => config?.runner.end() ?? Promise.resolve(), E.toError)),
+        TE.chain(() => TE.tryCatch(() => config?.server.pg.stop() ?? Promise.resolve(), E.toError)),
         TE.mapLeft((error) => ({ type: "INTERNAL_ERROR", error }))
     );
 }
 
-const program = flow((projectDir: string) => initializeTE({ projectDir }));
+// const program = flow((projectDir: string) => initializeTE({ projectDir }));
