@@ -7,5 +7,6 @@ export default defineConfig({
     },
     target: "esnext",
     external: ["eslint", "./sql-check.worker"],
+    sourcemap: true,
     clean: true,
 });

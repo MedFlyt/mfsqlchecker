@@ -27,7 +27,7 @@ export function jsonFormatter(errorDiagnostics: ErrorDiagnostic[]): string {
     return JSON.stringify(jsonOutput);
 }
 
-function formatJsonDiagnostic(errorDiagnostic: ErrorDiagnostic): JSONDiagnostic {
+export function formatJsonDiagnostic(errorDiagnostic: ErrorDiagnostic): JSONDiagnostic {
     let location: JSONDiagnosticLocation;
     switch (errorDiagnostic.span.type) {
         case "LineAndColRange":

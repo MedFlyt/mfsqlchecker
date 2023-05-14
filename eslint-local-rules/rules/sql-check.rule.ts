@@ -1,27 +1,33 @@
 import { TSESTree } from "@typescript-eslint/typescript-estree";
 import { TSESLint } from "@typescript-eslint/utils";
 import * as E from "fp-ts/Either";
-import { pipe } from "fp-ts/function";
+import { flow, pipe } from "fp-ts/function";
+import path from "path";
+import "source-map-support/register";
 import { createSyncFn, TsRunner } from "synckit";
 import invariant from "tiny-invariant";
-import ts from "typescript";
-import { Config, loadConfigFile, sqlUniqueTypeName } from "../../mfsqlchecker/ConfigFile";
+import {
+    Config,
+    defaultColTypesFormat,
+    loadConfigFile,
+    sqlUniqueTypeName
+} from "../../mfsqlchecker/ConfigFile";
 import { Either as OldEither } from "../../mfsqlchecker/either";
-import { ErrorDiagnostic } from "../../mfsqlchecker/ErrorDiagnostic";
+import { formatJsonDiagnostic } from "../../mfsqlchecker/formatters/jsonFormatter";
 import {
     buildQueryCallExpression,
-    QueryCallExpression,
     resolveQueryFragment,
     SqlType,
     TypeScriptType
 } from "../../mfsqlchecker/queries";
+import { getSqlViews } from "../../mfsqlchecker/sqlchecker_engine";
+import { QualifiedSqlViewName, SqlViewDefinition } from "../../mfsqlchecker/views";
 import { createRule } from "../utils";
 import { memoize } from "../utils/memoize";
+import { queryAnswerToErrorDiagnostics } from "./DbConnector";
+import { InvalidQueryError } from "./sql-check.errors";
 import { locateNearestPackageJsonDir, VALID_METHOD_NAMES } from "./sql-check.utils";
-import { WorkerParams } from "./sql-check.worker";
-import path from "path";
-import chalk from "chalk";
-import { QualifiedSqlViewName } from "../../mfsqlchecker/views";
+import { WorkerParams, WorkerResult } from "./sql-check.worker";
 
 export type RuleMessage = keyof typeof messages;
 export type RuleOptions = never[];
@@ -59,34 +65,51 @@ export const sqlCheck = createRule({
 });
 
 const workerPath = require.resolve("./sql-check.worker");
-const runWorker = createSyncFn<(params: WorkerParams) => Promise<E.Either<unknown, string>>>(
-    workerPath,
-    {
-        tsRunner: TsRunner.EsbuildRegister,
-        timeout: 5000
-        // timeout: 1000 * 60 * 5
-    }
-);
+const runWorker = createSyncFn(workerPath, {
+    tsRunner: TsRunner.TSX,
+    // timeout: 9000
+    timeout: 1000 * 60 * 5
+}) as <TWorkerParams extends WorkerParams>(
+    params: TWorkerParams
+) => WorkerResult<TWorkerParams["action"]>;
 
-let isInitial = true;
-let config: Config | undefined = undefined;
+let cache: Partial<{
+    isInitial: boolean;
+    config: Config;
+    tsUniqueTableColumnTypes: Map<TypeScriptType, SqlType>;
+    viewLibrary: Map<QualifiedSqlViewName, SqlViewDefinition>;
+}> = {
+    isInitial: true,
+    viewLibrary: new Map()
+};
 
 function checkCallExpression(params: {
     node: TSESTree.CallExpression;
     context: RuleContext;
     projectDir: string;
 }) {
-    const { node, context } = params;
+    const { node, context, projectDir } = params;
     const callExpressionValidityE = getCallExpressionValidity(node);
 
     if (E.isLeft(callExpressionValidityE) || context.parserServices === undefined) {
         return;
     }
 
-    if (isInitial) {
-        runWorker({ action: "INITIALIZE", projectDir: params.projectDir });
+    const parser = context.parserServices;
+    const sourceCode = context.getSourceCode();
+    const { callee, calleeProperty } = callExpressionValidityE.right;
+    const tsCallExpression = parser.esTreeNodeToTSNodeMap.get(node);
+    const checker = parser.program.getTypeChecker();
+    const tsObject = parser.esTreeNodeToTSNodeMap.get(callee.object);
+    const tsObjectType = checker.getTypeAtLocation(tsObject);
+
+    if (tsObjectType.getProperty("MfConnectionTypeTag") === undefined) {
+        return;
+    }
+
+    if (cache.isInitial) {
         const configE = toFpTsEither(
-            loadConfigFile(path.join(params.projectDir, "demo/mfsqlchecker.json"))
+            loadConfigFile(path.join(projectDir, "demo/mfsqlchecker.json"))
         );
 
         if (E.isLeft(configE)) {
@@ -97,30 +120,138 @@ function checkCallExpression(params: {
             });
         }
 
-        config = configE.right;
-        isInitial = false;
+        const config = configE.right;
+        const uniqueTableColumnTypes = getTSUniqueColumnTypes(config.uniqueTableColumnTypes);
+        const program = context.parserServices.program;
+        const sourceFiles = program.getSourceFiles().filter((s) => !s.isDeclarationFile);
+
+        const initE = pipe(
+            E.Do,
+            E.chain(() => {
+                return getSqlViews({
+                    projectDir,
+                    checker,
+                    program,
+                    sourceFiles: sourceFiles.map((x) => x.fileName)
+                });
+            }),
+            E.mapLeft(InvalidQueryError.to),
+            E.chainFirst(() => {
+                return runWorker({
+                    action: "INITIALIZE",
+                    projectDir: projectDir,
+                    strictDateTimeChecking: true,
+                    uniqueTableColumnTypes: config.uniqueTableColumnTypes,
+                    viewLibrary: []
+                });
+            })
+        );
+
+        if (E.isLeft(initE)) {
+            return context.report({
+                node: node,
+                messageId: "internal",
+                data: { value: initE.left.message }
+            });
+        }
+
+        cache.isInitial = false;
+        cache.config = config;
+        cache.tsUniqueTableColumnTypes = uniqueTableColumnTypes;
+        cache.viewLibrary = initE.right.viewLibrary;
     }
 
-    invariant(config !== undefined, "config should already be defined at this point");
+    invariant(cache.config !== undefined, "config is undefined");
+    invariant(
+        cache.tsUniqueTableColumnTypes !== undefined,
+        "tsUniqueTableColumnTypes is undefined"
+    );
+    invariant(cache.viewLibrary !== undefined, "viewLibrary is undefined");
 
-    if (E.isLeft(callExpressionValidityE) || context.parserServices === undefined) {
-        return;
+    const { config, tsUniqueTableColumnTypes, viewLibrary } = cache;
+
+    const resolvedStmtE = pipe(
+        E.Do,
+        E.chain(() => buildQueryCallExpressionE(calleeProperty.name, tsCallExpression)),
+        E.chainW((query) => {
+            return resolveQueryFragmentE(
+                tsUniqueTableColumnTypes,
+                params.projectDir,
+                checker,
+                query,
+                (name) => viewLibrary.get(name)?.getName()
+            );
+        })
+    );
+
+    if (E.isLeft(resolvedStmtE)) {
+        return context.report({
+            node: node,
+            messageId: "internal",
+            data: { value: resolvedStmtE.left.message }
+        });
     }
 
-    const { callee, calleeProperty } = callExpressionValidityE.right;
+    const resolvedStmt = resolvedStmtE.right;
 
-    const tsCallExpression = context.parserServices.esTreeNodeToTSNodeMap.get(node);
-    const checker = context.parserServices.program.getTypeChecker();
-    const tsObject = context.parserServices.esTreeNodeToTSNodeMap.get(callee.object);
-    const tsObjectType = checker.getTypeAtLocation(tsObject);
+    pipe(
+        E.Do,
+        E.chain(() => runWorker({ action: "CHECK", query: resolvedStmt })),
+        E.chainW((r) => (r.type === "NoErrors" ? E.right(r) : E.left(r))),
+        E.mapLeft((error) => {
+            if (error instanceof Error) {
+                return context.report({
+                    node: node,
+                    messageId: "internal",
+                    data: { value: error.message }
+                });
+            }
 
-    if (tsObjectType.getProperty("MfConnectionTypeTag") === undefined) {
-        return;
-    }
+            const diagnostics = queryAnswerToErrorDiagnostics(
+                resolvedStmt,
+                error,
+                defaultColTypesFormat
+            );
 
-    const typeScriptUniqueColumnTypes = new Map<TypeScriptType, SqlType>();
-    for (const uniqueTableColumnType of config.uniqueTableColumnTypes) {
-        typeScriptUniqueColumnTypes.set(
+            for (const diagnostic of diagnostics) {
+                const formatted = formatJsonDiagnostic(diagnostic);
+                context.report({
+                    node: node,
+                    messageId: "internal",
+                    loc: {
+                        start: {
+                            line: formatted.location.startLine + 1,
+                            column: formatted.location.startCharacter + 1
+                        },
+                        end: {
+                            line: formatted.location.endLine + 1,
+                            column: formatted.location.endCharacter + 1
+                        }
+                    },
+                    data: { value: diagnostic.messages.join("\n") }
+                });
+            }
+        })
+    );
+}
+
+const resolveQueryFragmentE = flow(
+    resolveQueryFragment,
+    toFpTsEither,
+    E.mapLeft((diagnostics) => new InvalidQueryError(diagnostics))
+);
+
+const buildQueryCallExpressionE = flow(
+    buildQueryCallExpression,
+    toFpTsEither,
+    E.mapLeft((diagnostics) => new InvalidQueryError(diagnostics))
+);
+
+function getTSUniqueColumnTypes(uniqueTableColumnTypes: Config["uniqueTableColumnTypes"]) {
+    const tsUniqueColumnTypes = new Map<TypeScriptType, SqlType>();
+
+    for (const uniqueTableColumnType of uniqueTableColumnTypes) {
+        tsUniqueColumnTypes.set(
             uniqueTableColumnType.typeScriptTypeName,
             SqlType.wrap(
                 sqlUniqueTypeName(uniqueTableColumnType.tableName, uniqueTableColumnType.columnName)
@@ -128,61 +259,11 @@ function checkCallExpression(params: {
         );
     }
 
-    const lookupViewName: (qualifiedSqlViewName: QualifiedSqlViewName) => string | undefined = (
-        qualifiedSqlViewName
-    ) => {
-        // TODO: implement
-        return undefined;
-    };
-
-    const queryFragmentE = pipe(
-        E.Do,
-        E.bindW("query", () => buildQueryCallExpressionE(calleeProperty.name, tsCallExpression)),
-        E.chain(({ query }) => {
-            return toFpTsEither(
-                resolveQueryFragment(
-                    typeScriptUniqueColumnTypes,
-                    params.projectDir,
-                    checker,
-                    query,
-                    lookupViewName
-                )
-            );
-        })
-    );
-
-    if (queryFragmentE._tag === "Left") {
-        queryFragmentE.left.map(l => l.messages).forEach((message) => {
-            console.log(chalk(...message));
-        });
-        // console.log(JSON.stringify(x.left.map(l => l.messages)));
-    }
-
-    if (E.isRight(queryFragmentE)) {
-        const x = runWorker({ action: "CHECK", query: queryFragmentE.right })
-        console.log(x);
-    }
-
-    // const { callee, property, argument } = callExpressionValidityE.right;
-    // const sourceCode = context.getSourceCode();
-
-    // return context.report({
-    //     node: callee,
-    //     messageId: "invalid",
-    //     data: { value: sourceCode.getText(argument.quasi) }
-    // });
+    return tsUniqueColumnTypes;
 }
 
 function toFpTsEither<T, E>(either: OldEither<E, T>): E.Either<E, T> {
     return either.type === "Left" ? E.left(either.value) : E.right(either.value);
-}
-
-function buildQueryCallExpressionE(
-    methodName: string,
-    node: ts.CallExpression
-): E.Either<ErrorDiagnostic[], QueryCallExpression> {
-    const result = buildQueryCallExpression(methodName, node);
-    return result.type === "Left" ? E.left(result.value) : E.right(result.value);
 }
 
 function getCallExpressionValidity(node: TSESTree.CallExpression) {

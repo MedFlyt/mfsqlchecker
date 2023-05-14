@@ -1,13 +1,29 @@
 import type EmbeddedPostgres from "embedded-postgres";
-import * as TE from "fp-ts/TaskEither";
 import * as E from "fp-ts/Either";
 import { pipe } from "fp-ts/function";
+import * as TE from "fp-ts/TaskEither";
+import "source-map-support/register";
 import { runAsWorker } from "synckit";
-import { QueryRunner } from "./DbConnector";
-import { Options, PostgresOptions, initializeTE } from "./sql-check.utils";
+import { UniqueTableColumnType } from "../../mfsqlchecker/ConfigFile";
 import { ResolvedSelect } from "../../mfsqlchecker/queries";
+import { SqlCreateView } from "../../mfsqlchecker/views";
+import { QueryRunner } from "./DbConnector";
+import { RunnerError } from "./sql-check.errors";
+import { initializeTE, Options, PostgresOptions } from "./sql-check.utils";
 
-let config: {
+export type WorkerParams = InitializeParams | CheckParams | EndParams;
+
+type TaskEitherToEither<T> = T extends TE.TaskEither<infer E, infer A> ? E.Either<E, A> : never;
+
+export type WorkerResult<Action extends WorkerParams["action"]> = TaskEitherToEither<
+    {
+        INITIALIZE: ReturnType<typeof runInitialize>;
+        CHECK: ReturnType<typeof runCheck>;
+        END: ReturnType<typeof runEnd>;
+    }[Action]
+>;
+
+let cache: {
     readonly options: Options;
     readonly server: {
         pg: EmbeddedPostgres;
@@ -18,55 +34,63 @@ let config: {
     readonly runner: QueryRunner;
 } | null = null;
 
-export type WorkerParams =
-    | {
-          action: "INITIALIZE";
-          projectDir: string;
-      }
-    | { action: "CHECK"; query: ResolvedSelect }
-    | { action: "END" };
+let i = 1;
 
-runAsWorker(async (params: WorkerParams) => {
+async function handler(params: WorkerParams) {
     switch (params.action) {
         case "INITIALIZE":
-            return runInitialize(params)();
+            return await runInitialize(params)();
         case "CHECK":
-            return runCheck(params)();
+            return await runCheck(params)();
         case "END":
-            return runEnd(params)();
+            return await runEnd(params)();
     }
-});
+}
 
-function runInitialize(params: Extract<WorkerParams, { action: "INITIALIZE" }>) {
+type InitializeParams = {
+    action: "INITIALIZE";
+    projectDir: string;
+    uniqueTableColumnTypes: UniqueTableColumnType[];
+    strictDateTimeChecking: boolean;
+    viewLibrary: SqlCreateView[];
+};
+
+function runInitialize(params: InitializeParams) {
     return pipe(
-        initializeTE({ projectDir: params.projectDir }),
-        TE.map((result) => {
-            config = result;
+        initializeTE({
+            projectDir: params.projectDir,
+            uniqueTableColumnTypes: params.uniqueTableColumnTypes,
+            strictDateTimeChecking: params.strictDateTimeChecking,
+            viewLibrary: params.viewLibrary
         }),
-        TE.mapLeft((error) => ({ type: "INTERNAL_ERROR", error }))
+        TE.map((result) => {
+            cache = result;
+        })
     );
 }
 
-function runCheck(params: Extract<WorkerParams, { action: "CHECK" }>) {
-    if (config?.runner === undefined) {
-        return TE.left({ type: "INTERNAL_ERROR", error: new Error("runner is not initialized") });
+type CheckParams = { action: "CHECK"; query: ResolvedSelect };
+
+function runCheck(params: CheckParams) {
+    if (cache?.runner === undefined) {
+        return TE.left(new Error("runner is not initialized"));
     }
 
-    const runner = config.runner;
+    const runner = cache.runner;
 
-    return pipe(
-        TE.tryCatch(() => runner.runQuery({ query: params.query }), E.toError),
-        TE.mapLeft((error) => ({ type: "RUNNER_ERROR", error: error.message }))
-    );
+    return pipe(TE.tryCatch(() => runner.runQuery({ query: params.query }), RunnerError.to));
 }
+
+type EndParams = { action: "END" };
 
 function runEnd(params: Extract<WorkerParams, { action: "END" }>) {
     return pipe(
         TE.Do,
-        TE.chain(() => TE.tryCatch(() => config?.runner.end() ?? Promise.resolve(), E.toError)),
-        TE.chain(() => TE.tryCatch(() => config?.server.pg.stop() ?? Promise.resolve(), E.toError)),
-        TE.mapLeft((error) => ({ type: "INTERNAL_ERROR", error }))
+        TE.chain(() => TE.tryCatch(() => cache?.runner.end() ?? Promise.resolve(), E.toError)),
+        TE.chain(() => TE.tryCatch(() => {
+            return cache?.server.pg.stop() ?? Promise.resolve();
+        }, E.toError))
     );
 }
 
-// const program = flow((projectDir: string) => initializeTE({ projectDir }));
+runAsWorker(handler);

@@ -25,9 +25,10 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 // eslint-local-rules/rules/sql-check.worker.ts
 var sql_check_worker_exports = {};
 module.exports = __toCommonJS(sql_check_worker_exports);
+var E4 = __toESM(require("fp-ts/Either"));
+var import_function4 = require("fp-ts/function");
 var TE3 = __toESM(require("fp-ts/TaskEither"));
-var E3 = __toESM(require("fp-ts/Either"));
-var import_function3 = require("fp-ts/function");
+var import_register = require("source-map-support/register");
 
 // node_modules/.pnpm/tslib@2.5.0/node_modules/tslib/tslib.es6.js
 function __awaiter(thisArg, _arguments, P, generator) {
@@ -122,26 +123,181 @@ function runAsWorker(fn) {
   }
 }
 
+// mfsqlchecker/formatters/codeFrameFormatter.ts
+var import_assert_never = require("assert-never");
+var import_chalk = __toESM(require("chalk"));
+function codeFrameFormatter(errorDiagnostic) {
+  let result = "\n";
+  result += renderFileLocation(errorDiagnostic);
+  result += renderMessages(errorDiagnostic);
+  result += renderCodeFrame(errorDiagnostic);
+  result += renderEpilogue(errorDiagnostic);
+  return result;
+}
+function renderFileLocation(errorDiagnostic) {
+  let result = "";
+  result += import_chalk.default.cyanBright(errorDiagnostic.fileName);
+  switch (errorDiagnostic.span.type) {
+    case "LineAndColRange":
+      result += ":" + import_chalk.default.yellowBright(`${errorDiagnostic.span.startLine}`) + ":" + import_chalk.default.yellowBright(`${errorDiagnostic.span.startCol}`) + ":";
+      break;
+    case "LineAndCol":
+      result += ":" + import_chalk.default.yellowBright(`${errorDiagnostic.span.line}`) + ":" + import_chalk.default.yellowBright(`${errorDiagnostic.span.col}`) + ":";
+      break;
+    case "File":
+      result += ":";
+      break;
+    default:
+      (0, import_assert_never.assertNever)(errorDiagnostic.span);
+  }
+  result += " " + import_chalk.default.redBright.bold("error:");
+  result += "\n";
+  return result;
+}
+function renderMessages(errorDiagnostic) {
+  let result = "";
+  for (const message of errorDiagnostic.messages) {
+    const msg = message.replace(/\n/g, "\n      ");
+    result += "    * " + msg + "\n";
+  }
+  return result;
+}
+function renderCodeFrame(errorDiagnostic) {
+  let result = "";
+  let startLine;
+  let endLine;
+  switch (errorDiagnostic.span.type) {
+    case "LineAndCol":
+      startLine = errorDiagnostic.span.line - 1;
+      endLine = errorDiagnostic.span.line - 1;
+      break;
+    case "LineAndColRange":
+      startLine = errorDiagnostic.span.startLine - 1;
+      endLine = errorDiagnostic.span.endLine - 1;
+      break;
+    case "File":
+      return result;
+    default:
+      return (0, import_assert_never.assertNever)(errorDiagnostic.span);
+  }
+  result += "\n";
+  const lines = errorDiagnostic.fileContents.split("\n");
+  const LINES_MARGIN = 6;
+  const minLine = Math.max(0, startLine - LINES_MARGIN);
+  const maxLine = Math.min(lines.length - 1, endLine + LINES_MARGIN);
+  const padding = `${maxLine + 1}`.length;
+  for (let l = minLine; l <= maxLine; ++l) {
+    switch (errorDiagnostic.span.type) {
+      case "LineAndCol":
+        if (l === errorDiagnostic.span.line - 1) {
+          const prefix = lines[l].substr(0, errorDiagnostic.span.col - 1);
+          const target = lines[l].substr(errorDiagnostic.span.col - 1, 1);
+          const suffix = lines[l].substr(errorDiagnostic.span.col);
+          result += import_chalk.default.blueBright(` ${pad(`${l + 1}`, padding, " ")} |`) + " " + prefix + import_chalk.default.redBright.bold(target) + suffix + "\n";
+        } else {
+          result += import_chalk.default.blueBright(` ${pad(`${l + 1}`, padding, " ")} |`) + " " + lines[l] + "\n";
+        }
+        if (l === errorDiagnostic.span.line - 1) {
+          result += import_chalk.default.blueBright(` ${pad("", padding, " ")} |`) + " ".repeat(errorDiagnostic.span.col) + import_chalk.default.redBright.bold("^") + "\n";
+        }
+        break;
+      case "LineAndColRange":
+        if (l > errorDiagnostic.span.startLine - 1 && l < errorDiagnostic.span.endLine - 1) {
+          result += import_chalk.default.blueBright(` ${pad(`${l + 1}`, padding, " ")} |`) + " " + import_chalk.default.redBright.bold(lines[l]) + "\n";
+          const spaces = lines[l].search(/(\S|$)/);
+          result += import_chalk.default.blueBright(` ${pad("", padding, " ")} |`) + " ".repeat(spaces + 1) + import_chalk.default.redBright.bold("~".repeat(lines[l].length - spaces)) + "\n";
+        } else if (l === errorDiagnostic.span.startLine - 1 && l !== errorDiagnostic.span.endLine - 1) {
+          const prefix = lines[l].substr(0, errorDiagnostic.span.startCol - 1);
+          const suffix = lines[l].substr(errorDiagnostic.span.startCol - 1);
+          const spaces = prefix.length;
+          result += import_chalk.default.blueBright(` ${pad(`${l + 1}`, padding, " ")} |`) + " " + prefix + import_chalk.default.redBright.bold(suffix) + "\n";
+          if (lines[l].length > spaces) {
+            result += import_chalk.default.blueBright(` ${pad("", padding, " ")} |`) + " ".repeat(spaces + 1) + import_chalk.default.redBright.bold("~".repeat(lines[l].length - spaces)) + "\n";
+          }
+        } else if (l === errorDiagnostic.span.endLine - 1 && l !== errorDiagnostic.span.startLine - 1) {
+          const prefix = lines[l].substr(0, errorDiagnostic.span.endCol - 1);
+          const suffix = lines[l].substr(errorDiagnostic.span.endCol - 1);
+          const spaces = lines[l].search(/(\S|$)/);
+          result += import_chalk.default.blueBright(` ${pad(`${l + 1}`, padding, " ")} |`) + " " + import_chalk.default.redBright.bold(prefix) + suffix + "\n";
+          result += import_chalk.default.blueBright(` ${pad("", padding, " ")} |`) + " ".repeat(spaces + 1) + import_chalk.default.redBright.bold("~".repeat(prefix.length - spaces)) + "\n";
+        } else if (l === errorDiagnostic.span.endLine - 1 && l === errorDiagnostic.span.startLine - 1) {
+          const prefix = lines[l].substr(0, errorDiagnostic.span.startCol - 1);
+          const target = lines[l].substring(errorDiagnostic.span.startCol - 1, errorDiagnostic.span.endCol - 1);
+          const suffix = lines[l].substr(errorDiagnostic.span.endCol - 1);
+          result += import_chalk.default.blueBright(` ${pad(`${l + 1}`, padding, " ")} |`) + " " + prefix + import_chalk.default.redBright.bold(target) + suffix + "\n";
+          result += import_chalk.default.blueBright(` ${pad("", padding, " ")} |`) + " ".repeat(prefix.length + 1) + import_chalk.default.redBright.bold("~".repeat(lines[l].length - suffix.length - prefix.length)) + "\n";
+        } else {
+          result += import_chalk.default.blueBright(` ${pad(`${l + 1}`, padding, " ")} |`) + " " + lines[l] + "\n";
+        }
+        break;
+      default:
+        (0, import_assert_never.assertNever)(errorDiagnostic.span);
+    }
+  }
+  result += "\n";
+  return result;
+}
+function renderEpilogue(errorDiagnostic) {
+  let result = "";
+  if (errorDiagnostic.epilogue === null) {
+    return result;
+  }
+  const msg = errorDiagnostic.epilogue.replace(/\n/g, "\n      ");
+  result += "    * " + msg + "\n";
+  return result;
+}
+function pad(str, width, z) {
+  return str.length >= width ? str : new Array(width - str.length + 1).join(z) + str;
+}
+
+// eslint-local-rules/rules/sql-check.errors.ts
+var RunnerError = class extends Error {
+  _tag = "RunnerError";
+  constructor(message) {
+    super(message);
+    this.name = "RunnerError";
+  }
+  static to(error) {
+    return error instanceof RunnerError ? error : new RunnerError(`${error}`);
+  }
+  toJSON() {
+    return { _tag: this._tag, message: this.message };
+  }
+};
+var InvalidQueryError = class extends Error {
+  _tag = "InvalidQueryError";
+  constructor(diagnostics) {
+    super(diagnostics.map(codeFrameFormatter).join("\n"));
+    this.name = "InvalidQueryError";
+  }
+  static to(error) {
+    return error instanceof InvalidQueryError ? error : new Error(`${error}`);
+  }
+  toJSON() {
+    return { _tag: this._tag, message: this.message };
+  }
+};
+
 // eslint-local-rules/rules/sql-check.utils.ts
-var import_assert_never5 = __toESM(require("assert-never"));
-var E2 = __toESM(require("fp-ts/Either"));
+var import_assert_never6 = __toESM(require("assert-never"));
+var E3 = __toESM(require("fp-ts/Either"));
 var TE2 = __toESM(require("fp-ts/TaskEither"));
-var import_function2 = require("fp-ts/function");
+var import_function3 = require("fp-ts/function");
 var import_fs2 = __toESM(require("fs"));
 var import_path = __toESM(require("path"));
 
 // mfsqlchecker/ConfigFile.ts
 var import_ajv = __toESM(require("ajv"));
-var import_assert_never3 = require("assert-never");
+var import_assert_never4 = require("assert-never");
 var import_fs = __toESM(require("fs"));
 
 // mfsqlchecker/queries.ts
-var import_assert_never2 = require("assert-never");
-var import_chalk2 = __toESM(require("chalk"));
+var import_assert_never3 = require("assert-never");
+var import_chalk3 = __toESM(require("chalk"));
 var ts4 = __toESM(require("typescript"));
 
 // mfsqlchecker/ErrorDiagnostic.ts
-var import_chalk = __toESM(require("chalk"));
+var import_chalk2 = __toESM(require("chalk"));
 var ts = __toESM(require("typescript"));
 function fileLineCol(fileContents, position) {
   let line = 1;
@@ -168,16 +324,15 @@ function postgresqlErrorDiagnostic(fileName, fileContents, err, span, message) {
     fileContents,
     span,
     messages: (message !== null ? [message] : []).concat([
-      import_chalk.default.bold(err.message),
-      import_chalk.default.bold("code:") + " " + err.code
-    ]).concat(err.detail !== null && err.detail !== err.message ? import_chalk.default.bold("detail:") + " " + err.detail : []),
-    epilogue: err.hint !== null ? import_chalk.default.bold("hint:") + " " + err.hint : null,
+      import_chalk2.default.bold(err.message),
+      import_chalk2.default.bold("code:") + " " + err.code
+    ]).concat(err.detail !== null && err.detail !== err.message ? import_chalk2.default.bold("detail:") + " " + err.detail : []),
+    epilogue: err.hint !== null ? import_chalk2.default.bold("hint:") + " " + err.hint : null,
     quickFix: null
   };
 }
 
 // mfsqlchecker/pg_extra.ts
-var crypto = __toESM(require("crypto"));
 var import_postgres = __toESM(require("postgres"));
 function connectPg(url) {
   return (0, import_postgres.default)(url, {
@@ -272,40 +427,17 @@ function parsePostgreSqlError(err) {
     hint: err.hint !== void 0 ? err.hint : null
   };
 }
-var Savepoint = class {
-  constructor(name) {
-    this.name = name;
-  }
-};
-function randomSavepointName() {
-  return new Promise((resolve, reject) => {
-    crypto.randomBytes(24, (err, buf) => {
-      if (err) {
-        reject(err);
-        return;
-      }
-      const token = buf.toString("hex");
-      resolve("savepoint_" + token);
-    });
-  });
-}
-async function newSavepoint(conn) {
-  const savepointName = await randomSavepointName();
-  await conn.unsafe(`SAVEPOINT ${savepointName}`);
-  return new Savepoint(savepointName);
-}
-async function rollbackToAndReleaseSavepoint(conn, savepoint) {
-  await conn.unsafe(`ROLLBACK TO SAVEPOINT ${savepoint.name}; RELEASE SAVEPOINT ${savepoint.name}`);
-}
 
 // mfsqlchecker/views.ts
-var import_assert_never = require("assert-never");
+var import_assert_never2 = require("assert-never");
 var ts3 = __toESM(require("typescript"));
 
 // mfsqlchecker/ts_extra.ts
 var ts2 = __toESM(require("typescript"));
 
 // mfsqlchecker/views.ts
+var E = __toESM(require("fp-ts/Either"));
+var import_function = require("fp-ts/function");
 var QualifiedSqlViewName = class {
   static create(moduleId, viewName) {
     return moduleId + " " + viewName;
@@ -427,7 +559,7 @@ function loadConfigFile(fileName) {
         value: normalizeConfigFile(mbConfigFile.value)
       };
     default:
-      return (0, import_assert_never3.assertNever)(mbConfigFile);
+      return (0, import_assert_never4.assertNever)(mbConfigFile);
   }
 }
 var ajv = new import_ajv.default();
@@ -547,7 +679,7 @@ var configFileSchema = {
 };
 
 // mfsqlchecker/pg_test_db.ts
-var crypto2 = __toESM(require("crypto"));
+var crypto = __toESM(require("crypto"));
 var fs3 = __toESM(require("fs"));
 var path2 = __toESM(require("path"));
 var import_pg_connection_string = require("pg-connection-string");
@@ -562,7 +694,7 @@ async function calcDbMigrationsHash(migrationsDir) {
 async function calcDirectoryContentsHash(hashAlgorithm, dir, fileFilter) {
   const allFiles = await readdirAsync(dir);
   const matchingFiles = allFiles.filter(fileFilter).sort();
-  const shasum = crypto2.createHash(hashAlgorithm);
+  const shasum = crypto.createHash(hashAlgorithm);
   for (const fileName of matchingFiles) {
     shasum.update(fileName);
     const fileHash = await calcFileHash(path2.join(dir, fileName), hashAlgorithm);
@@ -604,7 +736,7 @@ function readdirAsync(dir) {
 }
 function calcFileHash(filename, hashAlgorithm) {
   return new Promise((resolve, reject) => {
-    const shasum = crypto2.createHash(hashAlgorithm);
+    const shasum = crypto.createHash(hashAlgorithm);
     try {
       const s = fs3.createReadStream(filename, { encoding: "utf8" });
       s.on("data", (data) => {
@@ -624,7 +756,7 @@ function calcFileHash(filename, hashAlgorithm) {
 }
 function testDatabaseName() {
   return new Promise((resolve, reject) => {
-    crypto2.randomBytes(16, (err, buf) => {
+    crypto.randomBytes(16, (err, buf) => {
       if (err) {
         reject(err);
         return;
@@ -636,15 +768,15 @@ function testDatabaseName() {
 }
 
 // eslint-local-rules/rules/DbConnector.ts
-var import_assert_never4 = require("assert-never");
-var import_chalk3 = __toESM(require("chalk"));
+var import_assert_never5 = require("assert-never");
+var import_chalk4 = __toESM(require("chalk"));
 var import_cli_progress = require("cli-progress");
 var fs4 = __toESM(require("fs"));
 var path3 = __toESM(require("path"));
 var import_tiny_invariant = __toESM(require("tiny-invariant"));
 var TE = __toESM(require("fp-ts/TaskEither"));
-var E = __toESM(require("fp-ts/Either"));
-var import_function = require("fp-ts/function");
+var E2 = __toESM(require("fp-ts/Either"));
+var import_function2 = require("fp-ts/function");
 
 // mfsqlchecker/source_maps.ts
 function resolveFromSourceMap(fileContents, position, sourceMap) {
@@ -680,45 +812,23 @@ function resolveFromSourceMap(fileContents, position, sourceMap) {
 
 // eslint-local-rules/rules/DbConnector.ts
 function runnerLog(...args) {
-  console.log(import_chalk3.default.grey(`[${(/* @__PURE__ */ new Date()).toISOString()}]`), import_chalk3.default.green(`QueryRunner:`), ...args);
+  console.log(import_chalk4.default.grey(`[${(/* @__PURE__ */ new Date()).toISOString()}]`), import_chalk4.default.green(`QueryRunner:`), ...args);
 }
 var QueryRunner = class {
   migrationsDir;
   client;
-  constructor(config2) {
-    this.migrationsDir = config2.migrationsDir;
-    this.client = config2.client;
+  constructor(config) {
+    this.migrationsDir = config.migrationsDir;
+    this.client = config.client;
   }
   static async Connect(params) {
     const client = await newConnect(params.adminUrl, params.name);
     return new QueryRunner({ migrationsDir: params.migrationsDir, client });
   }
   static ConnectTE(params) {
-    return (0, import_function.pipe)(
-      TE.tryCatch(() => QueryRunner.Connect(params), E.toError),
-      TE.mapLeft((err) => {
-        const errors = [];
-        const pgError = parsePostgreSqlError(err);
-        if (pgError !== null) {
-          errors.push(
-            "Error connecting to database cluster:",
-            pgError.message,
-            `code: ${pgError.code}`
-          );
-          if (pgError.detail !== null && pgError.detail !== pgError.message) {
-            errors.push("detail: " + pgError.detail);
-          }
-          if (pgError.hint !== null) {
-            errors.push("hint: " + pgError.hint);
-          }
-          return new Error(errors.join("\n"));
-        }
-        if ("code" in err) {
-          errors.push("Error connecting to database cluster:", err.message);
-          return new Error(errors.join("\n"));
-        }
-        return err;
-      })
+    return (0, import_function2.pipe)(
+      TE.tryCatch(() => QueryRunner.Connect(params), E2.toError),
+      TE.mapLeft(formatPgError)
     );
   }
   dbMigrationsHash = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
@@ -730,6 +840,18 @@ var QueryRunner = class {
   uniqueColumnTypes = /* @__PURE__ */ new Map();
   tableColsLibrary = new TableColsLibrary();
   prevStrictDateTimeChecking = null;
+  initializeTE(params) {
+    return (0, import_function2.pipe)(
+      TE.Do,
+      TE.chain(() => TE.tryCatch(() => this.initialize(params), E2.toError)),
+      TE.match(
+        (error) => E2.left(error),
+        (result) => {
+          return result === void 0 ? E2.right(void 0) : E2.left(new InvalidQueryError(result));
+        }
+      )
+    );
+  }
   async initialize(params) {
     this.queryCache = new QueryMap();
     this.insertCache = new InsertMap();
@@ -927,7 +1049,7 @@ var QueryRunner = class {
             break;
           }
           default:
-            (0, import_assert_never4.assertNever)(query);
+            (0, import_assert_never5.assertNever)(query);
         }
         queriesProgressBar.update(++i);
       }
@@ -947,7 +1069,7 @@ var QueryRunner = class {
           finalErrors = finalErrors.concat(query.value.errors);
           break;
         default:
-          (0, import_assert_never4.assertNever)(query);
+          (0, import_assert_never5.assertNever)(query);
       }
     }
     return finalErrors.concat(queryErrors);
@@ -1048,7 +1170,7 @@ function viewAnswerToErrorDiagnostics(createView, viewAnswer) {
     case "NoErrors":
       return [];
     case "CreateError": {
-      const message = 'Error in view "' + import_chalk3.default.bold(viewAnswer.viewName) + '"';
+      const message = 'Error in view "' + import_chalk4.default.bold(viewAnswer.viewName) + '"';
       if (viewAnswer.perr.position !== null) {
         const srcSpan = resolveFromSourceMap(
           createView.fileContents,
@@ -1088,7 +1210,7 @@ function viewAnswerToErrorDiagnostics(createView, viewAnswer) {
           fileContents: createView.fileContents,
           span: srcSpan,
           messages: [
-            import_chalk3.default.bold('Error in view "' + import_chalk3.default.bold(viewAnswer.viewName) + '"'),
+            import_chalk4.default.bold('Error in view "' + import_chalk4.default.bold(viewAnswer.viewName) + '"'),
             viewAnswer.message
           ],
           epilogue: null,
@@ -1097,7 +1219,7 @@ function viewAnswerToErrorDiagnostics(createView, viewAnswer) {
       ];
     }
     default:
-      return (0, import_assert_never4.assertNever)(viewAnswer);
+      return (0, import_assert_never5.assertNever)(viewAnswer);
   }
 }
 var QueryMap = class {
@@ -1195,7 +1317,7 @@ ${JSON.stringify(
               2
             )}`
           ],
-          epilogue: import_chalk3.default.bold("hint") + ': Specify a different name for the column using the Sql "AS" keyword',
+          epilogue: import_chalk4.default.bold("hint") + ': Specify a different name for the column using the Sql "AS" keyword',
           quickFix: null
         }
       ];
@@ -1236,7 +1358,7 @@ ${JSON.stringify(
           fileContents: query.fileContents,
           span: query.colTypeSpan,
           messages: ["Wrong Column Types"],
-          epilogue: import_chalk3.default.bold("Fix it to:") + "\n" + queryAnswer.renderedColTypes,
+          epilogue: import_chalk4.default.bold("Fix it to:") + "\n" + queryAnswer.renderedColTypes,
           quickFix: {
             name: "Fix Column Types",
             replacementText
@@ -1244,7 +1366,7 @@ ${JSON.stringify(
         }
       ];
     default:
-      return (0, import_assert_never4.assertNever)(queryAnswer);
+      return (0, import_assert_never5.assertNever)(queryAnswer);
   }
 }
 function insertAnswerToErrorDiagnostics(query, queryAnswer, colTypesFormat) {
@@ -1282,7 +1404,7 @@ function insertAnswerToErrorDiagnostics(query, queryAnswer, colTypesFormat) {
                 case "ColNotFound":
                   return `Column "${e.colName}" does not exist on table "${e.tableName}"`;
                 default:
-                  return (0, import_assert_never4.assertNever)(e);
+                  return (0, import_assert_never5.assertNever)(e);
               }
             })
           ),
@@ -1291,12 +1413,11 @@ function insertAnswerToErrorDiagnostics(query, queryAnswer, colTypesFormat) {
         }
       ];
     default:
-      return (0, import_assert_never4.assertNever)(queryAnswer);
+      return (0, import_assert_never5.assertNever)(queryAnswer);
   }
 }
 async function processQuery(client, colTypesFormat, pgTypes, tableColsLibrary, uniqueColumnTypes, query) {
   let fields;
-  const savepoint = await newSavepoint(client);
   try {
     fields = await pgDescribeQuery(client, query.text);
   } catch (err) {
@@ -1304,14 +1425,12 @@ async function processQuery(client, colTypesFormat, pgTypes, tableColsLibrary, u
     if (perr === null) {
       throw err;
     } else {
-      await rollbackToAndReleaseSavepoint(client, savepoint);
       return {
         type: "DescribeError",
         perr
       };
     }
   }
-  await rollbackToAndReleaseSavepoint(client, savepoint);
   const duplicateResultColumns = [];
   if (fields === null) {
     if (query.colTypes !== null && query.colTypes.size !== 0) {
@@ -1720,7 +1839,7 @@ function colNullabilityStr(colNullability) {
     case 1 /* OPT */:
       return "Opt";
     default:
-      return (0, import_assert_never4.assertNever)(colNullability);
+      return (0, import_assert_never5.assertNever)(colNullability);
   }
 }
 function renderIdentifier(ident) {
@@ -1746,7 +1865,7 @@ function renderColTypesType(colTypesFormat, colTypes) {
       result = result.substr(0, result.length - 1);
       break;
     default:
-      return (0, import_assert_never4.assertNever)(delim);
+      return (0, import_assert_never5.assertNever)(delim);
   }
   result += "\n}";
   return result;
@@ -2135,31 +2254,61 @@ async function modifySystemCatalogs(client) {
     [illegalCasts.map((c) => c[0]), illegalCasts.map((c) => c[1])]
   );
 }
+function formatPgError(error) {
+  const errors = [];
+  const pgError = parsePostgreSqlError(error);
+  if (pgError !== null) {
+    errors.push(
+      "Error connecting to database cluster:",
+      pgError.message,
+      `code: ${pgError.code}`
+    );
+    if (pgError.detail !== null && pgError.detail !== pgError.message) {
+      errors.push("detail: " + pgError.detail);
+    }
+    if (pgError.hint !== null) {
+      errors.push("hint: " + pgError.hint);
+    }
+    return new Error(errors.join("\n"));
+  }
+  if ("code" in error) {
+    errors.push("Error connecting to database cluster:", error.message);
+    return new Error(errors.join("\n"));
+  }
+  return error;
+}
 
 // eslint-local-rules/rules/sql-check.utils.ts
 var import_embedded_postgres = __toESM(require("embedded-postgres"));
+var import_child_process = require("child_process");
 var DEFAULT_POSTGRES_VERSION = "14.6.0";
 var QUERY_METHOD_NAMES = /* @__PURE__ */ new Set(["query", "queryOne", "queryOneOrNone"]);
 var INSERT_METHOD_NAMES = /* @__PURE__ */ new Set(["insert", "insertMaybe"]);
 var VALID_METHOD_NAMES = /* @__PURE__ */ new Set([...QUERY_METHOD_NAMES, ...INSERT_METHOD_NAMES]);
 function initializeTE(params) {
-  return (0, import_function2.pipe)(
+  return (0, import_function3.pipe)(
     TE2.Do,
-    TE2.bindW(
-      "options",
-      () => initOptionsTE({
+    TE2.bindW("options", () => {
+      return initOptionsTE({
         projectDir: params.projectDir,
         configFile: "demo/mfsqlchecker.json",
         migrationsDir: "demo/migrations",
         postgresConnection: null
-      })
-    ),
+      });
+    }),
     TE2.bindW("server", ({ options }) => initPgServerTE(options)),
     TE2.bindW("runner", ({ server, options }) => {
       return QueryRunner.ConnectTE({
         adminUrl: server.adminUrl,
         name: server.dbName,
         migrationsDir: options.migrationsDir
+      });
+    }),
+    TE2.chainFirstW(({ runner }) => {
+      return runner.initializeTE({
+        strictDateTimeChecking: params.strictDateTimeChecking,
+        uniqueTableColumnTypes: params.uniqueTableColumnTypes,
+        viewLibrary: params.viewLibrary
       });
     })
   );
@@ -2169,54 +2318,60 @@ function initOptionsTE(options) {
 }
 function initOptionsE(options) {
   if (options.postgresConnection !== null && !isTestDatabaseCluster(options.postgresConnection.url)) {
-    return E2.left(
-      "Database Cluster url is not a local connection or is invalid:\n" + options.postgresConnection.url
+    return E3.left(
+      new Error(
+        "Database Cluster url is not a local connection or is invalid:\n" + options.postgresConnection.url
+      )
     );
   }
   if (options.postgresConnection !== null && !isTestDatabaseCluster(options.postgresConnection.url)) {
-    return E2.left(
-      "Database Cluster url is not a local connection or is invalid:\n" + options.postgresConnection.url
+    return E3.left(
+      new Error(
+        "Database Cluster url is not a local connection or is invalid:\n" + options.postgresConnection.url
+      )
     );
   }
   let migrationsDir = null;
   let postgresVersion = DEFAULT_POSTGRES_VERSION;
   if (options.configFile !== null) {
     const absoluteConfigFile = import_path.default.join(options.projectDir, options.configFile);
-    const config2 = loadConfigFile(absoluteConfigFile);
-    switch (config2.type) {
+    const config = loadConfigFile(absoluteConfigFile);
+    switch (config.type) {
       case "Left": {
         const errors = [
           `Error Loading config file: ${absoluteConfigFile}`,
-          ...config2.value.messages
+          ...config.value.messages
         ];
-        return E2.left(errors.join("\n"));
+        return E3.left(new Error(errors.join("\n")));
       }
       case "Right":
-        if (config2.value.postgresVersion !== null) {
-          postgresVersion = config2.value.postgresVersion;
+        if (config.value.postgresVersion !== null) {
+          postgresVersion = config.value.postgresVersion;
         }
-        if (config2.value.migrationsDir !== null) {
-          if (import_path.default.isAbsolute(config2.value.migrationsDir)) {
-            migrationsDir = config2.value.migrationsDir;
+        if (config.value.migrationsDir !== null) {
+          if (import_path.default.isAbsolute(config.value.migrationsDir)) {
+            migrationsDir = config.value.migrationsDir;
           } else {
             migrationsDir = import_path.default.join(
               import_path.default.dirname(options.configFile),
-              config2.value.migrationsDir
+              config.value.migrationsDir
             );
           }
         }
         break;
       default:
-        return (0, import_assert_never5.default)(config2);
+        return (0, import_assert_never6.default)(config);
     }
   }
   if (options.migrationsDir !== null) {
     migrationsDir = options.migrationsDir;
   }
   if (migrationsDir === null) {
-    return E2.left("migrations-dir is missing. Must be set in config file or command line");
+    return E3.left(
+      new Error("migrations-dir is missing. Must be set in config file or command line")
+    );
   }
-  return E2.right({
+  return E3.right({
     ...options,
     migrationsDir,
     postgresVersion
@@ -2232,38 +2387,43 @@ function createEmbeddedPostgresTE(options) {
   const pg = new import_embedded_postgres.default({
     ...postgresOptions,
     database_dir: databaseDir,
-    persistent: true
+    persistent: false
   });
   const adminUrl = `postgres://${postgresOptions.user}:${postgresOptions.password}@localhost:${postgresOptions.port}/postgres`;
   const testDbName = "test_eliya";
   const shouldInitialize = !import_fs2.default.existsSync(databaseDir);
-  const initializeAndStartTE = (0, import_function2.pipe)(
-    TE2.Do,
-    TE2.chain(() => TE2.tryCatch(() => pg.initialise(), E2.toError)),
-    TE2.chain(() => TE2.tryCatch(() => pg.start(), E2.toError))
-  );
-  const conditionalInitializeAndStartTE = shouldInitialize ? initializeAndStartTE : TE2.right(void 0);
-  const recreateDatabaseTE = (client) => (0, import_function2.pipe)(
+  const conditionalInitializeAndStartTE = shouldInitialize ? TE2.tryCatch(() => pg.initialise(), E3.toError) : TE2.right(void 0);
+  const recreateDatabaseTE = (client) => (0, import_function3.pipe)(
     TE2.Do,
     TE2.bind("dbName", () => TE2.right(client.escapeIdentifier(testDbName))),
     TE2.chainFirst(
-      ({ dbName }) => TE2.tryCatch(() => client.query(`DROP DATABASE IF EXISTS ${dbName}`), E2.toError)
+      ({ dbName }) => TE2.tryCatch(() => client.query(`DROP DATABASE IF EXISTS ${dbName} WITH (FORCE)`), E3.toError)
     ),
     TE2.chainFirst(
-      ({ dbName }) => TE2.tryCatch(() => client.query(`CREATE DATABASE ${dbName}`), E2.toError)
+      ({ dbName }) => TE2.tryCatch(() => client.query(`CREATE DATABASE ${dbName}`), E3.toError)
     )
   );
-  return (0, import_function2.pipe)(
+  return (0, import_function3.pipe)(
     TE2.Do,
     TE2.chain(() => conditionalInitializeAndStartTE),
+    TE2.bind(
+      "isPostmasterStale",
+      () => TE2.tryCatch(() => isPostmasterPidStale(databaseDir), E3.toError)
+    ),
+    TE2.chainFirst(({ isPostmasterStale }) => {
+      return isPostmasterStale ? (0, import_function3.pipe)(
+        TE2.tryCatch(() => import_fs2.default.promises.rmdir(databaseDir), E3.toError),
+        TE2.chain(() => TE2.tryCatch(() => pg.start(), E3.toError))
+      ) : TE2.right(void 0);
+    }),
     TE2.bind("client", () => TE2.right(pg.getPgClient())),
-    TE2.chainFirst(({ client }) => TE2.tryCatch(() => client.connect(), E2.toError)),
+    TE2.chainFirst(({ client }) => TE2.tryCatch(() => client.connect(), E3.toError)),
     TE2.chainFirst(({ client }) => recreateDatabaseTE(client)),
     TE2.map(() => ({ pg, options: postgresOptions, adminUrl, dbName: testDbName }))
   );
 }
 function initPgServerTE(options) {
-  return (0, import_function2.pipe)(
+  return (0, import_function3.pipe)(
     createEmbeddedPostgresTE(options),
     TE2.map((result) => {
       process.on("crash", () => result.pg.stop());
@@ -2272,43 +2432,63 @@ function initPgServerTE(options) {
     })
   );
 }
+function isPostmasterPidStale(filePath) {
+  return import_fs2.default.promises.readFile(import_path.default.join(filePath, "postmaster.pid"), "utf8").then((data) => {
+    const lines = data.split("\n");
+    const pid = parseInt(lines[0]);
+    if (isNaN(pid)) {
+      console.error("Invalid PID format");
+      throw new Error("Invalid PID format");
+    }
+    return (0, import_child_process.execSync)(`ps -p ${pid} -o comm=`);
+  }).then((buffer) => {
+    const stdout = buffer.toString();
+    return stdout.trim() !== "postgres";
+  }).catch((error) => {
+    return true;
+  });
+}
 
 // eslint-local-rules/rules/sql-check.worker.ts
-var config = null;
-runAsWorker(async (params) => {
+var cache = null;
+async function handler(params) {
   switch (params.action) {
     case "INITIALIZE":
-      return runInitialize(params)();
+      return await runInitialize(params)();
     case "CHECK":
-      return runCheck(params)();
+      return await runCheck(params)();
     case "END":
-      return runEnd(params)();
+      return await runEnd(params)();
   }
-});
+}
 function runInitialize(params) {
-  return (0, import_function3.pipe)(
-    initializeTE({ projectDir: params.projectDir }),
-    TE3.map((result) => {
-      config = result;
+  return (0, import_function4.pipe)(
+    initializeTE({
+      projectDir: params.projectDir,
+      uniqueTableColumnTypes: params.uniqueTableColumnTypes,
+      strictDateTimeChecking: params.strictDateTimeChecking,
+      viewLibrary: params.viewLibrary
     }),
-    TE3.mapLeft((error) => ({ type: "INTERNAL_ERROR", error }))
+    TE3.map((result) => {
+      cache = result;
+    })
   );
 }
 function runCheck(params) {
-  if (config?.runner === void 0) {
-    return TE3.left({ type: "INTERNAL_ERROR", error: new Error("runner is not initialized") });
+  if (cache?.runner === void 0) {
+    return TE3.left(new Error("runner is not initialized"));
   }
-  const runner = config.runner;
-  return (0, import_function3.pipe)(
-    TE3.tryCatch(() => runner.runQuery({ query: params.query }), E3.toError),
-    TE3.mapLeft((error) => ({ type: "RUNNER_ERROR", error: error.message }))
-  );
+  const runner = cache.runner;
+  return (0, import_function4.pipe)(TE3.tryCatch(() => runner.runQuery({ query: params.query }), RunnerError.to));
 }
 function runEnd(params) {
-  return (0, import_function3.pipe)(
+  return (0, import_function4.pipe)(
     TE3.Do,
-    TE3.chain(() => TE3.tryCatch(() => config?.runner.end() ?? Promise.resolve(), E3.toError)),
-    TE3.chain(() => TE3.tryCatch(() => config?.server.pg.stop() ?? Promise.resolve(), E3.toError)),
-    TE3.mapLeft((error) => ({ type: "INTERNAL_ERROR", error }))
+    TE3.chain(() => TE3.tryCatch(() => cache?.runner.end() ?? Promise.resolve(), E4.toError)),
+    TE3.chain(() => TE3.tryCatch(() => {
+      return cache?.server.pg.stop() ?? Promise.resolve();
+    }, E4.toError))
   );
 }
+runAsWorker(handler);
+//# sourceMappingURL=sql-check.worker.js.map

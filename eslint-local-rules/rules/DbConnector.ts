@@ -56,6 +56,7 @@ import {
 } from "../../mfsqlchecker/queries";
 import { resolveFromSourceMap } from "../../mfsqlchecker/source_maps";
 import { QualifiedSqlViewName, SqlCreateView } from "../../mfsqlchecker/views";
+import { InvalidQueryError } from "./sql-check.errors";
 
 type QueryRunnerConfig = {
     migrationsDir: string;
@@ -83,36 +84,7 @@ export class QueryRunner {
     static ConnectTE(params: { adminUrl: string; name?: string; migrationsDir: string }) {
         return pipe(
             TE.tryCatch(() => QueryRunner.Connect(params), E.toError),
-            TE.mapLeft((err: Error | postgres.PostgresError) => {
-                const errors: string[] = [];
-                const pgError = parsePostgreSqlError(err);
-
-                if (pgError !== null) {
-                    errors.push(
-                        "Error connecting to database cluster:",
-                        pgError.message,
-                        `code: ${pgError.code}`
-                    );
-
-                    if (pgError.detail !== null && pgError.detail !== pgError.message) {
-                        errors.push("detail: " + pgError.detail);
-                    }
-
-                    if (pgError.hint !== null) {
-                        errors.push("hint: " + pgError.hint);
-                    }
-
-                    return new Error(errors.join("\n"));
-                }
-
-                if ("code" in err) {
-                    errors.push("Error connecting to database cluster:", err.message);
-
-                    return new Error(errors.join("\n"));
-                }
-
-                return err;
-            })
+            TE.mapLeft(formatPgError)
         );
     }
 
@@ -125,6 +97,25 @@ export class QueryRunner {
     private uniqueColumnTypes = new Map<SqlType, TypeScriptType>();
     private tableColsLibrary = new TableColsLibrary();
     private prevStrictDateTimeChecking: boolean | null = null;
+
+    initializeTE(params: {
+        uniqueTableColumnTypes: UniqueTableColumnType[];
+        strictDateTimeChecking: boolean;
+        viewLibrary: SqlCreateView[];
+    }): TE.TaskEither<Error | InvalidQueryError, undefined> {
+        return pipe(
+            TE.Do,
+            TE.chain(() => TE.tryCatch(() => this.initialize(params), E.toError)),
+            TE.match(
+                (error) => E.left(error),
+                (result) => {
+                    return result === undefined
+                        ? E.right(undefined)
+                        : E.left(new InvalidQueryError(result));
+                }
+            )
+        );
+    }
 
     async initialize(params: {
         uniqueTableColumnTypes: UniqueTableColumnType[];
@@ -991,7 +982,7 @@ function stringifyInsertColumns(insertColumns: Map<string, [TypeScriptType, bool
     return result;
 }
 
-type SelectAnswer =
+export type SelectAnswer =
     | QueryAnswer.NoErrors
     | QueryAnswer.DescribeError
     | QueryAnswer.DuplicateColNamesError
@@ -1071,7 +1062,7 @@ function querySourceStart(fileContents: string, sourceMap: [number, number, numb
     );
 }
 
-function queryAnswerToErrorDiagnostics(
+export function queryAnswerToErrorDiagnostics(
     query: ResolvedSelect,
     queryAnswer: SelectAnswer,
     colTypesFormat: ColTypesFormat
@@ -1259,7 +1250,7 @@ async function processQuery(
     query: Pick<ResolvedSelect, "colTypes" | "text">
 ): Promise<SelectAnswer> {
     let fields: postgres.ColumnList<string> | null;
-    const savepoint = await newSavepoint(client);
+    // const savepoint = await newSavepoint(client);
     try {
         fields = await pgDescribeQuery(client, query.text);
     } catch (err) {
@@ -1267,14 +1258,14 @@ async function processQuery(
         if (perr === null) {
             throw err;
         } else {
-            await rollbackToAndReleaseSavepoint(client, savepoint);
+            // await rollbackToAndReleaseSavepoint(client, savepoint);
             return {
                 type: "DescribeError",
                 perr: perr
             };
         }
     }
-    await rollbackToAndReleaseSavepoint(client, savepoint);
+    // await rollbackToAndReleaseSavepoint(client, savepoint);
 
     const duplicateResultColumns: string[] = [];
     if (fields === null) {
@@ -2269,4 +2260,35 @@ async function modifySystemCatalogs(client: postgres.Sql): Promise<void> {
         `,
         [illegalCasts.map((c) => c[0]), illegalCasts.map((c) => c[1])]
     );
+}
+
+function formatPgError(error: Error | postgres.PostgresError) {
+    const errors: string[] = [];
+    const pgError = parsePostgreSqlError(error);
+
+    if (pgError !== null) {
+        errors.push(
+            "Error connecting to database cluster:",
+            pgError.message,
+            `code: ${pgError.code}`
+        );
+
+        if (pgError.detail !== null && pgError.detail !== pgError.message) {
+            errors.push("detail: " + pgError.detail);
+        }
+
+        if (pgError.hint !== null) {
+            errors.push("hint: " + pgError.hint);
+        }
+
+        return new Error(errors.join("\n"));
+    }
+
+    if ("code" in error) {
+        errors.push("Error connecting to database cluster:", error.message);
+
+        return new Error(errors.join("\n"));
+    }
+
+    return error;
 }

@@ -6,6 +6,8 @@ import { ErrorDiagnostic, fileLineCol, nodeErrorDiagnostic } from "./ErrorDiagno
 import { escapeIdentifier } from "./pg_extra";
 import { identifierImportedFrom, ModuleId } from "./ts_extra";
 import { calcViewName } from "./view_names";
+import * as E from "fp-ts/Either";
+import {pipe} from "fp-ts/function";
 
 function viewNameLength(varName: string | null): number {
     return escapeIdentifier(calcViewName(varName, "")).length;
@@ -424,7 +426,7 @@ export function tryTypeSqlFrag(type: ts.Type): Either<string, string | null> {
     };
 }
 
-function isSqlViewDefinition(checker: ts.TypeChecker, decl: ts.VariableDeclaration): boolean {
+export function isSqlViewDefinition(checker: ts.TypeChecker, decl: ts.VariableDeclaration): boolean {
     const name = checker.getTypeAtLocation(decl).symbol.name;
 
     // TODO This should be more robust: make sure that it is the "SqlView" type
@@ -434,40 +436,75 @@ function isSqlViewDefinition(checker: ts.TypeChecker, decl: ts.VariableDeclarati
     return name === "SqlView";
 }
 
+export function getSqlDefinitionE(params: {
+    projectDir: string;
+    sf: ts.SourceFile;
+    checker: ts.TypeChecker;
+    node: ts.Node;
+}): undefined | E.Either<ErrorDiagnostic, {
+    viewName: string;
+    qualifiedSqlViewName: QualifiedSqlViewName;
+    sqlViewDefinition: SqlViewDefinition;
+}> {
+    const { projectDir, sf, checker, node } = params;
+
+    if (!ts.isVariableStatement(node)) {
+        return;
+    }
+
+    for (const decl of node.declarationList.declarations) {
+        if (decl.initializer === undefined || !ts.isTaggedTemplateExpression(decl.initializer)) {
+            return;
+        }
+
+        if (!ts.isIdentifier(decl.initializer.tag) || !isSqlViewDefinition(checker, decl) || !ts.isIdentifier(decl.name)) {
+            return;
+        }
+
+        if ((node.declarationList.flags & ts.NodeFlags.Const) === 0) {
+            return E.left(nodeErrorDiagnostic(decl.name, "defineSqlView assigned to a non-const variable"));
+        }
+        
+        const viewName = decl.name.text;
+        const qualifiedSqlViewName = QualifiedSqlViewName.create(sourceFileModuleName(projectDir, sf), viewName);
+        const sqlViewDefinition = SqlViewDefinition.parseFromTemplateExpression(projectDir, sf, checker, viewName, decl.initializer.template);
+
+        switch (sqlViewDefinition.type) {
+            case "Left":
+                return E.left(sqlViewDefinition.value);
+            case "Right":
+                return E.right({
+                    viewName: viewName,
+                    qualifiedSqlViewName: qualifiedSqlViewName,
+                    sqlViewDefinition: sqlViewDefinition.value
+                })
+            default:
+                assertNever(sqlViewDefinition);
+        }
+    }
+
+    return;
+}
+
 export function sqlViewsLibraryAddFromSourceFile(projectDir: string, checker: ts.TypeChecker, sourceFile: ts.SourceFile): [Map<QualifiedSqlViewName, SqlViewDefinition>, ErrorDiagnostic[]] {
     const viewLibrary = new Map<QualifiedSqlViewName, SqlViewDefinition>();
     const errorDiagnostics: ErrorDiagnostic[] = [];
 
     function visit(sf: ts.SourceFile, node: ts.Node) {
-        if (ts.isVariableStatement(node)) {
-            for (const decl of node.declarationList.declarations) {
-                if (decl.initializer !== undefined) {
-                    if (ts.isTaggedTemplateExpression(decl.initializer)) {
-                        if (ts.isIdentifier(decl.initializer.tag) && isSqlViewDefinition(checker, decl)) {
-                            if (ts.isIdentifier(decl.name)) {
-                                // tslint:disable-next-line:no-bitwise
-                                if ((node.declarationList.flags & ts.NodeFlags.Const) === 0) {
-                                    errorDiagnostics.push(nodeErrorDiagnostic(decl.name, "defineSqlView assigned to a non-const variable"));
-                                } else {
-                                    const viewName = decl.name.text;
-                                    const qualifiedSqlViewName = QualifiedSqlViewName.create(sourceFileModuleName(projectDir, sf), viewName);
-                                    const sqlViewDefinition = SqlViewDefinition.parseFromTemplateExpression(projectDir, sf, checker, viewName, decl.initializer.template);
-                                    switch (sqlViewDefinition.type) {
-                                        case "Left":
-                                            errorDiagnostics.push(sqlViewDefinition.value);
-                                            break;
-                                        case "Right":
-                                            viewLibrary.set(qualifiedSqlViewName, sqlViewDefinition.value);
-                                            break;
-                                        default:
-                                            assertNever(sqlViewDefinition);
-                                    }
-                                }
-                            }
-                        }
+        const sqlDefinitionE = getSqlDefinitionE({ projectDir, sf, checker, node });
+
+        if (sqlDefinitionE !== undefined) {
+            pipe(
+                sqlDefinitionE,
+                E.match(
+                    (diagnostic) => {
+                        errorDiagnostics.push(diagnostic);
+                    },
+                    ({ sqlViewDefinition, qualifiedSqlViewName }) => {
+                        viewLibrary.set(qualifiedSqlViewName, sqlViewDefinition);
                     }
-                }
-            }
+                )
+            );
         }
     }
 

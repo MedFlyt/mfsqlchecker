@@ -58,14 +58,14 @@ var require_ms = __commonJS({
       if (str.length > 100) {
         return;
       }
-      var match = /^(-?(?:\d+)?\.?\d+) *(milliseconds?|msecs?|ms|seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|weeks?|w|years?|yrs?|y)?$/i.exec(
+      var match3 = /^(-?(?:\d+)?\.?\d+) *(milliseconds?|msecs?|ms|seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|weeks?|w|years?|yrs?|y)?$/i.exec(
         str
       );
-      if (!match) {
+      if (!match3) {
         return;
       }
-      var n = parseFloat(match[1]);
-      var type = (match[2] || "ms").toLowerCase();
+      var n = parseFloat(match3[1]);
+      var type = (match3[2] || "ms").toLowerCase();
       switch (type) {
         case "years":
         case "year":
@@ -196,19 +196,19 @@ var require_common = __commonJS({
             args.unshift("%O");
           }
           let index = 0;
-          args[0] = args[0].replace(/%([a-zA-Z%])/g, (match, format) => {
-            if (match === "%%") {
+          args[0] = args[0].replace(/%([a-zA-Z%])/g, (match3, format) => {
+            if (match3 === "%%") {
               return "%";
             }
             index++;
             const formatter = createDebug.formatters[format];
             if (typeof formatter === "function") {
               const val = args[index];
-              match = formatter.call(self2, val);
+              match3 = formatter.call(self2, val);
               args.splice(index, 1);
               index--;
             }
-            return match;
+            return match3;
           });
           createDebug.formatArgs.call(self2, args);
           const logFn = self2.log || createDebug.log;
@@ -428,12 +428,12 @@ var require_browser = __commonJS({
       args.splice(1, 0, c, "color: inherit");
       let index = 0;
       let lastC = 0;
-      args[0].replace(/%[a-zA-Z%]/g, (match) => {
-        if (match === "%%") {
+      args[0].replace(/%[a-zA-Z%]/g, (match3) => {
+        if (match3 === "%%") {
           return;
         }
         index++;
-        if (match === "%c") {
+        if (match3 === "%c") {
           lastC = index;
         }
       });
@@ -1479,23 +1479,23 @@ var require_coerce = __commonJS({
         return null;
       }
       options = options || {};
-      let match = null;
+      let match3 = null;
       if (!options.rtl) {
-        match = version.match(re[t.COERCE]);
+        match3 = version.match(re[t.COERCE]);
       } else {
         let next;
-        while ((next = re[t.COERCERTL].exec(version)) && (!match || match.index + match[0].length !== version.length)) {
-          if (!match || next.index + next[0].length !== match.index + match[0].length) {
-            match = next;
+        while ((next = re[t.COERCERTL].exec(version)) && (!match3 || match3.index + match3[0].length !== version.length)) {
+          if (!match3 || next.index + next[0].length !== match3.index + match3[0].length) {
+            match3 = next;
           }
           re[t.COERCERTL].lastIndex = next.index + next[1].length + next[2].length;
         }
         re[t.COERCERTL].lastIndex = -1;
       }
-      if (match === null) {
+      if (match3 === null) {
         return null;
       }
-      return parse2(`${match[2]}.${match[3] || "0"}.${match[4] || "0"}`, options);
+      return parse2(`${match3[2]}.${match3[3] || "0"}.${match3[4] || "0"}`, options);
     };
     module2.exports = coerce;
   }
@@ -2210,7 +2210,7 @@ var require_range = __commonJS({
         range = range.trim();
         const memoOpts = (this.options.includePrerelease && FLAG_INCLUDE_PRERELEASE) | (this.options.loose && FLAG_LOOSE);
         const memoKey = memoOpts + ":" + range;
-        const cached = cache.get(memoKey);
+        const cached = cache2.get(memoKey);
         if (cached) {
           return cached;
         }
@@ -2243,7 +2243,7 @@ var require_range = __commonJS({
           rangeMap.delete("");
         }
         const result = [...rangeMap.values()];
-        cache.set(memoKey, result);
+        cache2.set(memoKey, result);
         return result;
       }
       intersects(range, options) {
@@ -2282,7 +2282,7 @@ var require_range = __commonJS({
     };
     module2.exports = Range;
     var LRU = require_lru_cache();
-    var cache = new LRU({ max: 1e3 });
+    var cache2 = new LRU({ max: 1e3 });
     var parseOptions = require_parse_options();
     var Comparator = require_comparator();
     var debug = require_debug();
@@ -3221,9 +3221,9 @@ var require_version_check = __commonJS({
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.typescriptVersionIsAtLeast = void 0;
     var semver = __importStar2(require_semver2());
-    var ts5 = __importStar2(require("typescript"));
+    var ts6 = __importStar2(require("typescript"));
     function semverCheck(version) {
-      return semver.satisfies(ts5.version, `>= ${version}.0 || >= ${version}.1-rc || >= ${version}.0-beta`, {
+      return semver.satisfies(ts6.version, `>= ${version}.0 || >= ${version}.1-rc || >= ${version}.0-beta`, {
         includePrerelease: true
       });
     }
@@ -3289,7 +3289,7 @@ var require_getModifiers = __commonJS({
     };
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.getDecorators = exports.getModifiers = void 0;
-    var ts5 = __importStar2(require("typescript"));
+    var ts6 = __importStar2(require("typescript"));
     var version_check_1 = require_version_check();
     var isAtLeast48 = version_check_1.typescriptVersionIsAtLeast["4.8"];
     function getModifiers(node) {
@@ -3298,15 +3298,15 @@ var require_getModifiers = __commonJS({
         return void 0;
       }
       if (isAtLeast48) {
-        if (ts5.canHaveModifiers(node)) {
-          const modifiers = ts5.getModifiers(node);
+        if (ts6.canHaveModifiers(node)) {
+          const modifiers = ts6.getModifiers(node);
           return modifiers ? Array.from(modifiers) : void 0;
         }
         return void 0;
       }
       return (
         // @ts-expect-error intentional fallback for older TS versions
-        (_a2 = node.modifiers) === null || _a2 === void 0 ? void 0 : _a2.filter((m) => !ts5.isDecorator(m))
+        (_a2 = node.modifiers) === null || _a2 === void 0 ? void 0 : _a2.filter((m) => !ts6.isDecorator(m))
       );
     }
     exports.getModifiers = getModifiers;
@@ -3316,15 +3316,15 @@ var require_getModifiers = __commonJS({
         return void 0;
       }
       if (isAtLeast48) {
-        if (ts5.canHaveDecorators(node)) {
-          const decorators = ts5.getDecorators(node);
+        if (ts6.canHaveDecorators(node)) {
+          const decorators = ts6.getDecorators(node);
           return decorators ? Array.from(decorators) : void 0;
         }
         return void 0;
       }
       return (
         // @ts-expect-error intentional fallback for older TS versions
-        (_a2 = node.decorators) === null || _a2 === void 0 ? void 0 : _a2.filter(ts5.isDecorator)
+        (_a2 = node.decorators) === null || _a2 === void 0 ? void 0 : _a2.filter(ts6.isDecorator)
       );
     }
     exports.getDecorators = getDecorators;
@@ -3982,13 +3982,13 @@ var require_node_utils = __commonJS({
     };
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.isThisInTypeQuery = exports.isThisIdentifier = exports.identifierIsThisKeyword = exports.firstDefined = exports.nodeHasTokens = exports.createError = exports.TSError = exports.convertTokens = exports.convertToken = exports.getTokenType = exports.isChildUnwrappableOptionalChain = exports.isChainExpression = exports.isOptional = exports.isComputedProperty = exports.unescapeStringLiteralText = exports.hasJSXAncestor = exports.findFirstMatchingAncestor = exports.findNextToken = exports.getTSNodeAccessibility = exports.getDeclarationKind = exports.isJSXToken = exports.isToken = exports.getRange = exports.canContainDirective = exports.getLocFor = exports.getLineAndCharacterFor = exports.getBinaryExpressionType = exports.isJSDocComment = exports.isComment = exports.isComma = exports.getLastModifier = exports.hasModifier = exports.isESTreeClassMember = exports.getTextForTokenKind = exports.isLogicalOperator = exports.isAssignmentOperator = void 0;
-    var ts5 = __importStar2(require("typescript"));
+    var ts6 = __importStar2(require("typescript"));
     var getModifiers_1 = require_getModifiers();
     var xhtml_entities_1 = require_xhtml_entities();
     var ts_estree_1 = require_ts_estree2();
     var version_check_1 = require_version_check();
     var isAtLeast50 = version_check_1.typescriptVersionIsAtLeast["5.0"];
-    var SyntaxKind = ts5.SyntaxKind;
+    var SyntaxKind = ts6.SyntaxKind;
     var LOGICAL_OPERATORS = [
       SyntaxKind.BarBarToken,
       SyntaxKind.AmpersandAmpersandToken,
@@ -4003,7 +4003,7 @@ var require_node_utils = __commonJS({
     }
     exports.isLogicalOperator = isLogicalOperator;
     function getTextForTokenKind(kind) {
-      return ts5.tokenToString(kind);
+      return ts6.tokenToString(kind);
     }
     exports.getTextForTokenKind = getTextForTokenKind;
     function isESTreeClassMember(node) {
@@ -4061,15 +4061,15 @@ var require_node_utils = __commonJS({
     }
     exports.getLocFor = getLocFor;
     function canContainDirective(node) {
-      if (node.kind === ts5.SyntaxKind.Block) {
+      if (node.kind === ts6.SyntaxKind.Block) {
         switch (node.parent.kind) {
-          case ts5.SyntaxKind.Constructor:
-          case ts5.SyntaxKind.GetAccessor:
-          case ts5.SyntaxKind.SetAccessor:
-          case ts5.SyntaxKind.ArrowFunction:
-          case ts5.SyntaxKind.FunctionExpression:
-          case ts5.SyntaxKind.FunctionDeclaration:
-          case ts5.SyntaxKind.MethodDeclaration:
+          case ts6.SyntaxKind.Constructor:
+          case ts6.SyntaxKind.GetAccessor:
+          case ts6.SyntaxKind.SetAccessor:
+          case ts6.SyntaxKind.ArrowFunction:
+          case ts6.SyntaxKind.FunctionExpression:
+          case ts6.SyntaxKind.FunctionDeclaration:
+          case ts6.SyntaxKind.MethodDeclaration:
             return true;
           default:
             return false;
@@ -4091,10 +4091,10 @@ var require_node_utils = __commonJS({
     }
     exports.isJSXToken = isJSXToken;
     function getDeclarationKind(node) {
-      if (node.flags & ts5.NodeFlags.Let) {
+      if (node.flags & ts6.NodeFlags.Let) {
         return "let";
       }
-      if (node.flags & ts5.NodeFlags.Const) {
+      if (node.flags & ts6.NodeFlags.Const) {
         return "const";
       }
       return "var";
@@ -4123,7 +4123,7 @@ var require_node_utils = __commonJS({
     function findNextToken(previousToken, parent, ast) {
       return find(parent);
       function find(n) {
-        if (ts5.isToken(n) && n.pos === previousToken.end) {
+        if (ts6.isToken(n) && n.pos === previousToken.end) {
           return n;
         }
         return firstDefined(n.getChildren(ast), (child) => {
@@ -4176,13 +4176,13 @@ var require_node_utils = __commonJS({
     exports.isChainExpression = isChainExpression;
     function isChildUnwrappableOptionalChain(node, child) {
       return isChainExpression(child) && // (x?.y).z is semantically different, and as such .z is no longer optional
-      node.expression.kind !== ts5.SyntaxKind.ParenthesizedExpression;
+      node.expression.kind !== ts6.SyntaxKind.ParenthesizedExpression;
     }
     exports.isChildUnwrappableOptionalChain = isChildUnwrappableOptionalChain;
     function getTokenType(token) {
       let keywordKind;
       if (isAtLeast50 && token.kind === SyntaxKind.Identifier) {
-        keywordKind = ts5.identifierToKeywordKind(token);
+        keywordKind = ts6.identifierToKeywordKind(token);
       } else if ("originalKeywordKind" in token) {
         keywordKind = token.originalKeywordKind;
       }
@@ -4320,7 +4320,7 @@ var require_node_utils = __commonJS({
     function identifierIsThisKeyword(id) {
       return (
         // eslint-disable-next-line deprecation/deprecation -- intentional for older TS versions
-        (isAtLeast50 ? ts5.identifierToKeywordKind(id) : id.originalKeywordKind) === SyntaxKind.ThisKeyword
+        (isAtLeast50 ? ts6.identifierToKeywordKind(id) : id.originalKeywordKind) === SyntaxKind.ThisKeyword
       );
     }
     exports.identifierIsThisKeyword = identifierIsThisKeyword;
@@ -4332,7 +4332,7 @@ var require_node_utils = __commonJS({
       if (!isThisIdentifier(node)) {
         return false;
       }
-      while (ts5.isQualifiedName(node.parent) && node.parent.left === node) {
+      while (ts6.isQualifiedName(node.parent) && node.parent.left === node) {
         node = node.parent;
       }
       return node.parent.kind === SyntaxKind.TypeQuery;
@@ -4379,12 +4379,12 @@ var require_convert = __commonJS({
     };
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.Converter = exports.convertError = void 0;
-    var ts5 = __importStar2(require("typescript"));
+    var ts6 = __importStar2(require("typescript"));
     var getModifiers_1 = require_getModifiers();
     var node_utils_1 = require_node_utils();
     var ts_estree_1 = require_ts_estree2();
     var version_check_1 = require_version_check();
-    var SyntaxKind = ts5.SyntaxKind;
+    var SyntaxKind = ts6.SyntaxKind;
     function convertError(error) {
       return (0, node_utils_1.createError)(error.file, error.start, "message" in error && error.message || error.messageText);
     }
@@ -4570,7 +4570,7 @@ var require_convert = __commonJS({
         return nodes.map((statement) => {
           const child = this.convertChild(statement);
           if (allowDirectives) {
-            if ((child === null || child === void 0 ? void 0 : child.expression) && ts5.isExpressionStatement(statement) && ts5.isStringLiteral(statement.expression)) {
+            if ((child === null || child === void 0 ? void 0 : child.expression) && ts6.isExpressionStatement(statement) && ts6.isStringLiteral(statement.expression)) {
               const raw = child.expression.raw;
               child.directive = raw.slice(1, -1);
               return child;
@@ -4662,7 +4662,7 @@ var require_convert = __commonJS({
        * property instead of a kind property. Recursively copies all children.
        */
       deeplyCopy(node) {
-        if (node.kind === ts5.SyntaxKind.JSDocFunctionType) {
+        if (node.kind === ts6.SyntaxKind.JSDocFunctionType) {
           throw (0, node_utils_1.createError)(this.ast, node.pos, "JSDoc types can only be used inside documentation comments.");
         }
         const customType = `TS${SyntaxKind[node.kind]}`;
@@ -4673,7 +4673,7 @@ var require_convert = __commonJS({
           type: customType
         });
         if ("type" in node) {
-          result.typeAnnotation = node.type && "kind" in node.type && ts5.isTypeNode(node.type) ? this.convertTypeAnnotation(node.type, node) : null;
+          result.typeAnnotation = node.type && "kind" in node.type && ts6.isTypeNode(node.type) ? this.convertTypeAnnotation(node.type, node) : null;
         }
         if ("typeArguments" in node) {
           result.typeParameters = node.typeArguments && "pos" in node.typeArguments ? this.convertTypeArgumentsToTypeParameters(node.typeArguments, node) : null;
@@ -5722,11 +5722,11 @@ var require_convert = __commonJS({
                 type: ts_estree_1.AST_NODE_TYPES.SequenceExpression,
                 expressions: []
               });
-              const left3 = this.convertChild(node.left);
-              if (left3.type === ts_estree_1.AST_NODE_TYPES.SequenceExpression && node.left.kind !== SyntaxKind.ParenthesizedExpression) {
-                result.expressions = result.expressions.concat(left3.expressions);
+              const left6 = this.convertChild(node.left);
+              if (left6.type === ts_estree_1.AST_NODE_TYPES.SequenceExpression && node.left.kind !== SyntaxKind.ParenthesizedExpression) {
+                result.expressions = result.expressions.concat(left6.expressions);
               } else {
-                result.expressions.push(left3);
+                result.expressions.push(left6);
               }
               result.expressions.push(this.convertChild(node.right));
               return result;
@@ -6306,7 +6306,7 @@ var require_convert = __commonJS({
             if (node.initializer) {
               result.initializer = this.convertChild(node.initializer);
             }
-            if (node.name.kind === ts5.SyntaxKind.ComputedPropertyName) {
+            if (node.name.kind === ts6.SyntaxKind.ComputedPropertyName) {
               result.computed = true;
             }
             return result;
@@ -6315,7 +6315,7 @@ var require_convert = __commonJS({
             const result = this.createNode(node, Object.assign({ type: ts_estree_1.AST_NODE_TYPES.TSModuleDeclaration }, (() => {
               const id = this.convertChild(node.name);
               const body = this.convertChild(node.body);
-              if (node.flags & ts5.NodeFlags.GlobalAugmentation) {
+              if (node.flags & ts6.NodeFlags.GlobalAugmentation) {
                 if (body == null || body.type === ts_estree_1.AST_NODE_TYPES.TSModuleDeclaration) {
                   throw new Error("Expected a valid module body");
                 }
@@ -6328,7 +6328,7 @@ var require_convert = __commonJS({
                   body,
                   global: true
                 };
-              } else if (node.flags & ts5.NodeFlags.Namespace) {
+              } else if (node.flags & ts6.NodeFlags.Namespace) {
                 if (body == null) {
                   throw new Error("Expected a module body");
                 }
@@ -6868,53 +6868,53 @@ var require_node2 = __commonJS({
     exports.isNamespaceImport = exports.isNamespaceDeclaration = exports.isNamedImports = exports.isNamedExports = exports.isModuleDeclaration = exports.isModuleBlock = exports.isMethodSignature = exports.isMethodDeclaration = exports.isMetaProperty = exports.isMappedTypeNode = exports.isLiteralTypeNode = exports.isLiteralExpression = exports.isLabeledStatement = exports.isJsxText = exports.isJsxSpreadAttribute = exports.isJsxSelfClosingElement = exports.isJsxOpeningLikeElement = exports.isJsxOpeningFragment = exports.isJsxOpeningElement = exports.isJsxFragment = exports.isJsxExpression = exports.isJsxElement = exports.isJsxClosingFragment = exports.isJsxClosingElement = exports.isJsxAttributes = exports.isJsxAttributeLike = exports.isJsxAttribute = exports.isJsDoc = exports.isIterationStatement = exports.isIntersectionTypeNode = exports.isInterfaceDeclaration = exports.isInferTypeNode = exports.isIndexSignatureDeclaration = exports.isIndexedAccessTypeNode = exports.isImportSpecifier = exports.isImportEqualsDeclaration = exports.isImportDeclaration = exports.isImportClause = exports.isIfStatement = exports.isIdentifier = exports.isGetAccessorDeclaration = exports.isFunctionTypeNode = exports.isFunctionExpression = exports.isFunctionDeclaration = exports.isForStatement = exports.isForOfStatement = exports.isForInOrOfStatement = exports.isForInStatement = exports.isExternalModuleReference = exports.isExpressionWithTypeArguments = void 0;
     exports.isVariableStatement = exports.isVariableDeclaration = exports.isUnionTypeNode = exports.isTypeQueryNode = exports.isTypeReferenceNode = exports.isTypePredicateNode = exports.isTypeParameterDeclaration = exports.isTypeOperatorNode = exports.isTypeOfExpression = exports.isTypeLiteralNode = exports.isTypeAssertion = exports.isTypeAliasDeclaration = exports.isTupleTypeNode = exports.isTryStatement = exports.isThrowStatement = exports.isTextualLiteral = exports.isTemplateLiteral = exports.isTemplateExpression = exports.isTaggedTemplateExpression = exports.isSyntaxList = exports.isSwitchStatement = exports.isStringLiteral = exports.isSpreadElement = exports.isSpreadAssignment = exports.isSourceFile = exports.isSignatureDeclaration = exports.isShorthandPropertyAssignment = exports.isSetAccessorDeclaration = exports.isReturnStatement = exports.isRegularExpressionLiteral = exports.isQualifiedName = exports.isPropertySignature = exports.isPropertyDeclaration = exports.isPropertyAssignment = exports.isPropertyAccessExpression = exports.isPrefixUnaryExpression = exports.isPostfixUnaryExpression = exports.isParenthesizedTypeNode = exports.isParenthesizedExpression = exports.isParameterDeclaration = exports.isOmittedExpression = exports.isObjectLiteralExpression = exports.isObjectBindingPattern = exports.isNumericOrStringLikeLiteral = exports.isNumericLiteral = exports.isNullLiteral = exports.isNoSubstitutionTemplateLiteral = exports.isNonNullExpression = exports.isNewExpression = exports.isNamespaceExportDeclaration = void 0;
     exports.isWithStatement = exports.isWhileStatement = exports.isVoidExpression = exports.isVariableDeclarationList = void 0;
-    var ts5 = require("typescript");
+    var ts6 = require("typescript");
     function isAccessorDeclaration(node) {
-      return node.kind === ts5.SyntaxKind.GetAccessor || node.kind === ts5.SyntaxKind.SetAccessor;
+      return node.kind === ts6.SyntaxKind.GetAccessor || node.kind === ts6.SyntaxKind.SetAccessor;
     }
     exports.isAccessorDeclaration = isAccessorDeclaration;
     function isArrayBindingPattern(node) {
-      return node.kind === ts5.SyntaxKind.ArrayBindingPattern;
+      return node.kind === ts6.SyntaxKind.ArrayBindingPattern;
     }
     exports.isArrayBindingPattern = isArrayBindingPattern;
     function isArrayLiteralExpression(node) {
-      return node.kind === ts5.SyntaxKind.ArrayLiteralExpression;
+      return node.kind === ts6.SyntaxKind.ArrayLiteralExpression;
     }
     exports.isArrayLiteralExpression = isArrayLiteralExpression;
     function isArrayTypeNode(node) {
-      return node.kind === ts5.SyntaxKind.ArrayType;
+      return node.kind === ts6.SyntaxKind.ArrayType;
     }
     exports.isArrayTypeNode = isArrayTypeNode;
     function isArrowFunction(node) {
-      return node.kind === ts5.SyntaxKind.ArrowFunction;
+      return node.kind === ts6.SyntaxKind.ArrowFunction;
     }
     exports.isArrowFunction = isArrowFunction;
     function isAsExpression(node) {
-      return node.kind === ts5.SyntaxKind.AsExpression;
+      return node.kind === ts6.SyntaxKind.AsExpression;
     }
     exports.isAsExpression = isAsExpression;
     function isAssertionExpression(node) {
-      return node.kind === ts5.SyntaxKind.AsExpression || node.kind === ts5.SyntaxKind.TypeAssertionExpression;
+      return node.kind === ts6.SyntaxKind.AsExpression || node.kind === ts6.SyntaxKind.TypeAssertionExpression;
     }
     exports.isAssertionExpression = isAssertionExpression;
     function isAwaitExpression(node) {
-      return node.kind === ts5.SyntaxKind.AwaitExpression;
+      return node.kind === ts6.SyntaxKind.AwaitExpression;
     }
     exports.isAwaitExpression = isAwaitExpression;
     function isBinaryExpression(node) {
-      return node.kind === ts5.SyntaxKind.BinaryExpression;
+      return node.kind === ts6.SyntaxKind.BinaryExpression;
     }
     exports.isBinaryExpression = isBinaryExpression;
     function isBindingElement(node) {
-      return node.kind === ts5.SyntaxKind.BindingElement;
+      return node.kind === ts6.SyntaxKind.BindingElement;
     }
     exports.isBindingElement = isBindingElement;
     function isBindingPattern(node) {
-      return node.kind === ts5.SyntaxKind.ArrayBindingPattern || node.kind === ts5.SyntaxKind.ObjectBindingPattern;
+      return node.kind === ts6.SyntaxKind.ArrayBindingPattern || node.kind === ts6.SyntaxKind.ObjectBindingPattern;
     }
     exports.isBindingPattern = isBindingPattern;
     function isBlock(node) {
-      return node.kind === ts5.SyntaxKind.Block;
+      return node.kind === ts6.SyntaxKind.Block;
     }
     exports.isBlock = isBlock;
     function isBlockLike(node) {
@@ -6922,29 +6922,29 @@ var require_node2 = __commonJS({
     }
     exports.isBlockLike = isBlockLike;
     function isBooleanLiteral(node) {
-      return node.kind === ts5.SyntaxKind.TrueKeyword || node.kind === ts5.SyntaxKind.FalseKeyword;
+      return node.kind === ts6.SyntaxKind.TrueKeyword || node.kind === ts6.SyntaxKind.FalseKeyword;
     }
     exports.isBooleanLiteral = isBooleanLiteral;
     function isBreakOrContinueStatement(node) {
-      return node.kind === ts5.SyntaxKind.BreakStatement || node.kind === ts5.SyntaxKind.ContinueStatement;
+      return node.kind === ts6.SyntaxKind.BreakStatement || node.kind === ts6.SyntaxKind.ContinueStatement;
     }
     exports.isBreakOrContinueStatement = isBreakOrContinueStatement;
     function isBreakStatement(node) {
-      return node.kind === ts5.SyntaxKind.BreakStatement;
+      return node.kind === ts6.SyntaxKind.BreakStatement;
     }
     exports.isBreakStatement = isBreakStatement;
     function isCallExpression2(node) {
-      return node.kind === ts5.SyntaxKind.CallExpression;
+      return node.kind === ts6.SyntaxKind.CallExpression;
     }
     exports.isCallExpression = isCallExpression2;
     function isCallLikeExpression(node) {
       switch (node.kind) {
-        case ts5.SyntaxKind.CallExpression:
-        case ts5.SyntaxKind.Decorator:
-        case ts5.SyntaxKind.JsxOpeningElement:
-        case ts5.SyntaxKind.JsxSelfClosingElement:
-        case ts5.SyntaxKind.NewExpression:
-        case ts5.SyntaxKind.TaggedTemplateExpression:
+        case ts6.SyntaxKind.CallExpression:
+        case ts6.SyntaxKind.Decorator:
+        case ts6.SyntaxKind.JsxOpeningElement:
+        case ts6.SyntaxKind.JsxSelfClosingElement:
+        case ts6.SyntaxKind.NewExpression:
+        case ts6.SyntaxKind.TaggedTemplateExpression:
           return true;
         default:
           return false;
@@ -6952,171 +6952,171 @@ var require_node2 = __commonJS({
     }
     exports.isCallLikeExpression = isCallLikeExpression;
     function isCallSignatureDeclaration(node) {
-      return node.kind === ts5.SyntaxKind.CallSignature;
+      return node.kind === ts6.SyntaxKind.CallSignature;
     }
     exports.isCallSignatureDeclaration = isCallSignatureDeclaration;
     function isCaseBlock(node) {
-      return node.kind === ts5.SyntaxKind.CaseBlock;
+      return node.kind === ts6.SyntaxKind.CaseBlock;
     }
     exports.isCaseBlock = isCaseBlock;
     function isCaseClause(node) {
-      return node.kind === ts5.SyntaxKind.CaseClause;
+      return node.kind === ts6.SyntaxKind.CaseClause;
     }
     exports.isCaseClause = isCaseClause;
     function isCaseOrDefaultClause(node) {
-      return node.kind === ts5.SyntaxKind.CaseClause || node.kind === ts5.SyntaxKind.DefaultClause;
+      return node.kind === ts6.SyntaxKind.CaseClause || node.kind === ts6.SyntaxKind.DefaultClause;
     }
     exports.isCaseOrDefaultClause = isCaseOrDefaultClause;
     function isCatchClause(node) {
-      return node.kind === ts5.SyntaxKind.CatchClause;
+      return node.kind === ts6.SyntaxKind.CatchClause;
     }
     exports.isCatchClause = isCatchClause;
     function isClassDeclaration(node) {
-      return node.kind === ts5.SyntaxKind.ClassDeclaration;
+      return node.kind === ts6.SyntaxKind.ClassDeclaration;
     }
     exports.isClassDeclaration = isClassDeclaration;
     function isClassExpression(node) {
-      return node.kind === ts5.SyntaxKind.ClassExpression;
+      return node.kind === ts6.SyntaxKind.ClassExpression;
     }
     exports.isClassExpression = isClassExpression;
     function isClassLikeDeclaration(node) {
-      return node.kind === ts5.SyntaxKind.ClassDeclaration || node.kind === ts5.SyntaxKind.ClassExpression;
+      return node.kind === ts6.SyntaxKind.ClassDeclaration || node.kind === ts6.SyntaxKind.ClassExpression;
     }
     exports.isClassLikeDeclaration = isClassLikeDeclaration;
     function isCommaListExpression(node) {
-      return node.kind === ts5.SyntaxKind.CommaListExpression;
+      return node.kind === ts6.SyntaxKind.CommaListExpression;
     }
     exports.isCommaListExpression = isCommaListExpression;
     function isConditionalExpression(node) {
-      return node.kind === ts5.SyntaxKind.ConditionalExpression;
+      return node.kind === ts6.SyntaxKind.ConditionalExpression;
     }
     exports.isConditionalExpression = isConditionalExpression;
     function isConditionalTypeNode(node) {
-      return node.kind === ts5.SyntaxKind.ConditionalType;
+      return node.kind === ts6.SyntaxKind.ConditionalType;
     }
     exports.isConditionalTypeNode = isConditionalTypeNode;
     function isConstructorDeclaration(node) {
-      return node.kind === ts5.SyntaxKind.Constructor;
+      return node.kind === ts6.SyntaxKind.Constructor;
     }
     exports.isConstructorDeclaration = isConstructorDeclaration;
     function isConstructorTypeNode(node) {
-      return node.kind === ts5.SyntaxKind.ConstructorType;
+      return node.kind === ts6.SyntaxKind.ConstructorType;
     }
     exports.isConstructorTypeNode = isConstructorTypeNode;
     function isConstructSignatureDeclaration(node) {
-      return node.kind === ts5.SyntaxKind.ConstructSignature;
+      return node.kind === ts6.SyntaxKind.ConstructSignature;
     }
     exports.isConstructSignatureDeclaration = isConstructSignatureDeclaration;
     function isContinueStatement(node) {
-      return node.kind === ts5.SyntaxKind.ContinueStatement;
+      return node.kind === ts6.SyntaxKind.ContinueStatement;
     }
     exports.isContinueStatement = isContinueStatement;
     function isComputedPropertyName(node) {
-      return node.kind === ts5.SyntaxKind.ComputedPropertyName;
+      return node.kind === ts6.SyntaxKind.ComputedPropertyName;
     }
     exports.isComputedPropertyName = isComputedPropertyName;
     function isDebuggerStatement(node) {
-      return node.kind === ts5.SyntaxKind.DebuggerStatement;
+      return node.kind === ts6.SyntaxKind.DebuggerStatement;
     }
     exports.isDebuggerStatement = isDebuggerStatement;
     function isDecorator(node) {
-      return node.kind === ts5.SyntaxKind.Decorator;
+      return node.kind === ts6.SyntaxKind.Decorator;
     }
     exports.isDecorator = isDecorator;
     function isDefaultClause(node) {
-      return node.kind === ts5.SyntaxKind.DefaultClause;
+      return node.kind === ts6.SyntaxKind.DefaultClause;
     }
     exports.isDefaultClause = isDefaultClause;
     function isDeleteExpression(node) {
-      return node.kind === ts5.SyntaxKind.DeleteExpression;
+      return node.kind === ts6.SyntaxKind.DeleteExpression;
     }
     exports.isDeleteExpression = isDeleteExpression;
     function isDoStatement(node) {
-      return node.kind === ts5.SyntaxKind.DoStatement;
+      return node.kind === ts6.SyntaxKind.DoStatement;
     }
     exports.isDoStatement = isDoStatement;
     function isElementAccessExpression(node) {
-      return node.kind === ts5.SyntaxKind.ElementAccessExpression;
+      return node.kind === ts6.SyntaxKind.ElementAccessExpression;
     }
     exports.isElementAccessExpression = isElementAccessExpression;
     function isEmptyStatement(node) {
-      return node.kind === ts5.SyntaxKind.EmptyStatement;
+      return node.kind === ts6.SyntaxKind.EmptyStatement;
     }
     exports.isEmptyStatement = isEmptyStatement;
     function isEntityName(node) {
-      return node.kind === ts5.SyntaxKind.Identifier || isQualifiedName(node);
+      return node.kind === ts6.SyntaxKind.Identifier || isQualifiedName(node);
     }
     exports.isEntityName = isEntityName;
     function isEntityNameExpression(node) {
-      return node.kind === ts5.SyntaxKind.Identifier || isPropertyAccessExpression2(node) && isEntityNameExpression(node.expression);
+      return node.kind === ts6.SyntaxKind.Identifier || isPropertyAccessExpression2(node) && isEntityNameExpression(node.expression);
     }
     exports.isEntityNameExpression = isEntityNameExpression;
     function isEnumDeclaration(node) {
-      return node.kind === ts5.SyntaxKind.EnumDeclaration;
+      return node.kind === ts6.SyntaxKind.EnumDeclaration;
     }
     exports.isEnumDeclaration = isEnumDeclaration;
     function isEnumMember(node) {
-      return node.kind === ts5.SyntaxKind.EnumMember;
+      return node.kind === ts6.SyntaxKind.EnumMember;
     }
     exports.isEnumMember = isEnumMember;
     function isExportAssignment(node) {
-      return node.kind === ts5.SyntaxKind.ExportAssignment;
+      return node.kind === ts6.SyntaxKind.ExportAssignment;
     }
     exports.isExportAssignment = isExportAssignment;
     function isExportDeclaration(node) {
-      return node.kind === ts5.SyntaxKind.ExportDeclaration;
+      return node.kind === ts6.SyntaxKind.ExportDeclaration;
     }
     exports.isExportDeclaration = isExportDeclaration;
     function isExportSpecifier(node) {
-      return node.kind === ts5.SyntaxKind.ExportSpecifier;
+      return node.kind === ts6.SyntaxKind.ExportSpecifier;
     }
     exports.isExportSpecifier = isExportSpecifier;
     function isExpression(node) {
       switch (node.kind) {
-        case ts5.SyntaxKind.ArrayLiteralExpression:
-        case ts5.SyntaxKind.ArrowFunction:
-        case ts5.SyntaxKind.AsExpression:
-        case ts5.SyntaxKind.AwaitExpression:
-        case ts5.SyntaxKind.BinaryExpression:
-        case ts5.SyntaxKind.CallExpression:
-        case ts5.SyntaxKind.ClassExpression:
-        case ts5.SyntaxKind.CommaListExpression:
-        case ts5.SyntaxKind.ConditionalExpression:
-        case ts5.SyntaxKind.DeleteExpression:
-        case ts5.SyntaxKind.ElementAccessExpression:
-        case ts5.SyntaxKind.FalseKeyword:
-        case ts5.SyntaxKind.FunctionExpression:
-        case ts5.SyntaxKind.Identifier:
-        case ts5.SyntaxKind.JsxElement:
-        case ts5.SyntaxKind.JsxFragment:
-        case ts5.SyntaxKind.JsxExpression:
-        case ts5.SyntaxKind.JsxOpeningElement:
-        case ts5.SyntaxKind.JsxOpeningFragment:
-        case ts5.SyntaxKind.JsxSelfClosingElement:
-        case ts5.SyntaxKind.MetaProperty:
-        case ts5.SyntaxKind.NewExpression:
-        case ts5.SyntaxKind.NonNullExpression:
-        case ts5.SyntaxKind.NoSubstitutionTemplateLiteral:
-        case ts5.SyntaxKind.NullKeyword:
-        case ts5.SyntaxKind.NumericLiteral:
-        case ts5.SyntaxKind.ObjectLiteralExpression:
-        case ts5.SyntaxKind.OmittedExpression:
-        case ts5.SyntaxKind.ParenthesizedExpression:
-        case ts5.SyntaxKind.PostfixUnaryExpression:
-        case ts5.SyntaxKind.PrefixUnaryExpression:
-        case ts5.SyntaxKind.PropertyAccessExpression:
-        case ts5.SyntaxKind.RegularExpressionLiteral:
-        case ts5.SyntaxKind.SpreadElement:
-        case ts5.SyntaxKind.StringLiteral:
-        case ts5.SyntaxKind.SuperKeyword:
-        case ts5.SyntaxKind.TaggedTemplateExpression:
-        case ts5.SyntaxKind.TemplateExpression:
-        case ts5.SyntaxKind.ThisKeyword:
-        case ts5.SyntaxKind.TrueKeyword:
-        case ts5.SyntaxKind.TypeAssertionExpression:
-        case ts5.SyntaxKind.TypeOfExpression:
-        case ts5.SyntaxKind.VoidExpression:
-        case ts5.SyntaxKind.YieldExpression:
+        case ts6.SyntaxKind.ArrayLiteralExpression:
+        case ts6.SyntaxKind.ArrowFunction:
+        case ts6.SyntaxKind.AsExpression:
+        case ts6.SyntaxKind.AwaitExpression:
+        case ts6.SyntaxKind.BinaryExpression:
+        case ts6.SyntaxKind.CallExpression:
+        case ts6.SyntaxKind.ClassExpression:
+        case ts6.SyntaxKind.CommaListExpression:
+        case ts6.SyntaxKind.ConditionalExpression:
+        case ts6.SyntaxKind.DeleteExpression:
+        case ts6.SyntaxKind.ElementAccessExpression:
+        case ts6.SyntaxKind.FalseKeyword:
+        case ts6.SyntaxKind.FunctionExpression:
+        case ts6.SyntaxKind.Identifier:
+        case ts6.SyntaxKind.JsxElement:
+        case ts6.SyntaxKind.JsxFragment:
+        case ts6.SyntaxKind.JsxExpression:
+        case ts6.SyntaxKind.JsxOpeningElement:
+        case ts6.SyntaxKind.JsxOpeningFragment:
+        case ts6.SyntaxKind.JsxSelfClosingElement:
+        case ts6.SyntaxKind.MetaProperty:
+        case ts6.SyntaxKind.NewExpression:
+        case ts6.SyntaxKind.NonNullExpression:
+        case ts6.SyntaxKind.NoSubstitutionTemplateLiteral:
+        case ts6.SyntaxKind.NullKeyword:
+        case ts6.SyntaxKind.NumericLiteral:
+        case ts6.SyntaxKind.ObjectLiteralExpression:
+        case ts6.SyntaxKind.OmittedExpression:
+        case ts6.SyntaxKind.ParenthesizedExpression:
+        case ts6.SyntaxKind.PostfixUnaryExpression:
+        case ts6.SyntaxKind.PrefixUnaryExpression:
+        case ts6.SyntaxKind.PropertyAccessExpression:
+        case ts6.SyntaxKind.RegularExpressionLiteral:
+        case ts6.SyntaxKind.SpreadElement:
+        case ts6.SyntaxKind.StringLiteral:
+        case ts6.SyntaxKind.SuperKeyword:
+        case ts6.SyntaxKind.TaggedTemplateExpression:
+        case ts6.SyntaxKind.TemplateExpression:
+        case ts6.SyntaxKind.ThisKeyword:
+        case ts6.SyntaxKind.TrueKeyword:
+        case ts6.SyntaxKind.TypeAssertionExpression:
+        case ts6.SyntaxKind.TypeOfExpression:
+        case ts6.SyntaxKind.VoidExpression:
+        case ts6.SyntaxKind.YieldExpression:
           return true;
         default:
           return false;
@@ -7124,100 +7124,100 @@ var require_node2 = __commonJS({
     }
     exports.isExpression = isExpression;
     function isExpressionStatement(node) {
-      return node.kind === ts5.SyntaxKind.ExpressionStatement;
+      return node.kind === ts6.SyntaxKind.ExpressionStatement;
     }
     exports.isExpressionStatement = isExpressionStatement;
     function isExpressionWithTypeArguments(node) {
-      return node.kind === ts5.SyntaxKind.ExpressionWithTypeArguments;
+      return node.kind === ts6.SyntaxKind.ExpressionWithTypeArguments;
     }
     exports.isExpressionWithTypeArguments = isExpressionWithTypeArguments;
     function isExternalModuleReference(node) {
-      return node.kind === ts5.SyntaxKind.ExternalModuleReference;
+      return node.kind === ts6.SyntaxKind.ExternalModuleReference;
     }
     exports.isExternalModuleReference = isExternalModuleReference;
     function isForInStatement(node) {
-      return node.kind === ts5.SyntaxKind.ForInStatement;
+      return node.kind === ts6.SyntaxKind.ForInStatement;
     }
     exports.isForInStatement = isForInStatement;
     function isForInOrOfStatement(node) {
-      return node.kind === ts5.SyntaxKind.ForOfStatement || node.kind === ts5.SyntaxKind.ForInStatement;
+      return node.kind === ts6.SyntaxKind.ForOfStatement || node.kind === ts6.SyntaxKind.ForInStatement;
     }
     exports.isForInOrOfStatement = isForInOrOfStatement;
     function isForOfStatement(node) {
-      return node.kind === ts5.SyntaxKind.ForOfStatement;
+      return node.kind === ts6.SyntaxKind.ForOfStatement;
     }
     exports.isForOfStatement = isForOfStatement;
     function isForStatement(node) {
-      return node.kind === ts5.SyntaxKind.ForStatement;
+      return node.kind === ts6.SyntaxKind.ForStatement;
     }
     exports.isForStatement = isForStatement;
     function isFunctionDeclaration(node) {
-      return node.kind === ts5.SyntaxKind.FunctionDeclaration;
+      return node.kind === ts6.SyntaxKind.FunctionDeclaration;
     }
     exports.isFunctionDeclaration = isFunctionDeclaration;
     function isFunctionExpression(node) {
-      return node.kind === ts5.SyntaxKind.FunctionExpression;
+      return node.kind === ts6.SyntaxKind.FunctionExpression;
     }
     exports.isFunctionExpression = isFunctionExpression;
     function isFunctionTypeNode(node) {
-      return node.kind === ts5.SyntaxKind.FunctionType;
+      return node.kind === ts6.SyntaxKind.FunctionType;
     }
     exports.isFunctionTypeNode = isFunctionTypeNode;
     function isGetAccessorDeclaration(node) {
-      return node.kind === ts5.SyntaxKind.GetAccessor;
+      return node.kind === ts6.SyntaxKind.GetAccessor;
     }
     exports.isGetAccessorDeclaration = isGetAccessorDeclaration;
     function isIdentifier3(node) {
-      return node.kind === ts5.SyntaxKind.Identifier;
+      return node.kind === ts6.SyntaxKind.Identifier;
     }
     exports.isIdentifier = isIdentifier3;
     function isIfStatement(node) {
-      return node.kind === ts5.SyntaxKind.IfStatement;
+      return node.kind === ts6.SyntaxKind.IfStatement;
     }
     exports.isIfStatement = isIfStatement;
     function isImportClause(node) {
-      return node.kind === ts5.SyntaxKind.ImportClause;
+      return node.kind === ts6.SyntaxKind.ImportClause;
     }
     exports.isImportClause = isImportClause;
     function isImportDeclaration2(node) {
-      return node.kind === ts5.SyntaxKind.ImportDeclaration;
+      return node.kind === ts6.SyntaxKind.ImportDeclaration;
     }
     exports.isImportDeclaration = isImportDeclaration2;
     function isImportEqualsDeclaration(node) {
-      return node.kind === ts5.SyntaxKind.ImportEqualsDeclaration;
+      return node.kind === ts6.SyntaxKind.ImportEqualsDeclaration;
     }
     exports.isImportEqualsDeclaration = isImportEqualsDeclaration;
     function isImportSpecifier(node) {
-      return node.kind === ts5.SyntaxKind.ImportSpecifier;
+      return node.kind === ts6.SyntaxKind.ImportSpecifier;
     }
     exports.isImportSpecifier = isImportSpecifier;
     function isIndexedAccessTypeNode(node) {
-      return node.kind === ts5.SyntaxKind.IndexedAccessType;
+      return node.kind === ts6.SyntaxKind.IndexedAccessType;
     }
     exports.isIndexedAccessTypeNode = isIndexedAccessTypeNode;
     function isIndexSignatureDeclaration(node) {
-      return node.kind === ts5.SyntaxKind.IndexSignature;
+      return node.kind === ts6.SyntaxKind.IndexSignature;
     }
     exports.isIndexSignatureDeclaration = isIndexSignatureDeclaration;
     function isInferTypeNode(node) {
-      return node.kind === ts5.SyntaxKind.InferType;
+      return node.kind === ts6.SyntaxKind.InferType;
     }
     exports.isInferTypeNode = isInferTypeNode;
     function isInterfaceDeclaration(node) {
-      return node.kind === ts5.SyntaxKind.InterfaceDeclaration;
+      return node.kind === ts6.SyntaxKind.InterfaceDeclaration;
     }
     exports.isInterfaceDeclaration = isInterfaceDeclaration;
     function isIntersectionTypeNode(node) {
-      return node.kind === ts5.SyntaxKind.IntersectionType;
+      return node.kind === ts6.SyntaxKind.IntersectionType;
     }
     exports.isIntersectionTypeNode = isIntersectionTypeNode;
     function isIterationStatement(node) {
       switch (node.kind) {
-        case ts5.SyntaxKind.ForStatement:
-        case ts5.SyntaxKind.ForOfStatement:
-        case ts5.SyntaxKind.ForInStatement:
-        case ts5.SyntaxKind.WhileStatement:
-        case ts5.SyntaxKind.DoStatement:
+        case ts6.SyntaxKind.ForStatement:
+        case ts6.SyntaxKind.ForOfStatement:
+        case ts6.SyntaxKind.ForInStatement:
+        case ts6.SyntaxKind.WhileStatement:
+        case ts6.SyntaxKind.DoStatement:
           return true;
         default:
           return false;
@@ -7225,146 +7225,146 @@ var require_node2 = __commonJS({
     }
     exports.isIterationStatement = isIterationStatement;
     function isJsDoc(node) {
-      return node.kind === ts5.SyntaxKind.JSDocComment;
+      return node.kind === ts6.SyntaxKind.JSDocComment;
     }
     exports.isJsDoc = isJsDoc;
     function isJsxAttribute(node) {
-      return node.kind === ts5.SyntaxKind.JsxAttribute;
+      return node.kind === ts6.SyntaxKind.JsxAttribute;
     }
     exports.isJsxAttribute = isJsxAttribute;
     function isJsxAttributeLike(node) {
-      return node.kind === ts5.SyntaxKind.JsxAttribute || node.kind === ts5.SyntaxKind.JsxSpreadAttribute;
+      return node.kind === ts6.SyntaxKind.JsxAttribute || node.kind === ts6.SyntaxKind.JsxSpreadAttribute;
     }
     exports.isJsxAttributeLike = isJsxAttributeLike;
     function isJsxAttributes(node) {
-      return node.kind === ts5.SyntaxKind.JsxAttributes;
+      return node.kind === ts6.SyntaxKind.JsxAttributes;
     }
     exports.isJsxAttributes = isJsxAttributes;
     function isJsxClosingElement(node) {
-      return node.kind === ts5.SyntaxKind.JsxClosingElement;
+      return node.kind === ts6.SyntaxKind.JsxClosingElement;
     }
     exports.isJsxClosingElement = isJsxClosingElement;
     function isJsxClosingFragment(node) {
-      return node.kind === ts5.SyntaxKind.JsxClosingFragment;
+      return node.kind === ts6.SyntaxKind.JsxClosingFragment;
     }
     exports.isJsxClosingFragment = isJsxClosingFragment;
     function isJsxElement(node) {
-      return node.kind === ts5.SyntaxKind.JsxElement;
+      return node.kind === ts6.SyntaxKind.JsxElement;
     }
     exports.isJsxElement = isJsxElement;
     function isJsxExpression(node) {
-      return node.kind === ts5.SyntaxKind.JsxExpression;
+      return node.kind === ts6.SyntaxKind.JsxExpression;
     }
     exports.isJsxExpression = isJsxExpression;
     function isJsxFragment(node) {
-      return node.kind === ts5.SyntaxKind.JsxFragment;
+      return node.kind === ts6.SyntaxKind.JsxFragment;
     }
     exports.isJsxFragment = isJsxFragment;
     function isJsxOpeningElement(node) {
-      return node.kind === ts5.SyntaxKind.JsxOpeningElement;
+      return node.kind === ts6.SyntaxKind.JsxOpeningElement;
     }
     exports.isJsxOpeningElement = isJsxOpeningElement;
     function isJsxOpeningFragment(node) {
-      return node.kind === ts5.SyntaxKind.JsxOpeningFragment;
+      return node.kind === ts6.SyntaxKind.JsxOpeningFragment;
     }
     exports.isJsxOpeningFragment = isJsxOpeningFragment;
     function isJsxOpeningLikeElement(node) {
-      return node.kind === ts5.SyntaxKind.JsxOpeningElement || node.kind === ts5.SyntaxKind.JsxSelfClosingElement;
+      return node.kind === ts6.SyntaxKind.JsxOpeningElement || node.kind === ts6.SyntaxKind.JsxSelfClosingElement;
     }
     exports.isJsxOpeningLikeElement = isJsxOpeningLikeElement;
     function isJsxSelfClosingElement(node) {
-      return node.kind === ts5.SyntaxKind.JsxSelfClosingElement;
+      return node.kind === ts6.SyntaxKind.JsxSelfClosingElement;
     }
     exports.isJsxSelfClosingElement = isJsxSelfClosingElement;
     function isJsxSpreadAttribute(node) {
-      return node.kind === ts5.SyntaxKind.JsxSpreadAttribute;
+      return node.kind === ts6.SyntaxKind.JsxSpreadAttribute;
     }
     exports.isJsxSpreadAttribute = isJsxSpreadAttribute;
     function isJsxText(node) {
-      return node.kind === ts5.SyntaxKind.JsxText;
+      return node.kind === ts6.SyntaxKind.JsxText;
     }
     exports.isJsxText = isJsxText;
     function isLabeledStatement(node) {
-      return node.kind === ts5.SyntaxKind.LabeledStatement;
+      return node.kind === ts6.SyntaxKind.LabeledStatement;
     }
     exports.isLabeledStatement = isLabeledStatement;
     function isLiteralExpression(node) {
-      return node.kind >= ts5.SyntaxKind.FirstLiteralToken && node.kind <= ts5.SyntaxKind.LastLiteralToken;
+      return node.kind >= ts6.SyntaxKind.FirstLiteralToken && node.kind <= ts6.SyntaxKind.LastLiteralToken;
     }
     exports.isLiteralExpression = isLiteralExpression;
     function isLiteralTypeNode(node) {
-      return node.kind === ts5.SyntaxKind.LiteralType;
+      return node.kind === ts6.SyntaxKind.LiteralType;
     }
     exports.isLiteralTypeNode = isLiteralTypeNode;
     function isMappedTypeNode(node) {
-      return node.kind === ts5.SyntaxKind.MappedType;
+      return node.kind === ts6.SyntaxKind.MappedType;
     }
     exports.isMappedTypeNode = isMappedTypeNode;
     function isMetaProperty(node) {
-      return node.kind === ts5.SyntaxKind.MetaProperty;
+      return node.kind === ts6.SyntaxKind.MetaProperty;
     }
     exports.isMetaProperty = isMetaProperty;
     function isMethodDeclaration(node) {
-      return node.kind === ts5.SyntaxKind.MethodDeclaration;
+      return node.kind === ts6.SyntaxKind.MethodDeclaration;
     }
     exports.isMethodDeclaration = isMethodDeclaration;
     function isMethodSignature(node) {
-      return node.kind === ts5.SyntaxKind.MethodSignature;
+      return node.kind === ts6.SyntaxKind.MethodSignature;
     }
     exports.isMethodSignature = isMethodSignature;
     function isModuleBlock(node) {
-      return node.kind === ts5.SyntaxKind.ModuleBlock;
+      return node.kind === ts6.SyntaxKind.ModuleBlock;
     }
     exports.isModuleBlock = isModuleBlock;
     function isModuleDeclaration(node) {
-      return node.kind === ts5.SyntaxKind.ModuleDeclaration;
+      return node.kind === ts6.SyntaxKind.ModuleDeclaration;
     }
     exports.isModuleDeclaration = isModuleDeclaration;
     function isNamedExports(node) {
-      return node.kind === ts5.SyntaxKind.NamedExports;
+      return node.kind === ts6.SyntaxKind.NamedExports;
     }
     exports.isNamedExports = isNamedExports;
     function isNamedImports2(node) {
-      return node.kind === ts5.SyntaxKind.NamedImports;
+      return node.kind === ts6.SyntaxKind.NamedImports;
     }
     exports.isNamedImports = isNamedImports2;
     function isNamespaceDeclaration(node) {
-      return isModuleDeclaration(node) && node.name.kind === ts5.SyntaxKind.Identifier && node.body !== void 0 && (node.body.kind === ts5.SyntaxKind.ModuleBlock || isNamespaceDeclaration(node.body));
+      return isModuleDeclaration(node) && node.name.kind === ts6.SyntaxKind.Identifier && node.body !== void 0 && (node.body.kind === ts6.SyntaxKind.ModuleBlock || isNamespaceDeclaration(node.body));
     }
     exports.isNamespaceDeclaration = isNamespaceDeclaration;
     function isNamespaceImport(node) {
-      return node.kind === ts5.SyntaxKind.NamespaceImport;
+      return node.kind === ts6.SyntaxKind.NamespaceImport;
     }
     exports.isNamespaceImport = isNamespaceImport;
     function isNamespaceExportDeclaration(node) {
-      return node.kind === ts5.SyntaxKind.NamespaceExportDeclaration;
+      return node.kind === ts6.SyntaxKind.NamespaceExportDeclaration;
     }
     exports.isNamespaceExportDeclaration = isNamespaceExportDeclaration;
     function isNewExpression(node) {
-      return node.kind === ts5.SyntaxKind.NewExpression;
+      return node.kind === ts6.SyntaxKind.NewExpression;
     }
     exports.isNewExpression = isNewExpression;
     function isNonNullExpression(node) {
-      return node.kind === ts5.SyntaxKind.NonNullExpression;
+      return node.kind === ts6.SyntaxKind.NonNullExpression;
     }
     exports.isNonNullExpression = isNonNullExpression;
     function isNoSubstitutionTemplateLiteral3(node) {
-      return node.kind === ts5.SyntaxKind.NoSubstitutionTemplateLiteral;
+      return node.kind === ts6.SyntaxKind.NoSubstitutionTemplateLiteral;
     }
     exports.isNoSubstitutionTemplateLiteral = isNoSubstitutionTemplateLiteral3;
     function isNullLiteral(node) {
-      return node.kind === ts5.SyntaxKind.NullKeyword;
+      return node.kind === ts6.SyntaxKind.NullKeyword;
     }
     exports.isNullLiteral = isNullLiteral;
     function isNumericLiteral(node) {
-      return node.kind === ts5.SyntaxKind.NumericLiteral;
+      return node.kind === ts6.SyntaxKind.NumericLiteral;
     }
     exports.isNumericLiteral = isNumericLiteral;
     function isNumericOrStringLikeLiteral(node) {
       switch (node.kind) {
-        case ts5.SyntaxKind.StringLiteral:
-        case ts5.SyntaxKind.NumericLiteral:
-        case ts5.SyntaxKind.NoSubstitutionTemplateLiteral:
+        case ts6.SyntaxKind.StringLiteral:
+        case ts6.SyntaxKind.NumericLiteral:
+        case ts6.SyntaxKind.NoSubstitutionTemplateLiteral:
           return true;
         default:
           return false;
@@ -7372,71 +7372,71 @@ var require_node2 = __commonJS({
     }
     exports.isNumericOrStringLikeLiteral = isNumericOrStringLikeLiteral;
     function isObjectBindingPattern(node) {
-      return node.kind === ts5.SyntaxKind.ObjectBindingPattern;
+      return node.kind === ts6.SyntaxKind.ObjectBindingPattern;
     }
     exports.isObjectBindingPattern = isObjectBindingPattern;
     function isObjectLiteralExpression(node) {
-      return node.kind === ts5.SyntaxKind.ObjectLiteralExpression;
+      return node.kind === ts6.SyntaxKind.ObjectLiteralExpression;
     }
     exports.isObjectLiteralExpression = isObjectLiteralExpression;
     function isOmittedExpression(node) {
-      return node.kind === ts5.SyntaxKind.OmittedExpression;
+      return node.kind === ts6.SyntaxKind.OmittedExpression;
     }
     exports.isOmittedExpression = isOmittedExpression;
     function isParameterDeclaration(node) {
-      return node.kind === ts5.SyntaxKind.Parameter;
+      return node.kind === ts6.SyntaxKind.Parameter;
     }
     exports.isParameterDeclaration = isParameterDeclaration;
     function isParenthesizedExpression(node) {
-      return node.kind === ts5.SyntaxKind.ParenthesizedExpression;
+      return node.kind === ts6.SyntaxKind.ParenthesizedExpression;
     }
     exports.isParenthesizedExpression = isParenthesizedExpression;
     function isParenthesizedTypeNode(node) {
-      return node.kind === ts5.SyntaxKind.ParenthesizedType;
+      return node.kind === ts6.SyntaxKind.ParenthesizedType;
     }
     exports.isParenthesizedTypeNode = isParenthesizedTypeNode;
     function isPostfixUnaryExpression(node) {
-      return node.kind === ts5.SyntaxKind.PostfixUnaryExpression;
+      return node.kind === ts6.SyntaxKind.PostfixUnaryExpression;
     }
     exports.isPostfixUnaryExpression = isPostfixUnaryExpression;
     function isPrefixUnaryExpression(node) {
-      return node.kind === ts5.SyntaxKind.PrefixUnaryExpression;
+      return node.kind === ts6.SyntaxKind.PrefixUnaryExpression;
     }
     exports.isPrefixUnaryExpression = isPrefixUnaryExpression;
     function isPropertyAccessExpression2(node) {
-      return node.kind === ts5.SyntaxKind.PropertyAccessExpression;
+      return node.kind === ts6.SyntaxKind.PropertyAccessExpression;
     }
     exports.isPropertyAccessExpression = isPropertyAccessExpression2;
     function isPropertyAssignment(node) {
-      return node.kind === ts5.SyntaxKind.PropertyAssignment;
+      return node.kind === ts6.SyntaxKind.PropertyAssignment;
     }
     exports.isPropertyAssignment = isPropertyAssignment;
     function isPropertyDeclaration(node) {
-      return node.kind === ts5.SyntaxKind.PropertyDeclaration;
+      return node.kind === ts6.SyntaxKind.PropertyDeclaration;
     }
     exports.isPropertyDeclaration = isPropertyDeclaration;
     function isPropertySignature2(node) {
-      return node.kind === ts5.SyntaxKind.PropertySignature;
+      return node.kind === ts6.SyntaxKind.PropertySignature;
     }
     exports.isPropertySignature = isPropertySignature2;
     function isQualifiedName(node) {
-      return node.kind === ts5.SyntaxKind.QualifiedName;
+      return node.kind === ts6.SyntaxKind.QualifiedName;
     }
     exports.isQualifiedName = isQualifiedName;
     function isRegularExpressionLiteral(node) {
-      return node.kind === ts5.SyntaxKind.RegularExpressionLiteral;
+      return node.kind === ts6.SyntaxKind.RegularExpressionLiteral;
     }
     exports.isRegularExpressionLiteral = isRegularExpressionLiteral;
     function isReturnStatement(node) {
-      return node.kind === ts5.SyntaxKind.ReturnStatement;
+      return node.kind === ts6.SyntaxKind.ReturnStatement;
     }
     exports.isReturnStatement = isReturnStatement;
     function isSetAccessorDeclaration(node) {
-      return node.kind === ts5.SyntaxKind.SetAccessor;
+      return node.kind === ts6.SyntaxKind.SetAccessor;
     }
     exports.isSetAccessorDeclaration = isSetAccessorDeclaration;
     function isShorthandPropertyAssignment(node) {
-      return node.kind === ts5.SyntaxKind.ShorthandPropertyAssignment;
+      return node.kind === ts6.SyntaxKind.ShorthandPropertyAssignment;
     }
     exports.isShorthandPropertyAssignment = isShorthandPropertyAssignment;
     function isSignatureDeclaration(node) {
@@ -7444,119 +7444,119 @@ var require_node2 = __commonJS({
     }
     exports.isSignatureDeclaration = isSignatureDeclaration;
     function isSourceFile(node) {
-      return node.kind === ts5.SyntaxKind.SourceFile;
+      return node.kind === ts6.SyntaxKind.SourceFile;
     }
     exports.isSourceFile = isSourceFile;
     function isSpreadAssignment(node) {
-      return node.kind === ts5.SyntaxKind.SpreadAssignment;
+      return node.kind === ts6.SyntaxKind.SpreadAssignment;
     }
     exports.isSpreadAssignment = isSpreadAssignment;
     function isSpreadElement(node) {
-      return node.kind === ts5.SyntaxKind.SpreadElement;
+      return node.kind === ts6.SyntaxKind.SpreadElement;
     }
     exports.isSpreadElement = isSpreadElement;
     function isStringLiteral2(node) {
-      return node.kind === ts5.SyntaxKind.StringLiteral;
+      return node.kind === ts6.SyntaxKind.StringLiteral;
     }
     exports.isStringLiteral = isStringLiteral2;
     function isSwitchStatement(node) {
-      return node.kind === ts5.SyntaxKind.SwitchStatement;
+      return node.kind === ts6.SyntaxKind.SwitchStatement;
     }
     exports.isSwitchStatement = isSwitchStatement;
     function isSyntaxList(node) {
-      return node.kind === ts5.SyntaxKind.SyntaxList;
+      return node.kind === ts6.SyntaxKind.SyntaxList;
     }
     exports.isSyntaxList = isSyntaxList;
     function isTaggedTemplateExpression3(node) {
-      return node.kind === ts5.SyntaxKind.TaggedTemplateExpression;
+      return node.kind === ts6.SyntaxKind.TaggedTemplateExpression;
     }
     exports.isTaggedTemplateExpression = isTaggedTemplateExpression3;
     function isTemplateExpression3(node) {
-      return node.kind === ts5.SyntaxKind.TemplateExpression;
+      return node.kind === ts6.SyntaxKind.TemplateExpression;
     }
     exports.isTemplateExpression = isTemplateExpression3;
     function isTemplateLiteral(node) {
-      return node.kind === ts5.SyntaxKind.TemplateExpression || node.kind === ts5.SyntaxKind.NoSubstitutionTemplateLiteral;
+      return node.kind === ts6.SyntaxKind.TemplateExpression || node.kind === ts6.SyntaxKind.NoSubstitutionTemplateLiteral;
     }
     exports.isTemplateLiteral = isTemplateLiteral;
     function isTextualLiteral(node) {
-      return node.kind === ts5.SyntaxKind.StringLiteral || node.kind === ts5.SyntaxKind.NoSubstitutionTemplateLiteral;
+      return node.kind === ts6.SyntaxKind.StringLiteral || node.kind === ts6.SyntaxKind.NoSubstitutionTemplateLiteral;
     }
     exports.isTextualLiteral = isTextualLiteral;
     function isThrowStatement(node) {
-      return node.kind === ts5.SyntaxKind.ThrowStatement;
+      return node.kind === ts6.SyntaxKind.ThrowStatement;
     }
     exports.isThrowStatement = isThrowStatement;
     function isTryStatement(node) {
-      return node.kind === ts5.SyntaxKind.TryStatement;
+      return node.kind === ts6.SyntaxKind.TryStatement;
     }
     exports.isTryStatement = isTryStatement;
     function isTupleTypeNode(node) {
-      return node.kind === ts5.SyntaxKind.TupleType;
+      return node.kind === ts6.SyntaxKind.TupleType;
     }
     exports.isTupleTypeNode = isTupleTypeNode;
     function isTypeAliasDeclaration(node) {
-      return node.kind === ts5.SyntaxKind.TypeAliasDeclaration;
+      return node.kind === ts6.SyntaxKind.TypeAliasDeclaration;
     }
     exports.isTypeAliasDeclaration = isTypeAliasDeclaration;
     function isTypeAssertion(node) {
-      return node.kind === ts5.SyntaxKind.TypeAssertionExpression;
+      return node.kind === ts6.SyntaxKind.TypeAssertionExpression;
     }
     exports.isTypeAssertion = isTypeAssertion;
     function isTypeLiteralNode2(node) {
-      return node.kind === ts5.SyntaxKind.TypeLiteral;
+      return node.kind === ts6.SyntaxKind.TypeLiteral;
     }
     exports.isTypeLiteralNode = isTypeLiteralNode2;
     function isTypeOfExpression(node) {
-      return node.kind === ts5.SyntaxKind.TypeOfExpression;
+      return node.kind === ts6.SyntaxKind.TypeOfExpression;
     }
     exports.isTypeOfExpression = isTypeOfExpression;
     function isTypeOperatorNode(node) {
-      return node.kind === ts5.SyntaxKind.TypeOperator;
+      return node.kind === ts6.SyntaxKind.TypeOperator;
     }
     exports.isTypeOperatorNode = isTypeOperatorNode;
     function isTypeParameterDeclaration(node) {
-      return node.kind === ts5.SyntaxKind.TypeParameter;
+      return node.kind === ts6.SyntaxKind.TypeParameter;
     }
     exports.isTypeParameterDeclaration = isTypeParameterDeclaration;
     function isTypePredicateNode(node) {
-      return node.kind === ts5.SyntaxKind.TypePredicate;
+      return node.kind === ts6.SyntaxKind.TypePredicate;
     }
     exports.isTypePredicateNode = isTypePredicateNode;
     function isTypeReferenceNode2(node) {
-      return node.kind === ts5.SyntaxKind.TypeReference;
+      return node.kind === ts6.SyntaxKind.TypeReference;
     }
     exports.isTypeReferenceNode = isTypeReferenceNode2;
     function isTypeQueryNode(node) {
-      return node.kind === ts5.SyntaxKind.TypeQuery;
+      return node.kind === ts6.SyntaxKind.TypeQuery;
     }
     exports.isTypeQueryNode = isTypeQueryNode;
     function isUnionTypeNode(node) {
-      return node.kind === ts5.SyntaxKind.UnionType;
+      return node.kind === ts6.SyntaxKind.UnionType;
     }
     exports.isUnionTypeNode = isUnionTypeNode;
     function isVariableDeclaration(node) {
-      return node.kind === ts5.SyntaxKind.VariableDeclaration;
+      return node.kind === ts6.SyntaxKind.VariableDeclaration;
     }
     exports.isVariableDeclaration = isVariableDeclaration;
     function isVariableStatement2(node) {
-      return node.kind === ts5.SyntaxKind.VariableStatement;
+      return node.kind === ts6.SyntaxKind.VariableStatement;
     }
     exports.isVariableStatement = isVariableStatement2;
     function isVariableDeclarationList(node) {
-      return node.kind === ts5.SyntaxKind.VariableDeclarationList;
+      return node.kind === ts6.SyntaxKind.VariableDeclarationList;
     }
     exports.isVariableDeclarationList = isVariableDeclarationList;
     function isVoidExpression(node) {
-      return node.kind === ts5.SyntaxKind.VoidExpression;
+      return node.kind === ts6.SyntaxKind.VoidExpression;
     }
     exports.isVoidExpression = isVoidExpression;
     function isWhileStatement(node) {
-      return node.kind === ts5.SyntaxKind.WhileStatement;
+      return node.kind === ts6.SyntaxKind.WhileStatement;
     }
     exports.isWhileStatement = isWhileStatement;
     function isWithStatement(node) {
-      return node.kind === ts5.SyntaxKind.WithStatement;
+      return node.kind === ts6.SyntaxKind.WithStatement;
     }
     exports.isWithStatement = isWithStatement;
   }
@@ -7570,9 +7570,9 @@ var require_node3 = __commonJS({
     exports.isImportTypeNode = void 0;
     var tslib_1 = (init_tslib_es6(), __toCommonJS(tslib_es6_exports));
     tslib_1.__exportStar(require_node2(), exports);
-    var ts5 = require("typescript");
+    var ts6 = require("typescript");
     function isImportTypeNode(node) {
-      return node.kind === ts5.SyntaxKind.ImportType;
+      return node.kind === ts6.SyntaxKind.ImportType;
     }
     exports.isImportTypeNode = isImportTypeNode;
   }
@@ -7586,17 +7586,17 @@ var require_node4 = __commonJS({
     exports.isSyntheticExpression = exports.isRestTypeNode = exports.isOptionalTypeNode = void 0;
     var tslib_1 = (init_tslib_es6(), __toCommonJS(tslib_es6_exports));
     tslib_1.__exportStar(require_node3(), exports);
-    var ts5 = require("typescript");
+    var ts6 = require("typescript");
     function isOptionalTypeNode(node) {
-      return node.kind === ts5.SyntaxKind.OptionalType;
+      return node.kind === ts6.SyntaxKind.OptionalType;
     }
     exports.isOptionalTypeNode = isOptionalTypeNode;
     function isRestTypeNode(node) {
-      return node.kind === ts5.SyntaxKind.RestType;
+      return node.kind === ts6.SyntaxKind.RestType;
     }
     exports.isRestTypeNode = isRestTypeNode;
     function isSyntheticExpression(node) {
-      return node.kind === ts5.SyntaxKind.SyntheticExpression;
+      return node.kind === ts6.SyntaxKind.SyntheticExpression;
     }
     exports.isSyntheticExpression = isSyntheticExpression;
   }
@@ -7610,9 +7610,9 @@ var require_node5 = __commonJS({
     exports.isBigIntLiteral = void 0;
     var tslib_1 = (init_tslib_es6(), __toCommonJS(tslib_es6_exports));
     tslib_1.__exportStar(require_node4(), exports);
-    var ts5 = require("typescript");
+    var ts6 = require("typescript");
     function isBigIntLiteral(node) {
-      return node.kind === ts5.SyntaxKind.BigIntLiteral;
+      return node.kind === ts6.SyntaxKind.BigIntLiteral;
     }
     exports.isBigIntLiteral = isBigIntLiteral;
   }
@@ -7634,73 +7634,73 @@ var require_type = __commonJS({
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.isUniqueESSymbolType = exports.isUnionType = exports.isUnionOrIntersectionType = exports.isTypeVariable = exports.isTypeReference = exports.isTypeParameter = exports.isSubstitutionType = exports.isObjectType = exports.isLiteralType = exports.isIntersectionType = exports.isInterfaceType = exports.isInstantiableType = exports.isIndexedAccessype = exports.isIndexedAccessType = exports.isGenericType = exports.isEnumType = exports.isConditionalType = void 0;
-    var ts5 = require("typescript");
+    var ts6 = require("typescript");
     function isConditionalType(type) {
-      return (type.flags & ts5.TypeFlags.Conditional) !== 0;
+      return (type.flags & ts6.TypeFlags.Conditional) !== 0;
     }
     exports.isConditionalType = isConditionalType;
     function isEnumType(type) {
-      return (type.flags & ts5.TypeFlags.Enum) !== 0;
+      return (type.flags & ts6.TypeFlags.Enum) !== 0;
     }
     exports.isEnumType = isEnumType;
     function isGenericType(type) {
-      return (type.flags & ts5.TypeFlags.Object) !== 0 && (type.objectFlags & ts5.ObjectFlags.ClassOrInterface) !== 0 && (type.objectFlags & ts5.ObjectFlags.Reference) !== 0;
+      return (type.flags & ts6.TypeFlags.Object) !== 0 && (type.objectFlags & ts6.ObjectFlags.ClassOrInterface) !== 0 && (type.objectFlags & ts6.ObjectFlags.Reference) !== 0;
     }
     exports.isGenericType = isGenericType;
     function isIndexedAccessType(type) {
-      return (type.flags & ts5.TypeFlags.IndexedAccess) !== 0;
+      return (type.flags & ts6.TypeFlags.IndexedAccess) !== 0;
     }
     exports.isIndexedAccessType = isIndexedAccessType;
     function isIndexedAccessype(type) {
-      return (type.flags & ts5.TypeFlags.Index) !== 0;
+      return (type.flags & ts6.TypeFlags.Index) !== 0;
     }
     exports.isIndexedAccessype = isIndexedAccessype;
     function isInstantiableType(type) {
-      return (type.flags & ts5.TypeFlags.Instantiable) !== 0;
+      return (type.flags & ts6.TypeFlags.Instantiable) !== 0;
     }
     exports.isInstantiableType = isInstantiableType;
     function isInterfaceType(type) {
-      return (type.flags & ts5.TypeFlags.Object) !== 0 && (type.objectFlags & ts5.ObjectFlags.ClassOrInterface) !== 0;
+      return (type.flags & ts6.TypeFlags.Object) !== 0 && (type.objectFlags & ts6.ObjectFlags.ClassOrInterface) !== 0;
     }
     exports.isInterfaceType = isInterfaceType;
     function isIntersectionType(type) {
-      return (type.flags & ts5.TypeFlags.Intersection) !== 0;
+      return (type.flags & ts6.TypeFlags.Intersection) !== 0;
     }
     exports.isIntersectionType = isIntersectionType;
     function isLiteralType(type) {
-      return (type.flags & (ts5.TypeFlags.StringOrNumberLiteral | ts5.TypeFlags.BigIntLiteral)) !== 0;
+      return (type.flags & (ts6.TypeFlags.StringOrNumberLiteral | ts6.TypeFlags.BigIntLiteral)) !== 0;
     }
     exports.isLiteralType = isLiteralType;
     function isObjectType(type) {
-      return (type.flags & ts5.TypeFlags.Object) !== 0;
+      return (type.flags & ts6.TypeFlags.Object) !== 0;
     }
     exports.isObjectType = isObjectType;
     function isSubstitutionType(type) {
-      return (type.flags & ts5.TypeFlags.Substitution) !== 0;
+      return (type.flags & ts6.TypeFlags.Substitution) !== 0;
     }
     exports.isSubstitutionType = isSubstitutionType;
     function isTypeParameter(type) {
-      return (type.flags & ts5.TypeFlags.TypeParameter) !== 0;
+      return (type.flags & ts6.TypeFlags.TypeParameter) !== 0;
     }
     exports.isTypeParameter = isTypeParameter;
     function isTypeReference(type) {
-      return (type.flags & ts5.TypeFlags.Object) !== 0 && (type.objectFlags & ts5.ObjectFlags.Reference) !== 0;
+      return (type.flags & ts6.TypeFlags.Object) !== 0 && (type.objectFlags & ts6.ObjectFlags.Reference) !== 0;
     }
     exports.isTypeReference = isTypeReference;
     function isTypeVariable(type) {
-      return (type.flags & ts5.TypeFlags.TypeVariable) !== 0;
+      return (type.flags & ts6.TypeFlags.TypeVariable) !== 0;
     }
     exports.isTypeVariable = isTypeVariable;
     function isUnionOrIntersectionType(type) {
-      return (type.flags & ts5.TypeFlags.UnionOrIntersection) !== 0;
+      return (type.flags & ts6.TypeFlags.UnionOrIntersection) !== 0;
     }
     exports.isUnionOrIntersectionType = isUnionOrIntersectionType;
     function isUnionType(type) {
-      return (type.flags & ts5.TypeFlags.Union) !== 0;
+      return (type.flags & ts6.TypeFlags.Union) !== 0;
     }
     exports.isUnionType = isUnionType;
     function isUniqueESSymbolType(type) {
-      return (type.flags & ts5.TypeFlags.UniqueESSymbol) !== 0;
+      return (type.flags & ts6.TypeFlags.UniqueESSymbol) !== 0;
     }
     exports.isUniqueESSymbolType = isUniqueESSymbolType;
   }
@@ -7724,10 +7724,10 @@ var require_type3 = __commonJS({
     exports.isTupleTypeReference = exports.isTupleType = void 0;
     var tslib_1 = (init_tslib_es6(), __toCommonJS(tslib_es6_exports));
     tslib_1.__exportStar(require_type2(), exports);
-    var ts5 = require("typescript");
+    var ts6 = require("typescript");
     var type_1 = require_type2();
     function isTupleType(type) {
-      return (type.flags & ts5.TypeFlags.Object && type.objectFlags & ts5.ObjectFlags.Tuple) !== 0;
+      return (type.flags & ts6.TypeFlags.Object && type.objectFlags & ts6.ObjectFlags.Tuple) !== 0;
     }
     exports.isTupleType = isTupleType;
     function isTupleTypeReference(type) {
@@ -7774,12 +7774,12 @@ var require_type6 = __commonJS({
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.getBaseClassMemberOfClassElement = exports.getIteratorYieldResultFromIteratorResult = exports.getInstanceTypeOfClassLikeDeclaration = exports.getConstructorTypeOfClassLikeDeclaration = exports.getSymbolOfClassLikeDeclaration = exports.getPropertyNameFromType = exports.symbolHasReadonlyDeclaration = exports.isPropertyReadonlyInType = exports.getWellKnownSymbolPropertyOfType = exports.getPropertyOfType = exports.isBooleanLiteralType = exports.isFalsyType = exports.isThenableType = exports.someTypePart = exports.intersectionTypeParts = exports.unionTypeParts = exports.getCallSignaturesOfType = exports.isTypeAssignableToString = exports.isTypeAssignableToNumber = exports.isOptionalChainingUndefinedMarkerType = exports.removeOptionalChainingUndefinedMarkerType = exports.removeOptionalityFromType = exports.isEmptyObjectType = void 0;
-    var ts5 = require("typescript");
+    var ts6 = require("typescript");
     var type_1 = require_type5();
     var util_1 = require_util();
     var node_1 = require_node6();
     function isEmptyObjectType(type) {
-      if (type_1.isObjectType(type) && type.objectFlags & ts5.ObjectFlags.Anonymous && type.getProperties().length === 0 && type.getCallSignatures().length === 0 && type.getConstructSignatures().length === 0 && type.getStringIndexType() === void 0 && type.getNumberIndexType() === void 0) {
+      if (type_1.isObjectType(type) && type.objectFlags & ts6.ObjectFlags.Anonymous && type.getProperties().length === 0 && type.getCallSignatures().length === 0 && type.getConstructSignatures().length === 0 && type.getStringIndexType() === void 0 && type.getNumberIndexType() === void 0) {
         const baseTypes = type.getBaseTypes();
         return baseTypes === void 0 || baseTypes.every(isEmptyObjectType);
       }
@@ -7787,11 +7787,11 @@ var require_type6 = __commonJS({
     }
     exports.isEmptyObjectType = isEmptyObjectType;
     function removeOptionalityFromType(checker, type) {
-      if (!containsTypeWithFlag(type, ts5.TypeFlags.Undefined))
+      if (!containsTypeWithFlag(type, ts6.TypeFlags.Undefined))
         return type;
-      const allowsNull = containsTypeWithFlag(type, ts5.TypeFlags.Null);
+      const allowsNull = containsTypeWithFlag(type, ts6.TypeFlags.Null);
       type = checker.getNonNullableType(type);
-      return allowsNull ? checker.getNullableType(type, ts5.TypeFlags.Null) : type;
+      return allowsNull ? checker.getNullableType(type, ts6.TypeFlags.Null) : type;
     }
     exports.removeOptionalityFromType = removeOptionalityFromType;
     function containsTypeWithFlag(type, flag) {
@@ -7816,19 +7816,19 @@ var require_type6 = __commonJS({
     }
     exports.removeOptionalChainingUndefinedMarkerType = removeOptionalChainingUndefinedMarkerType;
     function isOptionalChainingUndefinedMarkerType(checker, t) {
-      return util_1.isTypeFlagSet(t, ts5.TypeFlags.Undefined) && checker.getNullableType(t.getNonNullableType(), ts5.TypeFlags.Undefined) !== t;
+      return util_1.isTypeFlagSet(t, ts6.TypeFlags.Undefined) && checker.getNullableType(t.getNonNullableType(), ts6.TypeFlags.Undefined) !== t;
     }
     exports.isOptionalChainingUndefinedMarkerType = isOptionalChainingUndefinedMarkerType;
     function isTypeAssignableToNumber(checker, type) {
-      return isTypeAssignableTo(checker, type, ts5.TypeFlags.NumberLike);
+      return isTypeAssignableTo(checker, type, ts6.TypeFlags.NumberLike);
     }
     exports.isTypeAssignableToNumber = isTypeAssignableToNumber;
     function isTypeAssignableToString(checker, type) {
-      return isTypeAssignableTo(checker, type, ts5.TypeFlags.StringLike);
+      return isTypeAssignableTo(checker, type, ts6.TypeFlags.StringLike);
     }
     exports.isTypeAssignableToString = isTypeAssignableToString;
     function isTypeAssignableTo(checker, type, flags) {
-      flags |= ts5.TypeFlags.Any;
+      flags |= ts6.TypeFlags.Any;
       let typeParametersSeen;
       return function check(t) {
         if (type_1.isTypeParameter(t) && t.symbol !== void 0 && t.symbol.declarations !== void 0) {
@@ -7912,7 +7912,7 @@ var require_type6 = __commonJS({
       return false;
     }
     function isFalsyType(type) {
-      if (type.flags & (ts5.TypeFlags.Undefined | ts5.TypeFlags.Null | ts5.TypeFlags.Void))
+      if (type.flags & (ts6.TypeFlags.Undefined | ts6.TypeFlags.Null | ts6.TypeFlags.Void))
         return true;
       if (type_1.isLiteralType(type))
         return !type.value;
@@ -7920,7 +7920,7 @@ var require_type6 = __commonJS({
     }
     exports.isFalsyType = isFalsyType;
     function isBooleanLiteralType(type, literal) {
-      return util_1.isTypeFlagSet(type, ts5.TypeFlags.BooleanLiteral) && type.intrinsicName === (literal ? "true" : "false");
+      return util_1.isTypeFlagSet(type, ts6.TypeFlags.BooleanLiteral) && type.intrinsicName === (literal ? "true" : "false");
     }
     exports.isBooleanLiteralType = isBooleanLiteralType;
     function getPropertyOfType(type, name) {
@@ -7953,7 +7953,7 @@ var require_type6 = __commonJS({
       let seenReadonlySignature = false;
       for (const t of unionTypeParts(type)) {
         if (getPropertyOfType(t, name) === void 0) {
-          const index = (util_1.isNumericPropertyName(name) ? checker.getIndexInfoOfType(t, ts5.IndexKind.Number) : void 0) || checker.getIndexInfoOfType(t, ts5.IndexKind.String);
+          const index = (util_1.isNumericPropertyName(name) ? checker.getIndexInfoOfType(t, ts6.IndexKind.Number) : void 0) || checker.getIndexInfoOfType(t, ts6.IndexKind.String);
           if (index !== void 0 && index.isReadonly) {
             if (seenProperty)
               return true;
@@ -7973,7 +7973,7 @@ var require_type6 = __commonJS({
         const prop = getPropertyOfType(t, name);
         if (prop === void 0)
           return false;
-        if (prop.flags & ts5.SymbolFlags.Transient) {
+        if (prop.flags & ts6.SymbolFlags.Transient) {
           if (/^(?:[1-9]\d*|0)$/.test(name) && type_1.isTupleTypeReference(t))
             return t.target.readonly;
           switch (isReadonlyPropertyFromMappedType(t, name, checker)) {
@@ -7986,27 +7986,27 @@ var require_type6 = __commonJS({
         }
         return (
           // members of namespace import
-          util_1.isSymbolFlagSet(prop, ts5.SymbolFlags.ValueModule) || // we unwrapped every mapped type, now we can check the actual declarations
+          util_1.isSymbolFlagSet(prop, ts6.SymbolFlags.ValueModule) || // we unwrapped every mapped type, now we can check the actual declarations
           symbolHasReadonlyDeclaration(prop, checker)
         );
       });
     }
     function isReadonlyPropertyFromMappedType(type, name, checker) {
-      if (!type_1.isObjectType(type) || !util_1.isObjectFlagSet(type, ts5.ObjectFlags.Mapped))
+      if (!type_1.isObjectType(type) || !util_1.isObjectFlagSet(type, ts6.ObjectFlags.Mapped))
         return;
       const declaration = type.symbol.declarations[0];
       if (declaration.readonlyToken !== void 0 && !/^__@[^@]+$/.test(name))
-        return declaration.readonlyToken.kind !== ts5.SyntaxKind.MinusToken;
+        return declaration.readonlyToken.kind !== ts6.SyntaxKind.MinusToken;
       return isPropertyReadonlyInType(type.modifiersType, name, checker);
     }
     function symbolHasReadonlyDeclaration(symbol, checker) {
-      return (symbol.flags & ts5.SymbolFlags.Accessor) === ts5.SymbolFlags.GetAccessor || symbol.declarations !== void 0 && symbol.declarations.some((node) => util_1.isModifierFlagSet(node, ts5.ModifierFlags.Readonly) || node_1.isVariableDeclaration(node) && util_1.isNodeFlagSet(node.parent, ts5.NodeFlags.Const) || node_1.isCallExpression(node) && util_1.isReadonlyAssignmentDeclaration(node, checker) || node_1.isEnumMember(node) || (node_1.isPropertyAssignment(node) || node_1.isShorthandPropertyAssignment(node)) && util_1.isInConstContext(node.parent));
+      return (symbol.flags & ts6.SymbolFlags.Accessor) === ts6.SymbolFlags.GetAccessor || symbol.declarations !== void 0 && symbol.declarations.some((node) => util_1.isModifierFlagSet(node, ts6.ModifierFlags.Readonly) || node_1.isVariableDeclaration(node) && util_1.isNodeFlagSet(node.parent, ts6.NodeFlags.Const) || node_1.isCallExpression(node) && util_1.isReadonlyAssignmentDeclaration(node, checker) || node_1.isEnumMember(node) || (node_1.isPropertyAssignment(node) || node_1.isShorthandPropertyAssignment(node)) && util_1.isInConstContext(node.parent));
     }
     exports.symbolHasReadonlyDeclaration = symbolHasReadonlyDeclaration;
     function getPropertyNameFromType(type) {
-      if (type.flags & (ts5.TypeFlags.StringLiteral | ts5.TypeFlags.NumberLiteral)) {
+      if (type.flags & (ts6.TypeFlags.StringLiteral | ts6.TypeFlags.NumberLiteral)) {
         const value = String(type.value);
-        return { displayName: value, symbolName: ts5.escapeLeadingUnderscores(value) };
+        return { displayName: value, symbolName: ts6.escapeLeadingUnderscores(value) };
       }
       if (type_1.isUniqueESSymbolType(type))
         return {
@@ -8016,22 +8016,22 @@ var require_type6 = __commonJS({
     }
     exports.getPropertyNameFromType = getPropertyNameFromType;
     function isKnownSymbol(symbol) {
-      return util_1.isSymbolFlagSet(symbol, ts5.SymbolFlags.Property) && symbol.valueDeclaration !== void 0 && node_1.isInterfaceDeclaration(symbol.valueDeclaration.parent) && symbol.valueDeclaration.parent.name.text === "SymbolConstructor" && isGlobalDeclaration(symbol.valueDeclaration.parent);
+      return util_1.isSymbolFlagSet(symbol, ts6.SymbolFlags.Property) && symbol.valueDeclaration !== void 0 && node_1.isInterfaceDeclaration(symbol.valueDeclaration.parent) && symbol.valueDeclaration.parent.name.text === "SymbolConstructor" && isGlobalDeclaration(symbol.valueDeclaration.parent);
     }
     function isGlobalDeclaration(node) {
-      return util_1.isNodeFlagSet(node.parent, ts5.NodeFlags.GlobalAugmentation) || node_1.isSourceFile(node.parent) && !ts5.isExternalModule(node.parent);
+      return util_1.isNodeFlagSet(node.parent, ts6.NodeFlags.GlobalAugmentation) || node_1.isSourceFile(node.parent) && !ts6.isExternalModule(node.parent);
     }
     function getSymbolOfClassLikeDeclaration(node, checker) {
       var _a2;
-      return checker.getSymbolAtLocation((_a2 = node.name) !== null && _a2 !== void 0 ? _a2 : util_1.getChildOfKind(node, ts5.SyntaxKind.ClassKeyword));
+      return checker.getSymbolAtLocation((_a2 = node.name) !== null && _a2 !== void 0 ? _a2 : util_1.getChildOfKind(node, ts6.SyntaxKind.ClassKeyword));
     }
     exports.getSymbolOfClassLikeDeclaration = getSymbolOfClassLikeDeclaration;
     function getConstructorTypeOfClassLikeDeclaration(node, checker) {
-      return node.kind === ts5.SyntaxKind.ClassExpression ? checker.getTypeAtLocation(node) : checker.getTypeOfSymbolAtLocation(getSymbolOfClassLikeDeclaration(node, checker), node);
+      return node.kind === ts6.SyntaxKind.ClassExpression ? checker.getTypeAtLocation(node) : checker.getTypeOfSymbolAtLocation(getSymbolOfClassLikeDeclaration(node, checker), node);
     }
     exports.getConstructorTypeOfClassLikeDeclaration = getConstructorTypeOfClassLikeDeclaration;
     function getInstanceTypeOfClassLikeDeclaration(node, checker) {
-      return node.kind === ts5.SyntaxKind.ClassDeclaration ? checker.getTypeAtLocation(node) : checker.getDeclaredTypeOfSymbol(getSymbolOfClassLikeDeclaration(node, checker));
+      return node.kind === ts6.SyntaxKind.ClassDeclaration ? checker.getTypeAtLocation(node) : checker.getDeclaredTypeOfSymbol(getSymbolOfClassLikeDeclaration(node, checker));
     }
     exports.getInstanceTypeOfClassLikeDeclaration = getInstanceTypeOfClassLikeDeclaration;
     function getIteratorYieldResultFromIteratorResult(type, node, checker) {
@@ -8050,7 +8050,7 @@ var require_type6 = __commonJS({
       const name = util_1.getSingleLateBoundPropertyNameOfPropertyName(node.name, checker);
       if (name === void 0)
         return;
-      const baseType = checker.getTypeAtLocation(util_1.hasModifier(node.modifiers, ts5.SyntaxKind.StaticKeyword) ? base.expression : base);
+      const baseType = checker.getTypeAtLocation(util_1.hasModifier(node.modifiers, ts6.SyntaxKind.StaticKeyword) ? base.expression : base);
       return getPropertyOfType(baseType, name.symbolName);
     }
     exports.getBaseClassMemberOfClassElement = getBaseClassMemberOfClassElement;
@@ -8064,7 +8064,7 @@ var require_util = __commonJS({
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.isValidIdentifier = exports.getLineBreakStyle = exports.getLineRanges = exports.forEachComment = exports.forEachTokenWithTrivia = exports.forEachToken = exports.isFunctionWithBody = exports.hasOwnThisReference = exports.isBlockScopeBoundary = exports.isFunctionScopeBoundary = exports.isTypeScopeBoundary = exports.isScopeBoundary = exports.ScopeBoundarySelector = exports.ScopeBoundary = exports.isInSingleStatementContext = exports.isBlockScopedDeclarationStatement = exports.isBlockScopedVariableDeclaration = exports.isBlockScopedVariableDeclarationList = exports.getVariableDeclarationKind = exports.VariableDeclarationKind = exports.forEachDeclaredVariable = exports.forEachDestructuringIdentifier = exports.getPropertyName = exports.getWrappedNodeAtPosition = exports.getAstNodeAtPosition = exports.commentText = exports.isPositionInComment = exports.getCommentAtPosition = exports.getTokenAtPosition = exports.getNextToken = exports.getPreviousToken = exports.getNextStatement = exports.getPreviousStatement = exports.isModifierFlagSet = exports.isObjectFlagSet = exports.isSymbolFlagSet = exports.isTypeFlagSet = exports.isNodeFlagSet = exports.hasAccessModifier = exports.isParameterProperty = exports.hasModifier = exports.getModifier = exports.isThisParameter = exports.isKeywordKind = exports.isJsDocKind = exports.isTypeNodeKind = exports.isAssignmentKind = exports.isNodeKind = exports.isTokenKind = exports.getChildOfKind = void 0;
     exports.getBaseOfClassLikeExpression = exports.hasExhaustiveCaseClauses = exports.formatPseudoBigInt = exports.unwrapParentheses = exports.getSingleLateBoundPropertyNameOfPropertyName = exports.getLateBoundPropertyNamesOfPropertyName = exports.getLateBoundPropertyNames = exports.getPropertyNameOfWellKnownSymbol = exports.isWellKnownSymbolLiterally = exports.isBindableObjectDefinePropertyCall = exports.isReadonlyAssignmentDeclaration = exports.isInConstContext = exports.isConstAssertion = exports.getTsCheckDirective = exports.getCheckJsDirective = exports.isAmbientModule = exports.isCompilerOptionEnabled = exports.isStrictCompilerOptionEnabled = exports.getIIFE = exports.isAmbientModuleBlock = exports.isStatementInAmbientContext = exports.findImportLikeNodes = exports.findImports = exports.ImportKind = exports.parseJsDocOfNode = exports.getJsDoc = exports.canHaveJsDoc = exports.isReassignmentTarget = exports.getAccessKind = exports.AccessKind = exports.isExpressionValueUsed = exports.getDeclarationOfBindingElement = exports.hasSideEffects = exports.SideEffectOptions = exports.isSameLine = exports.isNumericPropertyName = exports.isValidJsxIdentifier = exports.isValidNumericLiteral = exports.isValidPropertyName = exports.isValidPropertyAccess = void 0;
-    var ts5 = require("typescript");
+    var ts6 = require("typescript");
     var node_1 = require_node6();
     var _3_2_1 = require__();
     var type_1 = require_type6();
@@ -8075,31 +8075,31 @@ var require_util = __commonJS({
     }
     exports.getChildOfKind = getChildOfKind;
     function isTokenKind(kind) {
-      return kind >= ts5.SyntaxKind.FirstToken && kind <= ts5.SyntaxKind.LastToken;
+      return kind >= ts6.SyntaxKind.FirstToken && kind <= ts6.SyntaxKind.LastToken;
     }
     exports.isTokenKind = isTokenKind;
     function isNodeKind(kind) {
-      return kind >= ts5.SyntaxKind.FirstNode;
+      return kind >= ts6.SyntaxKind.FirstNode;
     }
     exports.isNodeKind = isNodeKind;
     function isAssignmentKind(kind) {
-      return kind >= ts5.SyntaxKind.FirstAssignment && kind <= ts5.SyntaxKind.LastAssignment;
+      return kind >= ts6.SyntaxKind.FirstAssignment && kind <= ts6.SyntaxKind.LastAssignment;
     }
     exports.isAssignmentKind = isAssignmentKind;
     function isTypeNodeKind(kind) {
-      return kind >= ts5.SyntaxKind.FirstTypeNode && kind <= ts5.SyntaxKind.LastTypeNode;
+      return kind >= ts6.SyntaxKind.FirstTypeNode && kind <= ts6.SyntaxKind.LastTypeNode;
     }
     exports.isTypeNodeKind = isTypeNodeKind;
     function isJsDocKind(kind) {
-      return kind >= ts5.SyntaxKind.FirstJSDocNode && kind <= ts5.SyntaxKind.LastJSDocNode;
+      return kind >= ts6.SyntaxKind.FirstJSDocNode && kind <= ts6.SyntaxKind.LastJSDocNode;
     }
     exports.isJsDocKind = isJsDocKind;
     function isKeywordKind(kind) {
-      return kind >= ts5.SyntaxKind.FirstKeyword && kind <= ts5.SyntaxKind.LastKeyword;
+      return kind >= ts6.SyntaxKind.FirstKeyword && kind <= ts6.SyntaxKind.LastKeyword;
     }
     exports.isKeywordKind = isKeywordKind;
     function isThisParameter(parameter) {
-      return parameter.name.kind === ts5.SyntaxKind.Identifier && parameter.name.originalKeywordKind === ts5.SyntaxKind.ThisKeyword;
+      return parameter.name.kind === ts6.SyntaxKind.Identifier && parameter.name.originalKeywordKind === ts6.SyntaxKind.ThisKeyword;
     }
     exports.isThisParameter = isThisParameter;
     function getModifier(node, kind) {
@@ -8120,11 +8120,11 @@ var require_util = __commonJS({
     }
     exports.hasModifier = hasModifier;
     function isParameterProperty(node) {
-      return hasModifier(node.modifiers, ts5.SyntaxKind.PublicKeyword, ts5.SyntaxKind.ProtectedKeyword, ts5.SyntaxKind.PrivateKeyword, ts5.SyntaxKind.ReadonlyKeyword);
+      return hasModifier(node.modifiers, ts6.SyntaxKind.PublicKeyword, ts6.SyntaxKind.ProtectedKeyword, ts6.SyntaxKind.PrivateKeyword, ts6.SyntaxKind.ReadonlyKeyword);
     }
     exports.isParameterProperty = isParameterProperty;
     function hasAccessModifier(node) {
-      return isModifierFlagSet(node, ts5.ModifierFlags.AccessibilityModifier);
+      return isModifierFlagSet(node, ts6.ModifierFlags.AccessibilityModifier);
     }
     exports.hasAccessModifier = hasAccessModifier;
     function isFlagSet(obj, flag) {
@@ -8138,7 +8138,7 @@ var require_util = __commonJS({
     }
     exports.isObjectFlagSet = isObjectFlagSet;
     function isModifierFlagSet(node, flag) {
-      return (ts5.getCombinedModifierFlags(node) & flag) !== 0;
+      return (ts6.getCombinedModifierFlags(node) & flag) !== 0;
     }
     exports.isModifierFlagSet = isModifierFlagSet;
     function getPreviousStatement(statement) {
@@ -8170,7 +8170,7 @@ var require_util = __commonJS({
     }
     exports.getPreviousToken = getPreviousToken;
     function getNextToken(node, sourceFile) {
-      if (node.kind === ts5.SyntaxKind.SourceFile || node.kind === ts5.SyntaxKind.EndOfFileToken)
+      if (node.kind === ts6.SyntaxKind.SourceFile || node.kind === ts6.SyntaxKind.EndOfFileToken)
         return;
       const end = node.end;
       node = node.parent;
@@ -8199,7 +8199,7 @@ var require_util = __commonJS({
       outer:
         while (true) {
           for (const child of node.getChildren(sourceFile)) {
-            if (child.end > pos && (allowJsDoc || child.kind !== ts5.SyntaxKind.JSDocComment)) {
+            if (child.end > pos && (allowJsDoc || child.kind !== ts6.SyntaxKind.JSDocComment)) {
               if (isTokenKind(child.kind))
                 return child;
               node = child;
@@ -8211,10 +8211,10 @@ var require_util = __commonJS({
     }
     function getCommentAtPosition(sourceFile, pos, parent = sourceFile) {
       const token = getTokenAtPosition(parent, pos, sourceFile);
-      if (token === void 0 || token.kind === ts5.SyntaxKind.JsxText || pos >= token.end - (ts5.tokenToString(token.kind) || "").length)
+      if (token === void 0 || token.kind === ts6.SyntaxKind.JsxText || pos >= token.end - (ts6.tokenToString(token.kind) || "").length)
         return;
-      const startPos = token.pos === 0 ? (ts5.getShebang(sourceFile.text) || "").length : token.pos;
-      return startPos !== 0 && ts5.forEachTrailingCommentRange(sourceFile.text, startPos, commentAtPositionCallback, pos) || ts5.forEachLeadingCommentRange(sourceFile.text, startPos, commentAtPositionCallback, pos);
+      const startPos = token.pos === 0 ? (ts6.getShebang(sourceFile.text) || "").length : token.pos;
+      return startPos !== 0 && ts6.forEachTrailingCommentRange(sourceFile.text, startPos, commentAtPositionCallback, pos) || ts6.forEachLeadingCommentRange(sourceFile.text, startPos, commentAtPositionCallback, pos);
     }
     exports.getCommentAtPosition = getCommentAtPosition;
     function commentAtPositionCallback(pos, end, kind, _nl, at) {
@@ -8225,14 +8225,14 @@ var require_util = __commonJS({
     }
     exports.isPositionInComment = isPositionInComment;
     function commentText(sourceText, comment) {
-      return sourceText.substring(comment.pos + 2, comment.kind === ts5.SyntaxKind.SingleLineCommentTrivia ? comment.end : comment.end - 2);
+      return sourceText.substring(comment.pos + 2, comment.kind === ts6.SyntaxKind.SingleLineCommentTrivia ? comment.end : comment.end - 2);
     }
     exports.commentText = commentText;
     function getAstNodeAtPosition(node, pos) {
       if (node.pos > pos || node.end <= pos)
         return;
       while (isNodeKind(node.kind)) {
-        const nested = ts5.forEachChild(node, (child) => child.pos <= pos && child.end > pos ? child : void 0);
+        const nested = ts6.forEachChild(node, (child) => child.pos <= pos && child.end > pos ? child : void 0);
         if (nested === void 0)
           break;
         node = nested;
@@ -8258,14 +8258,14 @@ var require_util = __commonJS({
     }
     exports.getWrappedNodeAtPosition = getWrappedNodeAtPosition;
     function getPropertyName(propertyName) {
-      if (propertyName.kind === ts5.SyntaxKind.ComputedPropertyName) {
+      if (propertyName.kind === ts6.SyntaxKind.ComputedPropertyName) {
         const expression = unwrapParentheses(propertyName.expression);
         if (node_1.isPrefixUnaryExpression(expression)) {
           let negate = false;
           switch (expression.operator) {
-            case ts5.SyntaxKind.MinusToken:
+            case ts6.SyntaxKind.MinusToken:
               negate = true;
-            case ts5.SyntaxKind.PlusToken:
+            case ts6.SyntaxKind.PlusToken:
               return node_1.isNumericLiteral(expression.operand) ? `${negate ? "-" : ""}${expression.operand.text}` : _3_2_1.isBigIntLiteral(expression.operand) ? `${negate ? "-" : ""}${expression.operand.text.slice(0, -1)}` : void 0;
             default:
               return;
@@ -8277,15 +8277,15 @@ var require_util = __commonJS({
           return expression.text;
         return;
       }
-      return propertyName.kind === ts5.SyntaxKind.PrivateIdentifier ? void 0 : propertyName.text;
+      return propertyName.kind === ts6.SyntaxKind.PrivateIdentifier ? void 0 : propertyName.text;
     }
     exports.getPropertyName = getPropertyName;
     function forEachDestructuringIdentifier(pattern, fn) {
       for (const element of pattern.elements) {
-        if (element.kind !== ts5.SyntaxKind.BindingElement)
+        if (element.kind !== ts6.SyntaxKind.BindingElement)
           continue;
         let result;
-        if (element.name.kind === ts5.SyntaxKind.Identifier) {
+        if (element.name.kind === ts6.SyntaxKind.Identifier) {
           result = fn(element);
         } else {
           result = forEachDestructuringIdentifier(element.name, fn);
@@ -8298,7 +8298,7 @@ var require_util = __commonJS({
     function forEachDeclaredVariable(declarationList, cb) {
       for (const declaration of declarationList.declarations) {
         let result;
-        if (declaration.name.kind === ts5.SyntaxKind.Identifier) {
+        if (declaration.name.kind === ts6.SyntaxKind.Identifier) {
           result = cb(declaration);
         } else {
           result = forEachDestructuringIdentifier(declaration.name, cb);
@@ -8315,30 +8315,30 @@ var require_util = __commonJS({
       VariableDeclarationKind2[VariableDeclarationKind2["Const"] = 2] = "Const";
     })(VariableDeclarationKind = exports.VariableDeclarationKind || (exports.VariableDeclarationKind = {}));
     function getVariableDeclarationKind(declarationList) {
-      if (declarationList.flags & ts5.NodeFlags.Let)
+      if (declarationList.flags & ts6.NodeFlags.Let)
         return 1;
-      if (declarationList.flags & ts5.NodeFlags.Const)
+      if (declarationList.flags & ts6.NodeFlags.Const)
         return 2;
       return 0;
     }
     exports.getVariableDeclarationKind = getVariableDeclarationKind;
     function isBlockScopedVariableDeclarationList(declarationList) {
-      return (declarationList.flags & ts5.NodeFlags.BlockScoped) !== 0;
+      return (declarationList.flags & ts6.NodeFlags.BlockScoped) !== 0;
     }
     exports.isBlockScopedVariableDeclarationList = isBlockScopedVariableDeclarationList;
     function isBlockScopedVariableDeclaration(declaration) {
       const parent = declaration.parent;
-      return parent.kind === ts5.SyntaxKind.CatchClause || isBlockScopedVariableDeclarationList(parent);
+      return parent.kind === ts6.SyntaxKind.CatchClause || isBlockScopedVariableDeclarationList(parent);
     }
     exports.isBlockScopedVariableDeclaration = isBlockScopedVariableDeclaration;
     function isBlockScopedDeclarationStatement(statement) {
       switch (statement.kind) {
-        case ts5.SyntaxKind.VariableStatement:
+        case ts6.SyntaxKind.VariableStatement:
           return isBlockScopedVariableDeclarationList(statement.declarationList);
-        case ts5.SyntaxKind.ClassDeclaration:
-        case ts5.SyntaxKind.EnumDeclaration:
-        case ts5.SyntaxKind.InterfaceDeclaration:
-        case ts5.SyntaxKind.TypeAliasDeclaration:
+        case ts6.SyntaxKind.ClassDeclaration:
+        case ts6.SyntaxKind.EnumDeclaration:
+        case ts6.SyntaxKind.InterfaceDeclaration:
+        case ts6.SyntaxKind.TypeAliasDeclaration:
           return true;
         default:
           return false;
@@ -8347,14 +8347,14 @@ var require_util = __commonJS({
     exports.isBlockScopedDeclarationStatement = isBlockScopedDeclarationStatement;
     function isInSingleStatementContext(statement) {
       switch (statement.parent.kind) {
-        case ts5.SyntaxKind.ForStatement:
-        case ts5.SyntaxKind.ForInStatement:
-        case ts5.SyntaxKind.ForOfStatement:
-        case ts5.SyntaxKind.WhileStatement:
-        case ts5.SyntaxKind.DoStatement:
-        case ts5.SyntaxKind.IfStatement:
-        case ts5.SyntaxKind.WithStatement:
-        case ts5.SyntaxKind.LabeledStatement:
+        case ts6.SyntaxKind.ForStatement:
+        case ts6.SyntaxKind.ForInStatement:
+        case ts6.SyntaxKind.ForOfStatement:
+        case ts6.SyntaxKind.WhileStatement:
+        case ts6.SyntaxKind.DoStatement:
+        case ts6.SyntaxKind.IfStatement:
+        case ts6.SyntaxKind.WithStatement:
+        case ts6.SyntaxKind.LabeledStatement:
           return true;
         default:
           return false;
@@ -8382,11 +8382,11 @@ var require_util = __commonJS({
     exports.isScopeBoundary = isScopeBoundary;
     function isTypeScopeBoundary(node) {
       switch (node.kind) {
-        case ts5.SyntaxKind.InterfaceDeclaration:
-        case ts5.SyntaxKind.TypeAliasDeclaration:
-        case ts5.SyntaxKind.MappedType:
+        case ts6.SyntaxKind.InterfaceDeclaration:
+        case ts6.SyntaxKind.TypeAliasDeclaration:
+        case ts6.SyntaxKind.MappedType:
           return 4;
-        case ts5.SyntaxKind.ConditionalType:
+        case ts6.SyntaxKind.ConditionalType:
           return 8;
         default:
           return 0;
@@ -8395,25 +8395,25 @@ var require_util = __commonJS({
     exports.isTypeScopeBoundary = isTypeScopeBoundary;
     function isFunctionScopeBoundary(node) {
       switch (node.kind) {
-        case ts5.SyntaxKind.FunctionExpression:
-        case ts5.SyntaxKind.ArrowFunction:
-        case ts5.SyntaxKind.Constructor:
-        case ts5.SyntaxKind.ModuleDeclaration:
-        case ts5.SyntaxKind.ClassDeclaration:
-        case ts5.SyntaxKind.ClassExpression:
-        case ts5.SyntaxKind.EnumDeclaration:
-        case ts5.SyntaxKind.MethodDeclaration:
-        case ts5.SyntaxKind.FunctionDeclaration:
-        case ts5.SyntaxKind.GetAccessor:
-        case ts5.SyntaxKind.SetAccessor:
-        case ts5.SyntaxKind.MethodSignature:
-        case ts5.SyntaxKind.CallSignature:
-        case ts5.SyntaxKind.ConstructSignature:
-        case ts5.SyntaxKind.ConstructorType:
-        case ts5.SyntaxKind.FunctionType:
+        case ts6.SyntaxKind.FunctionExpression:
+        case ts6.SyntaxKind.ArrowFunction:
+        case ts6.SyntaxKind.Constructor:
+        case ts6.SyntaxKind.ModuleDeclaration:
+        case ts6.SyntaxKind.ClassDeclaration:
+        case ts6.SyntaxKind.ClassExpression:
+        case ts6.SyntaxKind.EnumDeclaration:
+        case ts6.SyntaxKind.MethodDeclaration:
+        case ts6.SyntaxKind.FunctionDeclaration:
+        case ts6.SyntaxKind.GetAccessor:
+        case ts6.SyntaxKind.SetAccessor:
+        case ts6.SyntaxKind.MethodSignature:
+        case ts6.SyntaxKind.CallSignature:
+        case ts6.SyntaxKind.ConstructSignature:
+        case ts6.SyntaxKind.ConstructorType:
+        case ts6.SyntaxKind.FunctionType:
           return 1;
-        case ts5.SyntaxKind.SourceFile:
-          return ts5.isExternalModule(node) ? 1 : 0;
+        case ts6.SyntaxKind.SourceFile:
+          return ts6.isExternalModule(node) ? 1 : 0;
         default:
           return 0;
       }
@@ -8421,18 +8421,18 @@ var require_util = __commonJS({
     exports.isFunctionScopeBoundary = isFunctionScopeBoundary;
     function isBlockScopeBoundary(node) {
       switch (node.kind) {
-        case ts5.SyntaxKind.Block:
+        case ts6.SyntaxKind.Block:
           const parent = node.parent;
-          return parent.kind !== ts5.SyntaxKind.CatchClause && // blocks inside SourceFile are block scope boundaries
-          (parent.kind === ts5.SyntaxKind.SourceFile || // blocks that are direct children of a function scope boundary are no scope boundary
+          return parent.kind !== ts6.SyntaxKind.CatchClause && // blocks inside SourceFile are block scope boundaries
+          (parent.kind === ts6.SyntaxKind.SourceFile || // blocks that are direct children of a function scope boundary are no scope boundary
           // for example the FunctionBlock is part of the function scope of the containing function
           !isFunctionScopeBoundary(parent)) ? 2 : 0;
-        case ts5.SyntaxKind.ForStatement:
-        case ts5.SyntaxKind.ForInStatement:
-        case ts5.SyntaxKind.ForOfStatement:
-        case ts5.SyntaxKind.CaseBlock:
-        case ts5.SyntaxKind.CatchClause:
-        case ts5.SyntaxKind.WithStatement:
+        case ts6.SyntaxKind.ForStatement:
+        case ts6.SyntaxKind.ForInStatement:
+        case ts6.SyntaxKind.ForOfStatement:
+        case ts6.SyntaxKind.CaseBlock:
+        case ts6.SyntaxKind.CatchClause:
+        case ts6.SyntaxKind.WithStatement:
           return 2;
         default:
           return 0;
@@ -8441,16 +8441,16 @@ var require_util = __commonJS({
     exports.isBlockScopeBoundary = isBlockScopeBoundary;
     function hasOwnThisReference(node) {
       switch (node.kind) {
-        case ts5.SyntaxKind.ClassDeclaration:
-        case ts5.SyntaxKind.ClassExpression:
-        case ts5.SyntaxKind.FunctionExpression:
+        case ts6.SyntaxKind.ClassDeclaration:
+        case ts6.SyntaxKind.ClassExpression:
+        case ts6.SyntaxKind.FunctionExpression:
           return true;
-        case ts5.SyntaxKind.FunctionDeclaration:
+        case ts6.SyntaxKind.FunctionDeclaration:
           return node.body !== void 0;
-        case ts5.SyntaxKind.MethodDeclaration:
-        case ts5.SyntaxKind.GetAccessor:
-        case ts5.SyntaxKind.SetAccessor:
-          return node.parent.kind === ts5.SyntaxKind.ObjectLiteralExpression;
+        case ts6.SyntaxKind.MethodDeclaration:
+        case ts6.SyntaxKind.GetAccessor:
+        case ts6.SyntaxKind.SetAccessor:
+          return node.parent.kind === ts6.SyntaxKind.ObjectLiteralExpression;
         default:
           return false;
       }
@@ -8458,14 +8458,14 @@ var require_util = __commonJS({
     exports.hasOwnThisReference = hasOwnThisReference;
     function isFunctionWithBody(node) {
       switch (node.kind) {
-        case ts5.SyntaxKind.GetAccessor:
-        case ts5.SyntaxKind.SetAccessor:
-        case ts5.SyntaxKind.FunctionDeclaration:
-        case ts5.SyntaxKind.MethodDeclaration:
-        case ts5.SyntaxKind.Constructor:
+        case ts6.SyntaxKind.GetAccessor:
+        case ts6.SyntaxKind.SetAccessor:
+        case ts6.SyntaxKind.FunctionDeclaration:
+        case ts6.SyntaxKind.MethodDeclaration:
+        case ts6.SyntaxKind.Constructor:
           return node.body !== void 0;
-        case ts5.SyntaxKind.FunctionExpression:
-        case ts5.SyntaxKind.ArrowFunction:
+        case ts6.SyntaxKind.FunctionExpression:
+        case ts6.SyntaxKind.ArrowFunction:
           return true;
         default:
           return false;
@@ -8477,7 +8477,7 @@ var require_util = __commonJS({
       while (true) {
         if (isTokenKind(node.kind)) {
           cb(node);
-        } else if (node.kind !== ts5.SyntaxKind.JSDocComment) {
+        } else if (node.kind !== ts6.SyntaxKind.JSDocComment) {
           const children = node.getChildren(sourceFile);
           if (children.length === 1) {
             node = children[0];
@@ -8494,9 +8494,9 @@ var require_util = __commonJS({
     exports.forEachToken = forEachToken;
     function forEachTokenWithTrivia(node, cb, sourceFile = node.getSourceFile()) {
       const fullText = sourceFile.text;
-      const scanner = ts5.createScanner(sourceFile.languageVersion, false, sourceFile.languageVariant, fullText);
+      const scanner = ts6.createScanner(sourceFile.languageVersion, false, sourceFile.languageVariant, fullText);
       return forEachToken(node, (token) => {
-        const tokenStart = token.kind === ts5.SyntaxKind.JsxText || token.pos === token.end ? token.pos : token.getStart(sourceFile);
+        const tokenStart = token.kind === ts6.SyntaxKind.JsxText || token.pos === token.end ? token.pos : token.getStart(sourceFile);
         if (tokenStart !== token.pos) {
           scanner.setTextPos(token.pos);
           let kind = scanner.scan();
@@ -8516,19 +8516,19 @@ var require_util = __commonJS({
     exports.forEachTokenWithTrivia = forEachTokenWithTrivia;
     function forEachComment(node, cb, sourceFile = node.getSourceFile()) {
       const fullText = sourceFile.text;
-      const notJsx = sourceFile.languageVariant !== ts5.LanguageVariant.JSX;
+      const notJsx = sourceFile.languageVariant !== ts6.LanguageVariant.JSX;
       return forEachToken(node, (token) => {
         if (token.pos === token.end)
           return;
-        if (token.kind !== ts5.SyntaxKind.JsxText)
-          ts5.forEachLeadingCommentRange(
+        if (token.kind !== ts6.SyntaxKind.JsxText)
+          ts6.forEachLeadingCommentRange(
             fullText,
             // skip shebang at position 0
-            token.pos === 0 ? (ts5.getShebang(fullText) || "").length : token.pos,
+            token.pos === 0 ? (ts6.getShebang(fullText) || "").length : token.pos,
             commentCallback
           );
         if (notJsx || canHaveTrailingTrivia(token))
-          return ts5.forEachTrailingCommentRange(fullText, token.end, commentCallback);
+          return ts6.forEachTrailingCommentRange(fullText, token.end, commentCallback);
       }, sourceFile);
       function commentCallback(pos, end, kind) {
         cb(fullText, { pos, end, kind });
@@ -8537,26 +8537,26 @@ var require_util = __commonJS({
     exports.forEachComment = forEachComment;
     function canHaveTrailingTrivia(token) {
       switch (token.kind) {
-        case ts5.SyntaxKind.CloseBraceToken:
-          return token.parent.kind !== ts5.SyntaxKind.JsxExpression || !isJsxElementOrFragment(token.parent.parent);
-        case ts5.SyntaxKind.GreaterThanToken:
+        case ts6.SyntaxKind.CloseBraceToken:
+          return token.parent.kind !== ts6.SyntaxKind.JsxExpression || !isJsxElementOrFragment(token.parent.parent);
+        case ts6.SyntaxKind.GreaterThanToken:
           switch (token.parent.kind) {
-            case ts5.SyntaxKind.JsxOpeningElement:
+            case ts6.SyntaxKind.JsxOpeningElement:
               return token.end !== token.parent.end;
-            case ts5.SyntaxKind.JsxOpeningFragment:
+            case ts6.SyntaxKind.JsxOpeningFragment:
               return false;
-            case ts5.SyntaxKind.JsxSelfClosingElement:
+            case ts6.SyntaxKind.JsxSelfClosingElement:
               return token.end !== token.parent.end || // if end is not equal, this is part of the type arguments list
               !isJsxElementOrFragment(token.parent.parent);
-            case ts5.SyntaxKind.JsxClosingElement:
-            case ts5.SyntaxKind.JsxClosingFragment:
+            case ts6.SyntaxKind.JsxClosingElement:
+            case ts6.SyntaxKind.JsxClosingFragment:
               return !isJsxElementOrFragment(token.parent.parent.parent);
           }
       }
       return true;
     }
     function isJsxElementOrFragment(node) {
-      return node.kind === ts5.SyntaxKind.JsxElement || node.kind === ts5.SyntaxKind.JsxFragment;
+      return node.kind === ts6.SyntaxKind.JsxElement || node.kind === ts6.SyntaxKind.JsxFragment;
     }
     function getLineRanges(sourceFile) {
       const lineStarts = sourceFile.getLineStarts();
@@ -8568,7 +8568,7 @@ var require_util = __commonJS({
         const end = lineStarts[i];
         let lineEnd = end;
         for (; lineEnd > pos; --lineEnd)
-          if (!ts5.isLineBreak(sourceText.charCodeAt(lineEnd - 1)))
+          if (!ts6.isLineBreak(sourceText.charCodeAt(lineEnd - 1)))
             break;
         result.push({
           pos,
@@ -8593,7 +8593,7 @@ var require_util = __commonJS({
     var cachedScanner;
     function scanToken(text, languageVersion) {
       if (cachedScanner === void 0) {
-        cachedScanner = ts5.createScanner(languageVersion, false, void 0, text);
+        cachedScanner = ts6.createScanner(languageVersion, false, void 0, text);
       } else {
         cachedScanner.setScriptTarget(languageVersion);
         cachedScanner.setText(text);
@@ -8601,7 +8601,7 @@ var require_util = __commonJS({
       cachedScanner.scan();
       return cachedScanner;
     }
-    function isValidIdentifier(text, languageVersion = ts5.ScriptTarget.Latest) {
+    function isValidIdentifier(text, languageVersion = ts6.ScriptTarget.Latest) {
       const scan = scanToken(text, languageVersion);
       return scan.isIdentifier() && scan.getTextPos() === text.length && scan.getTokenPos() === 0;
     }
@@ -8609,42 +8609,42 @@ var require_util = __commonJS({
     function charSize(ch) {
       return ch >= 65536 ? 2 : 1;
     }
-    function isValidPropertyAccess(text, languageVersion = ts5.ScriptTarget.Latest) {
+    function isValidPropertyAccess(text, languageVersion = ts6.ScriptTarget.Latest) {
       if (text.length === 0)
         return false;
       let ch = text.codePointAt(0);
-      if (!ts5.isIdentifierStart(ch, languageVersion))
+      if (!ts6.isIdentifierStart(ch, languageVersion))
         return false;
       for (let i = charSize(ch); i < text.length; i += charSize(ch)) {
         ch = text.codePointAt(i);
-        if (!ts5.isIdentifierPart(ch, languageVersion))
+        if (!ts6.isIdentifierPart(ch, languageVersion))
           return false;
       }
       return true;
     }
     exports.isValidPropertyAccess = isValidPropertyAccess;
-    function isValidPropertyName(text, languageVersion = ts5.ScriptTarget.Latest) {
+    function isValidPropertyName(text, languageVersion = ts6.ScriptTarget.Latest) {
       if (isValidPropertyAccess(text, languageVersion))
         return true;
       const scan = scanToken(text, languageVersion);
-      return scan.getTextPos() === text.length && scan.getToken() === ts5.SyntaxKind.NumericLiteral && scan.getTokenValue() === text;
+      return scan.getTextPos() === text.length && scan.getToken() === ts6.SyntaxKind.NumericLiteral && scan.getTokenValue() === text;
     }
     exports.isValidPropertyName = isValidPropertyName;
-    function isValidNumericLiteral(text, languageVersion = ts5.ScriptTarget.Latest) {
+    function isValidNumericLiteral(text, languageVersion = ts6.ScriptTarget.Latest) {
       const scan = scanToken(text, languageVersion);
-      return scan.getToken() === ts5.SyntaxKind.NumericLiteral && scan.getTextPos() === text.length && scan.getTokenPos() === 0;
+      return scan.getToken() === ts6.SyntaxKind.NumericLiteral && scan.getTextPos() === text.length && scan.getTokenPos() === 0;
     }
     exports.isValidNumericLiteral = isValidNumericLiteral;
-    function isValidJsxIdentifier(text, languageVersion = ts5.ScriptTarget.Latest) {
+    function isValidJsxIdentifier(text, languageVersion = ts6.ScriptTarget.Latest) {
       if (text.length === 0)
         return false;
       let seenNamespaceSeparator = false;
       let ch = text.codePointAt(0);
-      if (!ts5.isIdentifierStart(ch, languageVersion))
+      if (!ts6.isIdentifierStart(ch, languageVersion))
         return false;
       for (let i = charSize(ch); i < text.length; i += charSize(ch)) {
         ch = text.codePointAt(i);
-        if (!ts5.isIdentifierPart(ch, languageVersion) && ch !== 45) {
+        if (!ts6.isIdentifierPart(ch, languageVersion) && ch !== 45) {
           if (!seenNamespaceSeparator && ch === 58 && i + charSize(ch) !== text.length) {
             seenNamespaceSeparator = true;
           } else {
@@ -8660,7 +8660,7 @@ var require_util = __commonJS({
     }
     exports.isNumericPropertyName = isNumericPropertyName;
     function isSameLine(sourceFile, pos1, pos2) {
-      return ts5.getLineAndCharacterOfPosition(sourceFile, pos1).line === ts5.getLineAndCharacterOfPosition(sourceFile, pos2).line;
+      return ts6.getLineAndCharacterOfPosition(sourceFile, pos1).line === ts6.getLineAndCharacterOfPosition(sourceFile, pos2).line;
     }
     exports.isSameLine = isSameLine;
     var SideEffectOptions;
@@ -8675,79 +8675,79 @@ var require_util = __commonJS({
       const queue = [];
       while (true) {
         switch (node.kind) {
-          case ts5.SyntaxKind.CallExpression:
-          case ts5.SyntaxKind.PostfixUnaryExpression:
-          case ts5.SyntaxKind.AwaitExpression:
-          case ts5.SyntaxKind.YieldExpression:
-          case ts5.SyntaxKind.DeleteExpression:
+          case ts6.SyntaxKind.CallExpression:
+          case ts6.SyntaxKind.PostfixUnaryExpression:
+          case ts6.SyntaxKind.AwaitExpression:
+          case ts6.SyntaxKind.YieldExpression:
+          case ts6.SyntaxKind.DeleteExpression:
             return true;
-          case ts5.SyntaxKind.TypeAssertionExpression:
-          case ts5.SyntaxKind.AsExpression:
-          case ts5.SyntaxKind.ParenthesizedExpression:
-          case ts5.SyntaxKind.NonNullExpression:
-          case ts5.SyntaxKind.VoidExpression:
-          case ts5.SyntaxKind.TypeOfExpression:
-          case ts5.SyntaxKind.PropertyAccessExpression:
-          case ts5.SyntaxKind.SpreadElement:
-          case ts5.SyntaxKind.PartiallyEmittedExpression:
+          case ts6.SyntaxKind.TypeAssertionExpression:
+          case ts6.SyntaxKind.AsExpression:
+          case ts6.SyntaxKind.ParenthesizedExpression:
+          case ts6.SyntaxKind.NonNullExpression:
+          case ts6.SyntaxKind.VoidExpression:
+          case ts6.SyntaxKind.TypeOfExpression:
+          case ts6.SyntaxKind.PropertyAccessExpression:
+          case ts6.SyntaxKind.SpreadElement:
+          case ts6.SyntaxKind.PartiallyEmittedExpression:
             node = node.expression;
             continue;
-          case ts5.SyntaxKind.BinaryExpression:
+          case ts6.SyntaxKind.BinaryExpression:
             if (isAssignmentKind(node.operatorToken.kind))
               return true;
             queue.push(node.right);
             node = node.left;
             continue;
-          case ts5.SyntaxKind.PrefixUnaryExpression:
+          case ts6.SyntaxKind.PrefixUnaryExpression:
             switch (node.operator) {
-              case ts5.SyntaxKind.PlusPlusToken:
-              case ts5.SyntaxKind.MinusMinusToken:
+              case ts6.SyntaxKind.PlusPlusToken:
+              case ts6.SyntaxKind.MinusMinusToken:
                 return true;
               default:
                 node = node.operand;
                 continue;
             }
-          case ts5.SyntaxKind.ElementAccessExpression:
+          case ts6.SyntaxKind.ElementAccessExpression:
             if (node.argumentExpression !== void 0)
               queue.push(node.argumentExpression);
             node = node.expression;
             continue;
-          case ts5.SyntaxKind.ConditionalExpression:
+          case ts6.SyntaxKind.ConditionalExpression:
             queue.push(node.whenTrue, node.whenFalse);
             node = node.condition;
             continue;
-          case ts5.SyntaxKind.NewExpression:
+          case ts6.SyntaxKind.NewExpression:
             if (options & 2)
               return true;
             if (node.arguments !== void 0)
               queue.push(...node.arguments);
             node = node.expression;
             continue;
-          case ts5.SyntaxKind.TaggedTemplateExpression:
+          case ts6.SyntaxKind.TaggedTemplateExpression:
             if (options & 1)
               return true;
             queue.push(node.tag);
             node = node.template;
-            if (node.kind === ts5.SyntaxKind.NoSubstitutionTemplateLiteral)
+            if (node.kind === ts6.SyntaxKind.NoSubstitutionTemplateLiteral)
               break;
-          case ts5.SyntaxKind.TemplateExpression:
+          case ts6.SyntaxKind.TemplateExpression:
             for (const child of node.templateSpans)
               queue.push(child.expression);
             break;
-          case ts5.SyntaxKind.ClassExpression: {
+          case ts6.SyntaxKind.ClassExpression: {
             if (node.decorators !== void 0)
               return true;
             for (const child of node.members) {
               if (child.decorators !== void 0)
                 return true;
-              if (!hasModifier(child.modifiers, ts5.SyntaxKind.DeclareKeyword)) {
-                if (((_a2 = child.name) === null || _a2 === void 0 ? void 0 : _a2.kind) === ts5.SyntaxKind.ComputedPropertyName)
+              if (!hasModifier(child.modifiers, ts6.SyntaxKind.DeclareKeyword)) {
+                if (((_a2 = child.name) === null || _a2 === void 0 ? void 0 : _a2.kind) === ts6.SyntaxKind.ComputedPropertyName)
                   queue.push(child.name.expression);
                 if (node_1.isMethodDeclaration(child)) {
                   for (const p of child.parameters)
                     if (p.decorators !== void 0)
                       return true;
-                } else if (node_1.isPropertyDeclaration(child) && child.initializer !== void 0 && hasModifier(child.modifiers, ts5.SyntaxKind.StaticKeyword)) {
+                } else if (node_1.isPropertyDeclaration(child) && child.initializer !== void 0 && hasModifier(child.modifiers, ts6.SyntaxKind.StaticKeyword)) {
                   queue.push(child.initializer);
                 }
               }
@@ -8758,48 +8758,48 @@ var require_util = __commonJS({
             node = base.expression;
             continue;
           }
-          case ts5.SyntaxKind.ArrayLiteralExpression:
+          case ts6.SyntaxKind.ArrayLiteralExpression:
             queue.push(...node.elements);
             break;
-          case ts5.SyntaxKind.ObjectLiteralExpression:
+          case ts6.SyntaxKind.ObjectLiteralExpression:
             for (const child of node.properties) {
-              if (((_b = child.name) === null || _b === void 0 ? void 0 : _b.kind) === ts5.SyntaxKind.ComputedPropertyName)
+              if (((_b = child.name) === null || _b === void 0 ? void 0 : _b.kind) === ts6.SyntaxKind.ComputedPropertyName)
                 queue.push(child.name.expression);
               switch (child.kind) {
-                case ts5.SyntaxKind.PropertyAssignment:
+                case ts6.SyntaxKind.PropertyAssignment:
                   queue.push(child.initializer);
                   break;
-                case ts5.SyntaxKind.SpreadAssignment:
+                case ts6.SyntaxKind.SpreadAssignment:
                   queue.push(child.expression);
               }
             }
             break;
-          case ts5.SyntaxKind.JsxExpression:
+          case ts6.SyntaxKind.JsxExpression:
             if (node.expression === void 0)
               break;
             node = node.expression;
             continue;
-          case ts5.SyntaxKind.JsxElement:
-          case ts5.SyntaxKind.JsxFragment:
+          case ts6.SyntaxKind.JsxElement:
+          case ts6.SyntaxKind.JsxFragment:
             for (const child of node.children)
-              if (child.kind !== ts5.SyntaxKind.JsxText)
+              if (child.kind !== ts6.SyntaxKind.JsxText)
                 queue.push(child);
-            if (node.kind === ts5.SyntaxKind.JsxFragment)
+            if (node.kind === ts6.SyntaxKind.JsxFragment)
               break;
             node = node.openingElement;
-          case ts5.SyntaxKind.JsxSelfClosingElement:
-          case ts5.SyntaxKind.JsxOpeningElement:
+          case ts6.SyntaxKind.JsxSelfClosingElement:
+          case ts6.SyntaxKind.JsxOpeningElement:
             if (options & 4)
               return true;
             for (const child of node.attributes.properties) {
-              if (child.kind === ts5.SyntaxKind.JsxSpreadAttribute) {
+              if (child.kind === ts6.SyntaxKind.JsxSpreadAttribute) {
                 queue.push(child.expression);
               } else if (child.initializer !== void 0) {
                 queue.push(child.initializer);
               }
             }
             break;
-          case ts5.SyntaxKind.CommaListExpression:
+          case ts6.SyntaxKind.CommaListExpression:
             queue.push(...node.elements);
         }
         if (queue.length === 0)
@@ -8810,7 +8810,7 @@ var require_util = __commonJS({
     exports.hasSideEffects = hasSideEffects;
     function getDeclarationOfBindingElement(node) {
       let parent = node.parent.parent;
-      while (parent.kind === ts5.SyntaxKind.BindingElement)
+      while (parent.kind === ts6.SyntaxKind.BindingElement)
         parent = parent.parent.parent;
       return parent;
     }
@@ -8819,123 +8819,123 @@ var require_util = __commonJS({
       while (true) {
         const parent = node.parent;
         switch (parent.kind) {
-          case ts5.SyntaxKind.CallExpression:
-          case ts5.SyntaxKind.NewExpression:
-          case ts5.SyntaxKind.ElementAccessExpression:
-          case ts5.SyntaxKind.WhileStatement:
-          case ts5.SyntaxKind.DoStatement:
-          case ts5.SyntaxKind.WithStatement:
-          case ts5.SyntaxKind.ThrowStatement:
-          case ts5.SyntaxKind.ReturnStatement:
-          case ts5.SyntaxKind.JsxExpression:
-          case ts5.SyntaxKind.JsxSpreadAttribute:
-          case ts5.SyntaxKind.JsxElement:
-          case ts5.SyntaxKind.JsxFragment:
-          case ts5.SyntaxKind.JsxSelfClosingElement:
-          case ts5.SyntaxKind.ComputedPropertyName:
-          case ts5.SyntaxKind.ArrowFunction:
-          case ts5.SyntaxKind.ExportSpecifier:
-          case ts5.SyntaxKind.ExportAssignment:
-          case ts5.SyntaxKind.ImportDeclaration:
-          case ts5.SyntaxKind.ExternalModuleReference:
-          case ts5.SyntaxKind.Decorator:
-          case ts5.SyntaxKind.TaggedTemplateExpression:
-          case ts5.SyntaxKind.TemplateSpan:
-          case ts5.SyntaxKind.ExpressionWithTypeArguments:
-          case ts5.SyntaxKind.TypeOfExpression:
-          case ts5.SyntaxKind.AwaitExpression:
-          case ts5.SyntaxKind.YieldExpression:
-          case ts5.SyntaxKind.LiteralType:
-          case ts5.SyntaxKind.JsxAttributes:
-          case ts5.SyntaxKind.JsxOpeningElement:
-          case ts5.SyntaxKind.JsxClosingElement:
-          case ts5.SyntaxKind.IfStatement:
-          case ts5.SyntaxKind.CaseClause:
-          case ts5.SyntaxKind.SwitchStatement:
+          case ts6.SyntaxKind.CallExpression:
+          case ts6.SyntaxKind.NewExpression:
+          case ts6.SyntaxKind.ElementAccessExpression:
+          case ts6.SyntaxKind.WhileStatement:
+          case ts6.SyntaxKind.DoStatement:
+          case ts6.SyntaxKind.WithStatement:
+          case ts6.SyntaxKind.ThrowStatement:
+          case ts6.SyntaxKind.ReturnStatement:
+          case ts6.SyntaxKind.JsxExpression:
+          case ts6.SyntaxKind.JsxSpreadAttribute:
+          case ts6.SyntaxKind.JsxElement:
+          case ts6.SyntaxKind.JsxFragment:
+          case ts6.SyntaxKind.JsxSelfClosingElement:
+          case ts6.SyntaxKind.ComputedPropertyName:
+          case ts6.SyntaxKind.ArrowFunction:
+          case ts6.SyntaxKind.ExportSpecifier:
+          case ts6.SyntaxKind.ExportAssignment:
+          case ts6.SyntaxKind.ImportDeclaration:
+          case ts6.SyntaxKind.ExternalModuleReference:
+          case ts6.SyntaxKind.Decorator:
+          case ts6.SyntaxKind.TaggedTemplateExpression:
+          case ts6.SyntaxKind.TemplateSpan:
+          case ts6.SyntaxKind.ExpressionWithTypeArguments:
+          case ts6.SyntaxKind.TypeOfExpression:
+          case ts6.SyntaxKind.AwaitExpression:
+          case ts6.SyntaxKind.YieldExpression:
+          case ts6.SyntaxKind.LiteralType:
+          case ts6.SyntaxKind.JsxAttributes:
+          case ts6.SyntaxKind.JsxOpeningElement:
+          case ts6.SyntaxKind.JsxClosingElement:
+          case ts6.SyntaxKind.IfStatement:
+          case ts6.SyntaxKind.CaseClause:
+          case ts6.SyntaxKind.SwitchStatement:
             return true;
-          case ts5.SyntaxKind.PropertyAccessExpression:
+          case ts6.SyntaxKind.PropertyAccessExpression:
             return parent.expression === node;
-          case ts5.SyntaxKind.QualifiedName:
+          case ts6.SyntaxKind.QualifiedName:
             return parent.left === node;
-          case ts5.SyntaxKind.ShorthandPropertyAssignment:
+          case ts6.SyntaxKind.ShorthandPropertyAssignment:
             return parent.objectAssignmentInitializer === node || !isInDestructuringAssignment(parent);
-          case ts5.SyntaxKind.PropertyAssignment:
+          case ts6.SyntaxKind.PropertyAssignment:
             return parent.initializer === node && !isInDestructuringAssignment(parent);
-          case ts5.SyntaxKind.SpreadAssignment:
-          case ts5.SyntaxKind.SpreadElement:
-          case ts5.SyntaxKind.ArrayLiteralExpression:
+          case ts6.SyntaxKind.SpreadAssignment:
+          case ts6.SyntaxKind.SpreadElement:
+          case ts6.SyntaxKind.ArrayLiteralExpression:
             return !isInDestructuringAssignment(parent);
-          case ts5.SyntaxKind.ParenthesizedExpression:
-          case ts5.SyntaxKind.AsExpression:
-          case ts5.SyntaxKind.TypeAssertionExpression:
-          case ts5.SyntaxKind.PostfixUnaryExpression:
-          case ts5.SyntaxKind.PrefixUnaryExpression:
-          case ts5.SyntaxKind.NonNullExpression:
+          case ts6.SyntaxKind.ParenthesizedExpression:
+          case ts6.SyntaxKind.AsExpression:
+          case ts6.SyntaxKind.TypeAssertionExpression:
+          case ts6.SyntaxKind.PostfixUnaryExpression:
+          case ts6.SyntaxKind.PrefixUnaryExpression:
+          case ts6.SyntaxKind.NonNullExpression:
             node = parent;
             continue;
-          case ts5.SyntaxKind.ForStatement:
+          case ts6.SyntaxKind.ForStatement:
             return parent.condition === node;
-          case ts5.SyntaxKind.ForInStatement:
-          case ts5.SyntaxKind.ForOfStatement:
+          case ts6.SyntaxKind.ForInStatement:
+          case ts6.SyntaxKind.ForOfStatement:
             return parent.expression === node;
-          case ts5.SyntaxKind.ConditionalExpression:
+          case ts6.SyntaxKind.ConditionalExpression:
             if (parent.condition === node)
               return true;
             node = parent;
             break;
-          case ts5.SyntaxKind.PropertyDeclaration:
-          case ts5.SyntaxKind.BindingElement:
-          case ts5.SyntaxKind.VariableDeclaration:
-          case ts5.SyntaxKind.Parameter:
-          case ts5.SyntaxKind.EnumMember:
+          case ts6.SyntaxKind.PropertyDeclaration:
+          case ts6.SyntaxKind.BindingElement:
+          case ts6.SyntaxKind.VariableDeclaration:
+          case ts6.SyntaxKind.Parameter:
+          case ts6.SyntaxKind.EnumMember:
             return parent.initializer === node;
-          case ts5.SyntaxKind.ImportEqualsDeclaration:
+          case ts6.SyntaxKind.ImportEqualsDeclaration:
             return parent.moduleReference === node;
-          case ts5.SyntaxKind.CommaListExpression:
+          case ts6.SyntaxKind.CommaListExpression:
             if (parent.elements[parent.elements.length - 1] !== node)
               return false;
             node = parent;
             break;
-          case ts5.SyntaxKind.BinaryExpression:
+          case ts6.SyntaxKind.BinaryExpression:
             if (parent.right === node) {
-              if (parent.operatorToken.kind === ts5.SyntaxKind.CommaToken) {
+              if (parent.operatorToken.kind === ts6.SyntaxKind.CommaToken) {
                 node = parent;
                 break;
               }
               return true;
             }
             switch (parent.operatorToken.kind) {
-              case ts5.SyntaxKind.CommaToken:
-              case ts5.SyntaxKind.EqualsToken:
+              case ts6.SyntaxKind.CommaToken:
+              case ts6.SyntaxKind.EqualsToken:
                 return false;
-              case ts5.SyntaxKind.EqualsEqualsEqualsToken:
-              case ts5.SyntaxKind.EqualsEqualsToken:
-              case ts5.SyntaxKind.ExclamationEqualsEqualsToken:
-              case ts5.SyntaxKind.ExclamationEqualsToken:
-              case ts5.SyntaxKind.InstanceOfKeyword:
-              case ts5.SyntaxKind.PlusToken:
-              case ts5.SyntaxKind.MinusToken:
-              case ts5.SyntaxKind.AsteriskToken:
-              case ts5.SyntaxKind.SlashToken:
-              case ts5.SyntaxKind.PercentToken:
-              case ts5.SyntaxKind.AsteriskAsteriskToken:
-              case ts5.SyntaxKind.GreaterThanToken:
-              case ts5.SyntaxKind.GreaterThanGreaterThanToken:
-              case ts5.SyntaxKind.GreaterThanGreaterThanGreaterThanToken:
-              case ts5.SyntaxKind.GreaterThanEqualsToken:
-              case ts5.SyntaxKind.LessThanToken:
-              case ts5.SyntaxKind.LessThanLessThanToken:
-              case ts5.SyntaxKind.LessThanEqualsToken:
-              case ts5.SyntaxKind.AmpersandToken:
-              case ts5.SyntaxKind.BarToken:
-              case ts5.SyntaxKind.CaretToken:
-              case ts5.SyntaxKind.BarBarToken:
-              case ts5.SyntaxKind.AmpersandAmpersandToken:
-              case ts5.SyntaxKind.QuestionQuestionToken:
-              case ts5.SyntaxKind.InKeyword:
-              case ts5.SyntaxKind.QuestionQuestionEqualsToken:
-              case ts5.SyntaxKind.AmpersandAmpersandEqualsToken:
-              case ts5.SyntaxKind.BarBarEqualsToken:
+              case ts6.SyntaxKind.EqualsEqualsEqualsToken:
+              case ts6.SyntaxKind.EqualsEqualsToken:
+              case ts6.SyntaxKind.ExclamationEqualsEqualsToken:
+              case ts6.SyntaxKind.ExclamationEqualsToken:
+              case ts6.SyntaxKind.InstanceOfKeyword:
+              case ts6.SyntaxKind.PlusToken:
+              case ts6.SyntaxKind.MinusToken:
+              case ts6.SyntaxKind.AsteriskToken:
+              case ts6.SyntaxKind.SlashToken:
+              case ts6.SyntaxKind.PercentToken:
+              case ts6.SyntaxKind.AsteriskAsteriskToken:
+              case ts6.SyntaxKind.GreaterThanToken:
+              case ts6.SyntaxKind.GreaterThanGreaterThanToken:
+              case ts6.SyntaxKind.GreaterThanGreaterThanGreaterThanToken:
+              case ts6.SyntaxKind.GreaterThanEqualsToken:
+              case ts6.SyntaxKind.LessThanToken:
+              case ts6.SyntaxKind.LessThanLessThanToken:
+              case ts6.SyntaxKind.LessThanEqualsToken:
+              case ts6.SyntaxKind.AmpersandToken:
+              case ts6.SyntaxKind.BarToken:
+              case ts6.SyntaxKind.CaretToken:
+              case ts6.SyntaxKind.BarBarToken:
+              case ts6.SyntaxKind.AmpersandAmpersandToken:
+              case ts6.SyntaxKind.QuestionQuestionToken:
+              case ts6.SyntaxKind.InKeyword:
+              case ts6.SyntaxKind.QuestionQuestionEqualsToken:
+              case ts6.SyntaxKind.AmpersandAmpersandEqualsToken:
+              case ts6.SyntaxKind.BarBarEqualsToken:
                 return true;
               default:
                 node = parent;
@@ -8949,34 +8949,34 @@ var require_util = __commonJS({
     exports.isExpressionValueUsed = isExpressionValueUsed;
     function isInDestructuringAssignment(node) {
       switch (node.kind) {
-        case ts5.SyntaxKind.ShorthandPropertyAssignment:
+        case ts6.SyntaxKind.ShorthandPropertyAssignment:
           if (node.objectAssignmentInitializer !== void 0)
             return true;
-        case ts5.SyntaxKind.PropertyAssignment:
-        case ts5.SyntaxKind.SpreadAssignment:
+        case ts6.SyntaxKind.PropertyAssignment:
+        case ts6.SyntaxKind.SpreadAssignment:
           node = node.parent;
           break;
-        case ts5.SyntaxKind.SpreadElement:
-          if (node.parent.kind !== ts5.SyntaxKind.ArrayLiteralExpression)
+        case ts6.SyntaxKind.SpreadElement:
+          if (node.parent.kind !== ts6.SyntaxKind.ArrayLiteralExpression)
             return false;
           node = node.parent;
       }
       while (true) {
         switch (node.parent.kind) {
-          case ts5.SyntaxKind.BinaryExpression:
-            return node.parent.left === node && node.parent.operatorToken.kind === ts5.SyntaxKind.EqualsToken;
-          case ts5.SyntaxKind.ForOfStatement:
+          case ts6.SyntaxKind.BinaryExpression:
+            return node.parent.left === node && node.parent.operatorToken.kind === ts6.SyntaxKind.EqualsToken;
+          case ts6.SyntaxKind.ForOfStatement:
             return node.parent.initializer === node;
-          case ts5.SyntaxKind.ArrayLiteralExpression:
-          case ts5.SyntaxKind.ObjectLiteralExpression:
+          case ts6.SyntaxKind.ArrayLiteralExpression:
+          case ts6.SyntaxKind.ObjectLiteralExpression:
             node = node.parent;
             break;
-          case ts5.SyntaxKind.SpreadAssignment:
-          case ts5.SyntaxKind.PropertyAssignment:
+          case ts6.SyntaxKind.SpreadAssignment:
+          case ts6.SyntaxKind.PropertyAssignment:
             node = node.parent.parent;
             break;
-          case ts5.SyntaxKind.SpreadElement:
-            if (node.parent.parent.kind !== ts5.SyntaxKind.ArrayLiteralExpression)
+          case ts6.SyntaxKind.SpreadElement:
+            if (node.parent.parent.kind !== ts6.SyntaxKind.ArrayLiteralExpression)
               return false;
             node = node.parent.parent;
             break;
@@ -8997,72 +8997,72 @@ var require_util = __commonJS({
     function getAccessKind(node) {
       const parent = node.parent;
       switch (parent.kind) {
-        case ts5.SyntaxKind.DeleteExpression:
+        case ts6.SyntaxKind.DeleteExpression:
           return 4;
-        case ts5.SyntaxKind.PostfixUnaryExpression:
+        case ts6.SyntaxKind.PostfixUnaryExpression:
           return 3;
-        case ts5.SyntaxKind.PrefixUnaryExpression:
-          return parent.operator === ts5.SyntaxKind.PlusPlusToken || parent.operator === ts5.SyntaxKind.MinusMinusToken ? 3 : 1;
-        case ts5.SyntaxKind.BinaryExpression:
-          return parent.right === node ? 1 : !isAssignmentKind(parent.operatorToken.kind) ? 1 : parent.operatorToken.kind === ts5.SyntaxKind.EqualsToken ? 2 : 3;
-        case ts5.SyntaxKind.ShorthandPropertyAssignment:
+        case ts6.SyntaxKind.PrefixUnaryExpression:
+          return parent.operator === ts6.SyntaxKind.PlusPlusToken || parent.operator === ts6.SyntaxKind.MinusMinusToken ? 3 : 1;
+        case ts6.SyntaxKind.BinaryExpression:
+          return parent.right === node ? 1 : !isAssignmentKind(parent.operatorToken.kind) ? 1 : parent.operatorToken.kind === ts6.SyntaxKind.EqualsToken ? 2 : 3;
+        case ts6.SyntaxKind.ShorthandPropertyAssignment:
           return parent.objectAssignmentInitializer === node ? 1 : isInDestructuringAssignment(parent) ? 2 : 1;
-        case ts5.SyntaxKind.PropertyAssignment:
+        case ts6.SyntaxKind.PropertyAssignment:
           return parent.name === node ? 0 : isInDestructuringAssignment(parent) ? 2 : 1;
-        case ts5.SyntaxKind.ArrayLiteralExpression:
-        case ts5.SyntaxKind.SpreadElement:
-        case ts5.SyntaxKind.SpreadAssignment:
+        case ts6.SyntaxKind.ArrayLiteralExpression:
+        case ts6.SyntaxKind.SpreadElement:
+        case ts6.SyntaxKind.SpreadAssignment:
           return isInDestructuringAssignment(parent) ? 2 : 1;
-        case ts5.SyntaxKind.ParenthesizedExpression:
-        case ts5.SyntaxKind.NonNullExpression:
-        case ts5.SyntaxKind.TypeAssertionExpression:
-        case ts5.SyntaxKind.AsExpression:
+        case ts6.SyntaxKind.ParenthesizedExpression:
+        case ts6.SyntaxKind.NonNullExpression:
+        case ts6.SyntaxKind.TypeAssertionExpression:
+        case ts6.SyntaxKind.AsExpression:
           return getAccessKind(parent);
-        case ts5.SyntaxKind.ForOfStatement:
-        case ts5.SyntaxKind.ForInStatement:
+        case ts6.SyntaxKind.ForOfStatement:
+        case ts6.SyntaxKind.ForInStatement:
           return parent.initializer === node ? 2 : 1;
-        case ts5.SyntaxKind.ExpressionWithTypeArguments:
-          return parent.parent.token === ts5.SyntaxKind.ExtendsKeyword && parent.parent.parent.kind !== ts5.SyntaxKind.InterfaceDeclaration ? 1 : 0;
-        case ts5.SyntaxKind.ComputedPropertyName:
-        case ts5.SyntaxKind.ExpressionStatement:
-        case ts5.SyntaxKind.TypeOfExpression:
-        case ts5.SyntaxKind.ElementAccessExpression:
-        case ts5.SyntaxKind.ForStatement:
-        case ts5.SyntaxKind.IfStatement:
-        case ts5.SyntaxKind.DoStatement:
-        case ts5.SyntaxKind.WhileStatement:
-        case ts5.SyntaxKind.SwitchStatement:
-        case ts5.SyntaxKind.WithStatement:
-        case ts5.SyntaxKind.ThrowStatement:
-        case ts5.SyntaxKind.CallExpression:
-        case ts5.SyntaxKind.NewExpression:
-        case ts5.SyntaxKind.TaggedTemplateExpression:
-        case ts5.SyntaxKind.JsxExpression:
-        case ts5.SyntaxKind.Decorator:
-        case ts5.SyntaxKind.TemplateSpan:
-        case ts5.SyntaxKind.JsxOpeningElement:
-        case ts5.SyntaxKind.JsxSelfClosingElement:
-        case ts5.SyntaxKind.JsxSpreadAttribute:
-        case ts5.SyntaxKind.VoidExpression:
-        case ts5.SyntaxKind.ReturnStatement:
-        case ts5.SyntaxKind.AwaitExpression:
-        case ts5.SyntaxKind.YieldExpression:
-        case ts5.SyntaxKind.ConditionalExpression:
-        case ts5.SyntaxKind.CaseClause:
-        case ts5.SyntaxKind.JsxElement:
+        case ts6.SyntaxKind.ExpressionWithTypeArguments:
+          return parent.parent.token === ts6.SyntaxKind.ExtendsKeyword && parent.parent.parent.kind !== ts6.SyntaxKind.InterfaceDeclaration ? 1 : 0;
+        case ts6.SyntaxKind.ComputedPropertyName:
+        case ts6.SyntaxKind.ExpressionStatement:
+        case ts6.SyntaxKind.TypeOfExpression:
+        case ts6.SyntaxKind.ElementAccessExpression:
+        case ts6.SyntaxKind.ForStatement:
+        case ts6.SyntaxKind.IfStatement:
+        case ts6.SyntaxKind.DoStatement:
+        case ts6.SyntaxKind.WhileStatement:
+        case ts6.SyntaxKind.SwitchStatement:
+        case ts6.SyntaxKind.WithStatement:
+        case ts6.SyntaxKind.ThrowStatement:
+        case ts6.SyntaxKind.CallExpression:
+        case ts6.SyntaxKind.NewExpression:
+        case ts6.SyntaxKind.TaggedTemplateExpression:
+        case ts6.SyntaxKind.JsxExpression:
+        case ts6.SyntaxKind.Decorator:
+        case ts6.SyntaxKind.TemplateSpan:
+        case ts6.SyntaxKind.JsxOpeningElement:
+        case ts6.SyntaxKind.JsxSelfClosingElement:
+        case ts6.SyntaxKind.JsxSpreadAttribute:
+        case ts6.SyntaxKind.VoidExpression:
+        case ts6.SyntaxKind.ReturnStatement:
+        case ts6.SyntaxKind.AwaitExpression:
+        case ts6.SyntaxKind.YieldExpression:
+        case ts6.SyntaxKind.ConditionalExpression:
+        case ts6.SyntaxKind.CaseClause:
+        case ts6.SyntaxKind.JsxElement:
           return 1;
-        case ts5.SyntaxKind.ArrowFunction:
+        case ts6.SyntaxKind.ArrowFunction:
           return parent.body === node ? 1 : 2;
-        case ts5.SyntaxKind.PropertyDeclaration:
-        case ts5.SyntaxKind.VariableDeclaration:
-        case ts5.SyntaxKind.Parameter:
-        case ts5.SyntaxKind.EnumMember:
-        case ts5.SyntaxKind.BindingElement:
-        case ts5.SyntaxKind.JsxAttribute:
+        case ts6.SyntaxKind.PropertyDeclaration:
+        case ts6.SyntaxKind.VariableDeclaration:
+        case ts6.SyntaxKind.Parameter:
+        case ts6.SyntaxKind.EnumMember:
+        case ts6.SyntaxKind.BindingElement:
+        case ts6.SyntaxKind.JsxAttribute:
           return parent.initializer === node ? 1 : 0;
-        case ts5.SyntaxKind.PropertyAccessExpression:
+        case ts6.SyntaxKind.PropertyAccessExpression:
           return parent.expression === node ? 1 : 0;
-        case ts5.SyntaxKind.ExportAssignment:
+        case ts6.SyntaxKind.ExportAssignment:
           return parent.isExportEquals ? 1 : 0;
       }
       return 0;
@@ -9075,44 +9075,44 @@ var require_util = __commonJS({
     function canHaveJsDoc(node) {
       const kind = node.kind;
       switch (kind) {
-        case ts5.SyntaxKind.Parameter:
-        case ts5.SyntaxKind.CallSignature:
-        case ts5.SyntaxKind.ConstructSignature:
-        case ts5.SyntaxKind.MethodSignature:
-        case ts5.SyntaxKind.PropertySignature:
-        case ts5.SyntaxKind.ArrowFunction:
-        case ts5.SyntaxKind.ParenthesizedExpression:
-        case ts5.SyntaxKind.SpreadAssignment:
-        case ts5.SyntaxKind.ShorthandPropertyAssignment:
-        case ts5.SyntaxKind.PropertyAssignment:
-        case ts5.SyntaxKind.FunctionExpression:
-        case ts5.SyntaxKind.LabeledStatement:
-        case ts5.SyntaxKind.ExpressionStatement:
-        case ts5.SyntaxKind.VariableStatement:
-        case ts5.SyntaxKind.FunctionDeclaration:
-        case ts5.SyntaxKind.Constructor:
-        case ts5.SyntaxKind.MethodDeclaration:
-        case ts5.SyntaxKind.PropertyDeclaration:
-        case ts5.SyntaxKind.GetAccessor:
-        case ts5.SyntaxKind.SetAccessor:
-        case ts5.SyntaxKind.ClassDeclaration:
-        case ts5.SyntaxKind.ClassExpression:
-        case ts5.SyntaxKind.InterfaceDeclaration:
-        case ts5.SyntaxKind.TypeAliasDeclaration:
-        case ts5.SyntaxKind.EnumMember:
-        case ts5.SyntaxKind.EnumDeclaration:
-        case ts5.SyntaxKind.ModuleDeclaration:
-        case ts5.SyntaxKind.ImportEqualsDeclaration:
-        case ts5.SyntaxKind.ImportDeclaration:
-        case ts5.SyntaxKind.NamespaceExportDeclaration:
-        case ts5.SyntaxKind.ExportAssignment:
-        case ts5.SyntaxKind.IndexSignature:
-        case ts5.SyntaxKind.FunctionType:
-        case ts5.SyntaxKind.ConstructorType:
-        case ts5.SyntaxKind.JSDocFunctionType:
-        case ts5.SyntaxKind.ExportDeclaration:
-        case ts5.SyntaxKind.NamedTupleMember:
-        case ts5.SyntaxKind.EndOfFileToken:
+        case ts6.SyntaxKind.Parameter:
+        case ts6.SyntaxKind.CallSignature:
+        case ts6.SyntaxKind.ConstructSignature:
+        case ts6.SyntaxKind.MethodSignature:
+        case ts6.SyntaxKind.PropertySignature:
+        case ts6.SyntaxKind.ArrowFunction:
+        case ts6.SyntaxKind.ParenthesizedExpression:
+        case ts6.SyntaxKind.SpreadAssignment:
+        case ts6.SyntaxKind.ShorthandPropertyAssignment:
+        case ts6.SyntaxKind.PropertyAssignment:
+        case ts6.SyntaxKind.FunctionExpression:
+        case ts6.SyntaxKind.LabeledStatement:
+        case ts6.SyntaxKind.ExpressionStatement:
+        case ts6.SyntaxKind.VariableStatement:
+        case ts6.SyntaxKind.FunctionDeclaration:
+        case ts6.SyntaxKind.Constructor:
+        case ts6.SyntaxKind.MethodDeclaration:
+        case ts6.SyntaxKind.PropertyDeclaration:
+        case ts6.SyntaxKind.GetAccessor:
+        case ts6.SyntaxKind.SetAccessor:
+        case ts6.SyntaxKind.ClassDeclaration:
+        case ts6.SyntaxKind.ClassExpression:
+        case ts6.SyntaxKind.InterfaceDeclaration:
+        case ts6.SyntaxKind.TypeAliasDeclaration:
+        case ts6.SyntaxKind.EnumMember:
+        case ts6.SyntaxKind.EnumDeclaration:
+        case ts6.SyntaxKind.ModuleDeclaration:
+        case ts6.SyntaxKind.ImportEqualsDeclaration:
+        case ts6.SyntaxKind.ImportDeclaration:
+        case ts6.SyntaxKind.NamespaceExportDeclaration:
+        case ts6.SyntaxKind.ExportAssignment:
+        case ts6.SyntaxKind.IndexSignature:
+        case ts6.SyntaxKind.FunctionType:
+        case ts6.SyntaxKind.ConstructorType:
+        case ts6.SyntaxKind.JSDocFunctionType:
+        case ts6.SyntaxKind.ExportDeclaration:
+        case ts6.SyntaxKind.NamedTupleMember:
+        case ts6.SyntaxKind.EndOfFileToken:
           return true;
         default:
           return false;
@@ -9130,7 +9130,7 @@ var require_util = __commonJS({
     }
     exports.getJsDoc = getJsDoc;
     function parseJsDocOfNode(node, considerTrailingComments, sourceFile = node.getSourceFile()) {
-      if (canHaveJsDoc(node) && node.kind !== ts5.SyntaxKind.EndOfFileToken) {
+      if (canHaveJsDoc(node) && node.kind !== ts6.SyntaxKind.EndOfFileToken) {
         const result = getJsDoc(node, sourceFile);
         if (result.length !== 0 || !considerTrailingComments)
           return result;
@@ -9139,17 +9139,17 @@ var require_util = __commonJS({
     }
     exports.parseJsDocOfNode = parseJsDocOfNode;
     function parseJsDocWorker(node, nodeStart, sourceFile, considerTrailingComments) {
-      const start = ts5[considerTrailingComments && isSameLine(sourceFile, node.pos, nodeStart) ? "forEachTrailingCommentRange" : "forEachLeadingCommentRange"](
+      const start = ts6[considerTrailingComments && isSameLine(sourceFile, node.pos, nodeStart) ? "forEachTrailingCommentRange" : "forEachLeadingCommentRange"](
         sourceFile.text,
         node.pos,
         // return object to make `0` a truthy value
-        (pos, _end, kind) => kind === ts5.SyntaxKind.MultiLineCommentTrivia && sourceFile.text[pos + 2] === "*" ? { pos } : void 0
+        (pos, _end, kind) => kind === ts6.SyntaxKind.MultiLineCommentTrivia && sourceFile.text[pos + 2] === "*" ? { pos } : void 0
       );
       if (start === void 0)
         return [];
       const startPos = start.pos;
       const text = sourceFile.text.slice(startPos, nodeStart);
-      const newSourceFile = ts5.createSourceFile("jsdoc.ts", `${text}var a;`, sourceFile.languageVersion);
+      const newSourceFile = ts6.createSourceFile("jsdoc.ts", `${text}var a;`, sourceFile.languageVersion);
       const result = getJsDoc(newSourceFile.statements[0], newSourceFile);
       for (const doc of result)
         updateNode(doc, node);
@@ -9158,7 +9158,7 @@ var require_util = __commonJS({
         n.pos += startPos;
         n.end += startPos;
         n.parent = parent;
-        return ts5.forEachChild(n, (child) => updateNode(child, n), (children) => {
+        return ts6.forEachChild(n, (child) => updateNode(child, n), (children) => {
           children.pos += startPos;
           children.end += startPos;
           for (const child of children)
@@ -9186,19 +9186,19 @@ var require_util = __commonJS({
       const result = [];
       for (const node of findImportLikeNodes(sourceFile, kinds, ignoreFileName)) {
         switch (node.kind) {
-          case ts5.SyntaxKind.ImportDeclaration:
+          case ts6.SyntaxKind.ImportDeclaration:
             addIfTextualLiteral(node.moduleSpecifier);
             break;
-          case ts5.SyntaxKind.ImportEqualsDeclaration:
+          case ts6.SyntaxKind.ImportEqualsDeclaration:
             addIfTextualLiteral(node.moduleReference.expression);
             break;
-          case ts5.SyntaxKind.ExportDeclaration:
+          case ts6.SyntaxKind.ExportDeclaration:
             addIfTextualLiteral(node.moduleSpecifier);
             break;
-          case ts5.SyntaxKind.CallExpression:
+          case ts6.SyntaxKind.CallExpression:
             addIfTextualLiteral(node.arguments[0]);
             break;
-          case ts5.SyntaxKind.ImportType:
+          case ts6.SyntaxKind.ImportType:
             if (node_1.isLiteralTypeNode(node.argument))
               addIfTextualLiteral(node.argument.literal);
             break;
@@ -9239,7 +9239,7 @@ var require_util = __commonJS({
             if (this._options & 1)
               this._result.push(statement);
           } else if (node_1.isImportEqualsDeclaration(statement)) {
-            if (this._options & 2 && statement.moduleReference.kind === ts5.SyntaxKind.ExternalModuleReference)
+            if (this._options & 2 && statement.moduleReference.kind === ts6.SyntaxKind.ExternalModuleReference)
               this._result.push(statement);
           } else if (node_1.isExportDeclaration(statement)) {
             if (statement.moduleSpecifier !== void 0 && this._options & 4)
@@ -9252,12 +9252,12 @@ var require_util = __commonJS({
       _findImportsInModule(declaration) {
         if (declaration.body === void 0)
           return;
-        if (declaration.body.kind === ts5.SyntaxKind.ModuleDeclaration)
+        if (declaration.body.kind === ts6.SyntaxKind.ModuleDeclaration)
           return this._findImportsInModule(declaration.body);
         this._findImports(declaration.body.statements);
       }
       _findNestedImports() {
-        const isJavaScriptFile = this._ignoreFileName || (this._sourceFile.flags & ts5.NodeFlags.JavaScriptFile) !== 0;
+        const isJavaScriptFile = this._ignoreFileName || (this._sourceFile.flags & ts6.NodeFlags.JavaScriptFile) !== 0;
         let re;
         let includeJsDoc;
         if ((this._options & 56) === 16) {
@@ -9272,43 +9272,43 @@ var require_util = __commonJS({
           re = /\bimport\s*[</(]/g;
           includeJsDoc = isJavaScriptFile && (this._options & 32) !== 0;
         }
-        for (let match = re.exec(this._sourceFile.text); match !== null; match = re.exec(this._sourceFile.text)) {
+        for (let match3 = re.exec(this._sourceFile.text); match3 !== null; match3 = re.exec(this._sourceFile.text)) {
           const token = getTokenAtPositionWorker(
             this._sourceFile,
-            match.index,
+            match3.index,
             this._sourceFile,
             // only look for ImportTypeNode within JSDoc in JS files
-            match[0][0] === "i" && includeJsDoc
+            match3[0][0] === "i" && includeJsDoc
           );
-          if (token.kind === ts5.SyntaxKind.ImportKeyword) {
-            if (token.end - "import".length !== match.index)
+          if (token.kind === ts6.SyntaxKind.ImportKeyword) {
+            if (token.end - "import".length !== match3.index)
               continue;
             switch (token.parent.kind) {
-              case ts5.SyntaxKind.ImportType:
+              case ts6.SyntaxKind.ImportType:
                 this._result.push(token.parent);
                 break;
-              case ts5.SyntaxKind.CallExpression:
+              case ts6.SyntaxKind.CallExpression:
                 if (token.parent.arguments.length > 1)
                   this._result.push(token.parent);
             }
-          } else if (token.kind === ts5.SyntaxKind.Identifier && token.end - "require".length === match.index && token.parent.kind === ts5.SyntaxKind.CallExpression && token.parent.expression === token && token.parent.arguments.length === 1) {
+          } else if (token.kind === ts6.SyntaxKind.Identifier && token.end - "require".length === match3.index && token.parent.kind === ts6.SyntaxKind.CallExpression && token.parent.expression === token && token.parent.arguments.length === 1) {
             this._result.push(token.parent);
           }
         }
       }
     };
     function isStatementInAmbientContext(node) {
-      while (node.flags & ts5.NodeFlags.NestedNamespace)
+      while (node.flags & ts6.NodeFlags.NestedNamespace)
         node = node.parent;
-      return hasModifier(node.modifiers, ts5.SyntaxKind.DeclareKeyword) || isAmbientModuleBlock(node.parent);
+      return hasModifier(node.modifiers, ts6.SyntaxKind.DeclareKeyword) || isAmbientModuleBlock(node.parent);
     }
     exports.isStatementInAmbientContext = isStatementInAmbientContext;
     function isAmbientModuleBlock(node) {
-      while (node.kind === ts5.SyntaxKind.ModuleBlock) {
+      while (node.kind === ts6.SyntaxKind.ModuleBlock) {
         do
           node = node.parent;
-        while (node.flags & ts5.NodeFlags.NestedNamespace);
-        if (hasModifier(node.modifiers, ts5.SyntaxKind.DeclareKeyword))
+        while (node.flags & ts6.NodeFlags.NestedNamespace);
+        if (hasModifier(node.modifiers, ts6.SyntaxKind.DeclareKeyword))
           return true;
         node = node.parent;
       }
@@ -9317,7 +9317,7 @@ var require_util = __commonJS({
     exports.isAmbientModuleBlock = isAmbientModuleBlock;
     function getIIFE(func) {
       let node = func.parent;
-      while (node.kind === ts5.SyntaxKind.ParenthesizedExpression)
+      while (node.kind === ts6.SyntaxKind.ParenthesizedExpression)
         node = node.parent;
       return node_1.isCallExpression(node) && func.end <= node.expression.end ? node : void 0;
     }
@@ -9341,7 +9341,7 @@ var require_util = __commonJS({
         case "suppressImplicitAnyIndexErrors":
           return options.suppressImplicitAnyIndexErrors === true && isCompilerOptionEnabled(options, "noImplicitAny");
         case "allowSyntheticDefaultImports":
-          return options.allowSyntheticDefaultImports !== void 0 ? options.allowSyntheticDefaultImports : isCompilerOptionEnabled(options, "esModuleInterop") || options.module === ts5.ModuleKind.System;
+          return options.allowSyntheticDefaultImports !== void 0 ? options.allowSyntheticDefaultImports : isCompilerOptionEnabled(options, "esModuleInterop") || options.module === ts6.ModuleKind.System;
         case "noUncheckedIndexedAccess":
           return options.noUncheckedIndexedAccess === true && isCompilerOptionEnabled(options, "strictNullChecks");
         case "allowJs":
@@ -9359,7 +9359,7 @@ var require_util = __commonJS({
     }
     exports.isCompilerOptionEnabled = isCompilerOptionEnabled;
     function isAmbientModule(node) {
-      return node.name.kind === ts5.SyntaxKind.StringLiteral || (node.flags & ts5.NodeFlags.GlobalAugmentation) !== 0;
+      return node.name.kind === ts6.SyntaxKind.StringLiteral || (node.flags & ts6.NodeFlags.GlobalAugmentation) !== 0;
     }
     exports.isAmbientModule = isAmbientModule;
     function getCheckJsDirective(source) {
@@ -9368,19 +9368,19 @@ var require_util = __commonJS({
     exports.getCheckJsDirective = getCheckJsDirective;
     function getTsCheckDirective(source) {
       let directive;
-      ts5.forEachLeadingCommentRange(source, (ts5.getShebang(source) || "").length, (pos, end, kind) => {
-        if (kind === ts5.SyntaxKind.SingleLineCommentTrivia) {
+      ts6.forEachLeadingCommentRange(source, (ts6.getShebang(source) || "").length, (pos, end, kind) => {
+        if (kind === ts6.SyntaxKind.SingleLineCommentTrivia) {
           const text = source.slice(pos, end);
-          const match = /^\/{2,3}\s*@ts-(no)?check(?:\s|$)/i.exec(text);
-          if (match !== null)
-            directive = { pos, end, enabled: match[1] === void 0 };
+          const match3 = /^\/{2,3}\s*@ts-(no)?check(?:\s|$)/i.exec(text);
+          if (match3 !== null)
+            directive = { pos, end, enabled: match3[1] === void 0 };
         }
       });
       return directive;
     }
     exports.getTsCheckDirective = getTsCheckDirective;
     function isConstAssertion(node) {
-      return node_1.isTypeReferenceNode(node.type) && node.type.typeName.kind === ts5.SyntaxKind.Identifier && node.type.typeName.escapedText === "const";
+      return node_1.isTypeReferenceNode(node.type) && node.type.typeName.kind === ts6.SyntaxKind.Identifier && node.type.typeName.escapedText === "const";
     }
     exports.isConstAssertion = isConstAssertion;
     function isInConstContext(node) {
@@ -9389,32 +9389,32 @@ var require_util = __commonJS({
         const parent = current.parent;
         outer:
           switch (parent.kind) {
-            case ts5.SyntaxKind.TypeAssertionExpression:
-            case ts5.SyntaxKind.AsExpression:
+            case ts6.SyntaxKind.TypeAssertionExpression:
+            case ts6.SyntaxKind.AsExpression:
               return isConstAssertion(parent);
-            case ts5.SyntaxKind.PrefixUnaryExpression:
-              if (current.kind !== ts5.SyntaxKind.NumericLiteral)
+            case ts6.SyntaxKind.PrefixUnaryExpression:
+              if (current.kind !== ts6.SyntaxKind.NumericLiteral)
                 return false;
               switch (parent.operator) {
-                case ts5.SyntaxKind.PlusToken:
-                case ts5.SyntaxKind.MinusToken:
+                case ts6.SyntaxKind.PlusToken:
+                case ts6.SyntaxKind.MinusToken:
                   current = parent;
                   break outer;
                 default:
                   return false;
               }
-            case ts5.SyntaxKind.PropertyAssignment:
+            case ts6.SyntaxKind.PropertyAssignment:
               if (parent.initializer !== current)
                 return false;
               current = parent.parent;
               break;
-            case ts5.SyntaxKind.ShorthandPropertyAssignment:
+            case ts6.SyntaxKind.ShorthandPropertyAssignment:
               current = parent.parent;
               break;
-            case ts5.SyntaxKind.ParenthesizedExpression:
-            case ts5.SyntaxKind.ArrayLiteralExpression:
-            case ts5.SyntaxKind.ObjectLiteralExpression:
-            case ts5.SyntaxKind.TemplateExpression:
+            case ts6.SyntaxKind.ParenthesizedExpression:
+            case ts6.SyntaxKind.ArrayLiteralExpression:
+            case ts6.SyntaxKind.ObjectLiteralExpression:
+            case ts6.SyntaxKind.TemplateExpression:
               current = parent;
               break;
             default:
@@ -9441,7 +9441,7 @@ var require_util = __commonJS({
     }
     exports.isBindableObjectDefinePropertyCall = isBindableObjectDefinePropertyCall;
     function isWellKnownSymbolLiterally(node) {
-      return ts5.isPropertyAccessExpression(node) && ts5.isIdentifier(node.expression) && node.expression.escapedText === "Symbol";
+      return ts6.isPropertyAccessExpression(node) && ts6.isIdentifier(node.expression) && node.expression.escapedText === "Symbol";
     }
     exports.isWellKnownSymbolLiterally = isWellKnownSymbolLiterally;
     function getPropertyNameOfWellKnownSymbol(node) {
@@ -9451,7 +9451,7 @@ var require_util = __commonJS({
       };
     }
     exports.getPropertyNameOfWellKnownSymbol = getPropertyNameOfWellKnownSymbol;
-    var isTsBefore43 = (([major, minor]) => major < "4" || major === "4" && minor < "3")(ts5.versionMajorMinor.split("."));
+    var isTsBefore43 = (([major, minor]) => major < "4" || major === "4" && minor < "3")(ts6.versionMajorMinor.split("."));
     function getLateBoundPropertyNames(node, checker) {
       const result = {
         known: true,
@@ -9476,21 +9476,21 @@ var require_util = __commonJS({
     exports.getLateBoundPropertyNames = getLateBoundPropertyNames;
     function getLateBoundPropertyNamesOfPropertyName(node, checker) {
       const staticName = getPropertyName(node);
-      return staticName !== void 0 ? { known: true, names: [{ displayName: staticName, symbolName: ts5.escapeLeadingUnderscores(staticName) }] } : node.kind === ts5.SyntaxKind.PrivateIdentifier ? { known: true, names: [{ displayName: node.text, symbolName: checker.getSymbolAtLocation(node).escapedName }] } : getLateBoundPropertyNames(node.expression, checker);
+      return staticName !== void 0 ? { known: true, names: [{ displayName: staticName, symbolName: ts6.escapeLeadingUnderscores(staticName) }] } : node.kind === ts6.SyntaxKind.PrivateIdentifier ? { known: true, names: [{ displayName: node.text, symbolName: checker.getSymbolAtLocation(node).escapedName }] } : getLateBoundPropertyNames(node.expression, checker);
     }
     exports.getLateBoundPropertyNamesOfPropertyName = getLateBoundPropertyNamesOfPropertyName;
     function getSingleLateBoundPropertyNameOfPropertyName(node, checker) {
       const staticName = getPropertyName(node);
       if (staticName !== void 0)
-        return { displayName: staticName, symbolName: ts5.escapeLeadingUnderscores(staticName) };
-      if (node.kind === ts5.SyntaxKind.PrivateIdentifier)
+        return { displayName: staticName, symbolName: ts6.escapeLeadingUnderscores(staticName) };
+      if (node.kind === ts6.SyntaxKind.PrivateIdentifier)
         return { displayName: node.text, symbolName: checker.getSymbolAtLocation(node).escapedName };
       const { expression } = node;
       return isTsBefore43 && isWellKnownSymbolLiterally(expression) ? getPropertyNameOfWellKnownSymbol(expression) : type_1.getPropertyNameFromType(checker.getTypeAtLocation(expression));
     }
     exports.getSingleLateBoundPropertyNameOfPropertyName = getSingleLateBoundPropertyNameOfPropertyName;
     function unwrapParentheses(node) {
-      while (node.kind === ts5.SyntaxKind.ParenthesizedExpression)
+      while (node.kind === ts6.SyntaxKind.ParenthesizedExpression)
         node = node.expression;
       return node;
     }
@@ -9512,7 +9512,7 @@ var require_util = __commonJS({
       const seen = /* @__PURE__ */ new Set();
       for (const clause of caseClauses) {
         const expressionType = checker.getTypeAtLocation(clause.expression);
-        if (exports.isTypeFlagSet(expressionType, ts5.TypeFlags.Never))
+        if (exports.isTypeFlagSet(expressionType, ts6.TypeFlags.Never))
           continue;
         const type = getPrimitiveLiteralFromType(expressionType);
         if (types.has(type)) {
@@ -9525,15 +9525,15 @@ var require_util = __commonJS({
     }
     exports.hasExhaustiveCaseClauses = hasExhaustiveCaseClauses;
     function getPrimitiveLiteralFromType(t) {
-      if (exports.isTypeFlagSet(t, ts5.TypeFlags.Null))
+      if (exports.isTypeFlagSet(t, ts6.TypeFlags.Null))
         return "null";
-      if (exports.isTypeFlagSet(t, ts5.TypeFlags.Undefined))
+      if (exports.isTypeFlagSet(t, ts6.TypeFlags.Undefined))
         return "undefined";
-      if (exports.isTypeFlagSet(t, ts5.TypeFlags.NumberLiteral))
-        return `${exports.isTypeFlagSet(t, ts5.TypeFlags.EnumLiteral) ? "enum:" : ""}${t.value}`;
-      if (exports.isTypeFlagSet(t, ts5.TypeFlags.StringLiteral))
-        return `${exports.isTypeFlagSet(t, ts5.TypeFlags.EnumLiteral) ? "enum:" : ""}string:${t.value}`;
-      if (exports.isTypeFlagSet(t, ts5.TypeFlags.BigIntLiteral))
+      if (exports.isTypeFlagSet(t, ts6.TypeFlags.NumberLiteral))
+        return `${exports.isTypeFlagSet(t, ts6.TypeFlags.EnumLiteral) ? "enum:" : ""}${t.value}`;
+      if (exports.isTypeFlagSet(t, ts6.TypeFlags.StringLiteral))
+        return `${exports.isTypeFlagSet(t, ts6.TypeFlags.EnumLiteral) ? "enum:" : ""}string:${t.value}`;
+      if (exports.isTypeFlagSet(t, ts6.TypeFlags.BigIntLiteral))
         return formatPseudoBigInt(t.value);
       if (_3_2_1.isUniqueESSymbolType(t))
         return t.escapedName;
@@ -9544,7 +9544,7 @@ var require_util = __commonJS({
     }
     function getBaseOfClassLikeExpression(node) {
       var _a2;
-      if (((_a2 = node.heritageClauses) === null || _a2 === void 0 ? void 0 : _a2[0].token) === ts5.SyntaxKind.ExtendsKeyword)
+      if (((_a2 = node.heritageClauses) === null || _a2 === void 0 ? void 0 : _a2[0].token) === ts6.SyntaxKind.ExtendsKeyword)
         return node.heritageClauses[0].types[0];
     }
     exports.getBaseOfClassLikeExpression = getBaseOfClassLikeExpression;
@@ -9590,17 +9590,17 @@ var require_convert_comments = __commonJS({
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.convertComments = void 0;
     var util_1 = require_util();
-    var ts5 = __importStar2(require("typescript"));
+    var ts6 = __importStar2(require("typescript"));
     var node_utils_1 = require_node_utils();
     var ts_estree_1 = require_ts_estree2();
     function convertComments(ast, code) {
       const comments = [];
       (0, util_1.forEachComment)(ast, (_, comment) => {
-        const type = comment.kind === ts5.SyntaxKind.SingleLineCommentTrivia ? ts_estree_1.AST_TOKEN_TYPES.Line : ts_estree_1.AST_TOKEN_TYPES.Block;
+        const type = comment.kind === ts6.SyntaxKind.SingleLineCommentTrivia ? ts_estree_1.AST_TOKEN_TYPES.Line : ts_estree_1.AST_TOKEN_TYPES.Block;
         const range = [comment.pos, comment.end];
         const loc = (0, node_utils_1.getLocFor)(range[0], range[1], ast);
         const textStart = range[0] + 2;
-        const textEnd = comment.kind === ts5.SyntaxKind.SingleLineCommentTrivia ? (
+        const textEnd = comment.kind === ts6.SyntaxKind.SingleLineCommentTrivia ? (
           // single line comments end at the end
           range[1] - textStart
         ) : (
@@ -10317,7 +10317,7 @@ var require_shared = __commonJS({
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.getModuleResolver = exports.getAstFromProgram = exports.getCanonicalFileName = exports.ensureAbsolutePath = exports.createHash = exports.createDefaultCompilerOptionsFromExtra = exports.canonicalDirname = exports.CORE_COMPILER_OPTIONS = void 0;
     var path_1 = __importDefault2(require("path"));
-    var ts5 = __importStar2(require("typescript"));
+    var ts6 = __importStar2(require("typescript"));
     var CORE_COMPILER_OPTIONS = {
       noEmit: true,
       /**
@@ -10335,7 +10335,7 @@ var require_shared = __commonJS({
       return DEFAULT_COMPILER_OPTIONS;
     }
     exports.createDefaultCompilerOptionsFromExtra = createDefaultCompilerOptionsFromExtra;
-    var useCaseSensitiveFileNames = ts5.sys !== void 0 ? ts5.sys.useCaseSensitiveFileNames : true;
+    var useCaseSensitiveFileNames = ts6.sys !== void 0 ? ts6.sys.useCaseSensitiveFileNames : true;
     var correctPathCasing = useCaseSensitiveFileNames ? (filePath) => filePath : (filePath) => filePath.toLowerCase();
     function getCanonicalFileName(filePath) {
       let normalized = path_1.default.normalize(filePath);
@@ -10354,9 +10354,9 @@ var require_shared = __commonJS({
     }
     exports.canonicalDirname = canonicalDirname;
     var DEFINITION_EXTENSIONS = [
-      ts5.Extension.Dts,
-      ts5.Extension.Dcts,
-      ts5.Extension.Dmts
+      ts6.Extension.Dts,
+      ts6.Extension.Dcts,
+      ts6.Extension.Dmts
     ];
     function getExtension(fileName) {
       var _a2;
@@ -10389,14 +10389,14 @@ var require_shared = __commonJS({
       return moduleResolver;
     }
     exports.getModuleResolver = getModuleResolver;
-    function createHash(content) {
+    function createHash2(content) {
       var _a2;
-      if ((_a2 = ts5.sys) === null || _a2 === void 0 ? void 0 : _a2.createHash) {
-        return ts5.sys.createHash(content);
+      if ((_a2 = ts6.sys) === null || _a2 === void 0 ? void 0 : _a2.createHash) {
+        return ts6.sys.createHash(content);
       }
       return content;
     }
-    exports.createHash = createHash;
+    exports.createHash = createHash2;
   }
 });
 
@@ -10443,7 +10443,7 @@ var require_createDefaultProgram = __commonJS({
     exports.createDefaultProgram = void 0;
     var debug_1 = __importDefault2(require_src());
     var path_1 = __importDefault2(require("path"));
-    var ts5 = __importStar2(require("typescript"));
+    var ts6 = __importStar2(require("typescript"));
     var shared_1 = require_shared();
     var log = (0, debug_1.default)("typescript-eslint:typescript-estree:createDefaultProgram");
     function createDefaultProgram(parseSettings) {
@@ -10453,12 +10453,12 @@ var require_createDefaultProgram = __commonJS({
         return void 0;
       }
       const tsconfigPath = parseSettings.projects[0];
-      const commandLine = ts5.getParsedCommandLineOfConfigFile(tsconfigPath, (0, shared_1.createDefaultCompilerOptionsFromExtra)(parseSettings), Object.assign(Object.assign({}, ts5.sys), { onUnRecoverableConfigFileDiagnostic: () => {
+      const commandLine = ts6.getParsedCommandLineOfConfigFile(tsconfigPath, (0, shared_1.createDefaultCompilerOptionsFromExtra)(parseSettings), Object.assign(Object.assign({}, ts6.sys), { onUnRecoverableConfigFileDiagnostic: () => {
       } }));
       if (!commandLine) {
         return void 0;
       }
-      const compilerHost = ts5.createCompilerHost(
+      const compilerHost = ts6.createCompilerHost(
         commandLine.options,
         /* setParentNodes */
         true
@@ -10468,7 +10468,7 @@ var require_createDefaultProgram = __commonJS({
       }
       const oldReadFile = compilerHost.readFile;
       compilerHost.readFile = (fileName) => path_1.default.normalize(fileName) === path_1.default.normalize(parseSettings.filePath) ? parseSettings.code : oldReadFile(fileName);
-      const program = ts5.createProgram([parseSettings.filePath], commandLine.options, compilerHost);
+      const program = ts6.createProgram([parseSettings.filePath], commandLine.options, compilerHost);
       const ast = program.getSourceFile(parseSettings.filePath);
       return ast && { ast, program };
     }
@@ -10518,38 +10518,38 @@ var require_getScriptKind = __commonJS({
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.getLanguageVariant = exports.getScriptKind = void 0;
     var path_1 = __importDefault2(require("path"));
-    var ts5 = __importStar2(require("typescript"));
+    var ts6 = __importStar2(require("typescript"));
     function getScriptKind(filePath, jsx) {
       const extension = path_1.default.extname(filePath).toLowerCase();
       switch (extension) {
-        case ts5.Extension.Js:
-        case ts5.Extension.Cjs:
-        case ts5.Extension.Mjs:
-          return ts5.ScriptKind.JS;
-        case ts5.Extension.Jsx:
-          return ts5.ScriptKind.JSX;
-        case ts5.Extension.Ts:
-        case ts5.Extension.Cts:
-        case ts5.Extension.Mts:
-          return ts5.ScriptKind.TS;
-        case ts5.Extension.Tsx:
-          return ts5.ScriptKind.TSX;
-        case ts5.Extension.Json:
-          return ts5.ScriptKind.JSON;
+        case ts6.Extension.Js:
+        case ts6.Extension.Cjs:
+        case ts6.Extension.Mjs:
+          return ts6.ScriptKind.JS;
+        case ts6.Extension.Jsx:
+          return ts6.ScriptKind.JSX;
+        case ts6.Extension.Ts:
+        case ts6.Extension.Cts:
+        case ts6.Extension.Mts:
+          return ts6.ScriptKind.TS;
+        case ts6.Extension.Tsx:
+          return ts6.ScriptKind.TSX;
+        case ts6.Extension.Json:
+          return ts6.ScriptKind.JSON;
         default:
-          return jsx ? ts5.ScriptKind.TSX : ts5.ScriptKind.TS;
+          return jsx ? ts6.ScriptKind.TSX : ts6.ScriptKind.TS;
       }
     }
     exports.getScriptKind = getScriptKind;
     function getLanguageVariant(scriptKind) {
       switch (scriptKind) {
-        case ts5.ScriptKind.TSX:
-        case ts5.ScriptKind.JSX:
-        case ts5.ScriptKind.JS:
-        case ts5.ScriptKind.JSON:
-          return ts5.LanguageVariant.JSX;
+        case ts6.ScriptKind.TSX:
+        case ts6.ScriptKind.JSX:
+        case ts6.ScriptKind.JS:
+        case ts6.ScriptKind.JSON:
+          return ts6.LanguageVariant.JSX;
         default:
-          return ts5.LanguageVariant.Standard;
+          return ts6.LanguageVariant.Standard;
       }
     }
     exports.getLanguageVariant = getLanguageVariant;
@@ -10598,7 +10598,7 @@ var require_createIsolatedProgram = __commonJS({
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.createIsolatedProgram = void 0;
     var debug_1 = __importDefault2(require_src());
-    var ts5 = __importStar2(require("typescript"));
+    var ts6 = __importStar2(require("typescript"));
     var getScriptKind_1 = require_getScriptKind();
     var shared_1 = require_shared();
     var log = (0, debug_1.default)("typescript-eslint:typescript-estree:createIsolatedProgram");
@@ -10625,10 +10625,10 @@ var require_createIsolatedProgram = __commonJS({
           return "\n";
         },
         getSourceFile(filename) {
-          return ts5.createSourceFile(
+          return ts6.createSourceFile(
             filename,
             parseSettings.code,
-            ts5.ScriptTarget.Latest,
+            ts6.ScriptTarget.Latest,
             /* setParentNodes */
             true,
             (0, getScriptKind_1.getScriptKind)(parseSettings.filePath, parseSettings.jsx)
@@ -10644,7 +10644,7 @@ var require_createIsolatedProgram = __commonJS({
           return null;
         }
       };
-      const program = ts5.createProgram([parseSettings.filePath], Object.assign({ noResolve: true, target: ts5.ScriptTarget.Latest, jsx: parseSettings.jsx ? ts5.JsxEmit.Preserve : void 0 }, (0, shared_1.createDefaultCompilerOptionsFromExtra)(parseSettings)), compilerHost);
+      const program = ts6.createProgram([parseSettings.filePath], Object.assign({ noResolve: true, target: ts6.ScriptTarget.Latest, jsx: parseSettings.jsx ? ts6.JsxEmit.Preserve : void 0 }, (0, shared_1.createDefaultCompilerOptionsFromExtra)(parseSettings)), compilerHost);
       const ast = program.getSourceFile(parseSettings.filePath);
       if (!ast) {
         throw new Error("Expected an ast to be returned for the single-file isolated program.");
@@ -10726,7 +10726,7 @@ var require_getWatchProgramsForProjects = __commonJS({
     var debug_1 = __importDefault2(require_src());
     var fs_1 = __importDefault2(require("fs"));
     var semver_1 = __importDefault2(require_semver2());
-    var ts5 = __importStar2(require("typescript"));
+    var ts6 = __importStar2(require("typescript"));
     var shared_1 = require_shared();
     var log = (0, debug_1.default)("typescript-eslint:typescript-estree:createWatchProgram");
     var knownWatchProgramMap = /* @__PURE__ */ new Map();
@@ -10768,7 +10768,7 @@ var require_getWatchProgramsForProjects = __commonJS({
       filePath: ""
     };
     function diagnosticReporter(diagnostic) {
-      throw new Error(ts5.flattenDiagnosticMessageText(diagnostic.messageText, ts5.sys.newLine));
+      throw new Error(ts6.flattenDiagnosticMessageText(diagnostic.messageText, ts6.sys.newLine));
     }
     function updateCachedFileList(tsconfigPath, program, parseSettings) {
       const fileList = parseSettings.EXPERIMENTAL_useSourceOfProjectReferenceRedirect ? new Set(program.getSourceFiles().map((sf) => (0, shared_1.getCanonicalFileName)(sf.fileName))) : new Set(program.getRootFileNames().map((f) => (0, shared_1.getCanonicalFileName)(f)));
@@ -10783,7 +10783,7 @@ var require_getWatchProgramsForProjects = __commonJS({
       const fileWatchCallbacks = fileWatchCallbackTrackingMap.get(filePath);
       const codeHash = (0, shared_1.createHash)(parseSettings.code);
       if (parsedFilesSeenHash.get(filePath) !== codeHash && fileWatchCallbacks && fileWatchCallbacks.size > 0) {
-        fileWatchCallbacks.forEach((cb) => cb(filePath, ts5.FileWatcherEventKind.Changed));
+        fileWatchCallbacks.forEach((cb) => cb(filePath, ts6.FileWatcherEventKind.Changed));
       }
       const currentProjectsFromSettings = new Set(parseSettings.projects);
       for (const [tsconfigPath, existingWatch] of knownWatchProgramMap.entries()) {
@@ -10820,7 +10820,7 @@ var require_getWatchProgramsForProjects = __commonJS({
           results.push(updatedProgram);
           continue;
         }
-        const programWatch = createWatchProgram(tsconfigPath, parseSettings);
+        const programWatch = createWatchProgram2(tsconfigPath, parseSettings);
         knownWatchProgramMap.set(tsconfigPath, programWatch);
         const program = programWatch.getProgram().getProgram();
         program.getTypeChecker();
@@ -10834,16 +10834,16 @@ var require_getWatchProgramsForProjects = __commonJS({
       return results;
     }
     exports.getWatchProgramsForProjects = getWatchProgramsForProjects;
-    var isRunningNoTimeoutFix = semver_1.default.satisfies(ts5.version, ">=3.9.0-beta", {
+    var isRunningNoTimeoutFix = semver_1.default.satisfies(ts6.version, ">=3.9.0-beta", {
       includePrerelease: true
     });
-    function createWatchProgram(tsconfigPath, parseSettings) {
+    function createWatchProgram2(tsconfigPath, parseSettings) {
       log("Creating watch program for %s.", tsconfigPath);
-      const watchCompilerHost = ts5.createWatchCompilerHost(
+      const watchCompilerHost = ts6.createWatchCompilerHost(
         tsconfigPath,
         (0, shared_1.createDefaultCompilerOptionsFromExtra)(parseSettings),
-        ts5.sys,
-        ts5.createAbstractBuilder,
+        ts6.sys,
+        ts6.createAbstractBuilder,
         diagnosticReporter,
         /*reportWatchStatus*/
         () => {
@@ -10863,7 +10863,7 @@ var require_getWatchProgramsForProjects = __commonJS({
       };
       watchCompilerHost.onUnRecoverableConfigFileDiagnostic = diagnosticReporter;
       watchCompilerHost.afterProgramCreate = (program) => {
-        const configFileDiagnostics = program.getConfigFileParsingDiagnostics().filter((diag) => diag.category === ts5.DiagnosticCategory.Error && diag.code !== 18003);
+        const configFileDiagnostics = program.getConfigFileParsingDiagnostics().filter((diag) => diag.category === ts6.DiagnosticCategory.Error && diag.code !== 18003);
         if (configFileDiagnostics.length > 0) {
           diagnosticReporter(configFileDiagnostics[0]);
         }
@@ -10879,7 +10879,7 @@ var require_getWatchProgramsForProjects = __commonJS({
       watchCompilerHost.extraFileExtensions = parseSettings.extraFileExtensions.map((extension) => ({
         extension,
         isMixedContent: true,
-        scriptKind: ts5.ScriptKind.Deferred
+        scriptKind: ts6.ScriptKind.Deferred
       }));
       watchCompilerHost.trace = log;
       watchCompilerHost.useSourceOfProjectReferenceRedirect = () => parseSettings.EXPERIMENTAL_useSourceOfProjectReferenceRedirect;
@@ -10901,7 +10901,7 @@ var require_getWatchProgramsForProjects = __commonJS({
           callback = void 0;
         };
       }
-      const watch = ts5.createWatchProgram(watchCompilerHost);
+      const watch = ts6.createWatchProgram(watchCompilerHost);
       if (!isRunningNoTimeoutFix) {
         const originalGetProgram = watch.getProgram;
         watch.getProgram = () => {
@@ -10931,7 +10931,7 @@ var require_getWatchProgramsForProjects = __commonJS({
       }
       if (hasTSConfigChanged(tsconfigPath)) {
         log("tsconfig has changed - triggering program update. %s", tsconfigPath);
-        fileWatchCallbackTrackingMap.get(tsconfigPath).forEach((cb) => cb(tsconfigPath, ts5.FileWatcherEventKind.Changed));
+        fileWatchCallbackTrackingMap.get(tsconfigPath).forEach((cb) => cb(tsconfigPath, ts6.FileWatcherEventKind.Changed));
         programFileListCache.delete(tsconfigPath);
       }
       let sourceFile = updatedProgram.getSourceFile(filePath);
@@ -10949,9 +10949,9 @@ var require_getWatchProgramsForProjects = __commonJS({
         if (folderWatchCallbacks) {
           folderWatchCallbacks.forEach((cb) => {
             if (currentDir !== current) {
-              cb(currentDir, ts5.FileWatcherEventKind.Changed);
+              cb(currentDir, ts6.FileWatcherEventKind.Changed);
             }
-            cb(current, ts5.FileWatcherEventKind.Changed);
+            cb(current, ts6.FileWatcherEventKind.Changed);
           });
           hasCallback = true;
         }
@@ -10979,7 +10979,7 @@ var require_getWatchProgramsForProjects = __commonJS({
         return updatedProgram;
       }
       log("Marking file as deleted. %s", deletedFile);
-      fileWatchCallbacks.forEach((cb) => cb(deletedFile, ts5.FileWatcherEventKind.Deleted));
+      fileWatchCallbacks.forEach((cb) => cb(deletedFile, ts6.FileWatcherEventKind.Deleted));
       programFileListCache.delete(tsconfigPath);
       updatedProgram = existingWatch.getProgram().getProgram();
       sourceFile = updatedProgram.getSourceFile(filePath);
@@ -11035,21 +11035,21 @@ var require_createProjectProgram = __commonJS({
     exports.createProjectProgram = void 0;
     var debug_1 = __importDefault2(require_src());
     var path_1 = __importDefault2(require("path"));
-    var ts5 = __importStar2(require("typescript"));
+    var ts6 = __importStar2(require("typescript"));
     var node_utils_1 = require_node_utils();
     var describeFilePath_1 = require_describeFilePath();
     var getWatchProgramsForProjects_1 = require_getWatchProgramsForProjects();
     var shared_1 = require_shared();
     var log = (0, debug_1.default)("typescript-eslint:typescript-estree:createProjectProgram");
     var DEFAULT_EXTRA_FILE_EXTENSIONS = [
-      ts5.Extension.Ts,
-      ts5.Extension.Tsx,
-      ts5.Extension.Js,
-      ts5.Extension.Jsx,
-      ts5.Extension.Mjs,
-      ts5.Extension.Mts,
-      ts5.Extension.Cjs,
-      ts5.Extension.Cts
+      ts6.Extension.Ts,
+      ts6.Extension.Tsx,
+      ts6.Extension.Js,
+      ts6.Extension.Jsx,
+      ts6.Extension.Mjs,
+      ts6.Extension.Mts,
+      ts6.Extension.Cjs,
+      ts6.Extension.Cts
     ];
     function createProjectProgram(parseSettings) {
       log("Creating project program for: %s", parseSettings.filePath);
@@ -11141,15 +11141,15 @@ var require_createSourceFile = __commonJS({
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.createSourceFile = void 0;
     var debug_1 = __importDefault2(require_src());
-    var ts5 = __importStar2(require("typescript"));
+    var ts6 = __importStar2(require("typescript"));
     var getScriptKind_1 = require_getScriptKind();
     var log = (0, debug_1.default)("typescript-eslint:typescript-estree:createSourceFile");
     function createSourceFile(parseSettings) {
       log("Getting AST without type information in %s mode for: %s", parseSettings.jsx ? "TSX" : "TS", parseSettings.filePath);
-      return ts5.createSourceFile(
+      return ts6.createSourceFile(
         parseSettings.filePath,
         parseSettings.code,
-        ts5.ScriptTarget.Latest,
+        ts6.ScriptTarget.Latest,
         /* setParentNodes */
         true,
         (0, getScriptKind_1.getScriptKind)(parseSettings.filePath, parseSettings.jsx)
@@ -11203,7 +11203,7 @@ var require_useProvidedPrograms = __commonJS({
     var debug_1 = __importDefault2(require_src());
     var fs5 = __importStar2(require("fs"));
     var path6 = __importStar2(require("path"));
-    var ts5 = __importStar2(require("typescript"));
+    var ts6 = __importStar2(require("typescript"));
     var shared_1 = require_shared();
     var log = (0, debug_1.default)("typescript-eslint:typescript-estree:useProvidedProgram");
     function useProvidedPrograms(programInstances, parseSettings) {
@@ -11228,29 +11228,29 @@ var require_useProvidedPrograms = __commonJS({
     }
     exports.useProvidedPrograms = useProvidedPrograms;
     function createProgramFromConfigFile(configFile, projectDirectory) {
-      if (ts5.sys === void 0) {
+      if (ts6.sys === void 0) {
         throw new Error("`createProgramFromConfigFile` is only supported in a Node-like environment.");
       }
-      const parsed = ts5.getParsedCommandLineOfConfigFile(configFile, shared_1.CORE_COMPILER_OPTIONS, {
+      const parsed = ts6.getParsedCommandLineOfConfigFile(configFile, shared_1.CORE_COMPILER_OPTIONS, {
         onUnRecoverableConfigFileDiagnostic: (diag) => {
-          throw new Error(formatDiagnostics([diag]));
+          throw new Error(formatDiagnostics2([diag]));
         },
         fileExists: fs5.existsSync,
         getCurrentDirectory: () => projectDirectory && path6.resolve(projectDirectory) || process.cwd(),
-        readDirectory: ts5.sys.readDirectory,
+        readDirectory: ts6.sys.readDirectory,
         readFile: (file) => fs5.readFileSync(file, "utf-8"),
-        useCaseSensitiveFileNames: ts5.sys.useCaseSensitiveFileNames
+        useCaseSensitiveFileNames: ts6.sys.useCaseSensitiveFileNames
       });
       const result = parsed;
       if (result.errors.length) {
-        throw new Error(formatDiagnostics(result.errors));
+        throw new Error(formatDiagnostics2(result.errors));
       }
-      const host = ts5.createCompilerHost(result.options, true);
-      return ts5.createProgram(result.fileNames, result.options, host);
+      const host = ts6.createCompilerHost(result.options, true);
+      return ts6.createProgram(result.fileNames, result.options, host);
     }
     exports.createProgramFromConfigFile = createProgramFromConfigFile;
-    function formatDiagnostics(diagnostics) {
-      return ts5.formatDiagnostics(diagnostics, {
+    function formatDiagnostics2(diagnostics) {
+      return ts6.formatDiagnostics(diagnostics, {
         getCanonicalFileName: (f) => f,
         getCurrentDirectory: process.cwd,
         getNewLine: () => "\n"
@@ -11499,7 +11499,7 @@ var require_merge2 = __commonJS({
           merging = false;
           mergeStream();
         }
-        function pipe4(stream) {
+        function pipe5(stream) {
           function onend() {
             stream.removeListener("merge2UnpipeEnd", onend);
             stream.removeListener("end", onend);
@@ -11523,7 +11523,7 @@ var require_merge2 = __commonJS({
           stream.resume();
         }
         for (let i = 0; i < streams.length; i++) {
-          pipe4(streams[i]);
+          pipe5(streams[i]);
         }
         next();
       }
@@ -11669,11 +11669,11 @@ var require_is_extglob = __commonJS({
       if (typeof str !== "string" || str === "") {
         return false;
       }
-      var match;
-      while (match = /(\\).|([@?!+*]\(.*\))/g.exec(str)) {
-        if (match[2])
+      var match3;
+      while (match3 = /(\\).|([@?!+*]\(.*\))/g.exec(str)) {
+        if (match3[2])
           return true;
-        str = str.slice(match.index + match[0].length);
+        str = str.slice(match3.index + match3[0].length);
       }
       return false;
     };
@@ -12214,7 +12214,7 @@ var require_fill_range = __commonJS({
       }
       return options.stringify === true;
     };
-    var pad = (input, maxLength, toNumber) => {
+    var pad2 = (input, maxLength, toNumber) => {
       if (maxLength > 0) {
         let dash = input[0] === "-" ? "-" : "";
         if (dash)
@@ -12323,7 +12323,7 @@ var require_fill_range = __commonJS({
         if (options.toRegex === true && step > 1) {
           push(a);
         } else {
-          range.push(pad(format(a, index), maxLen, toNumber));
+          range.push(pad2(format(a, index), maxLen, toNumber));
         }
         a = descending ? a - step : a + step;
         index++;
@@ -13160,8 +13160,8 @@ var require_utils2 = __commonJS({
     exports.escapeRegex = (str) => str.replace(REGEX_SPECIAL_CHARS_GLOBAL, "\\$1");
     exports.toPosixSlashes = (str) => str.replace(REGEX_BACKSLASH, "/");
     exports.removeBackslashes = (str) => {
-      return str.replace(REGEX_REMOVE_BACKSLASH, (match) => {
-        return match === "\\" ? "" : match;
+      return str.replace(REGEX_REMOVE_BACKSLASH, (match3) => {
+        return match3 === "\\" ? "" : match3;
       });
     };
     exports.supportsLookbehinds = () => {
@@ -13788,10 +13788,10 @@ var require_parse3 = __commonJS({
             push({ type: "text", value });
             continue;
           }
-          const match = /^\\+/.exec(remaining());
+          const match3 = /^\\+/.exec(remaining());
           let slashes = 0;
-          if (match && match[0].length > 2) {
-            slashes = match[0].length;
+          if (match3 && match3[0].length > 2) {
+            slashes = match3[0].length;
             state.index += slashes;
             if (slashes % 2 !== 0) {
               value += "\\";
@@ -14080,10 +14080,10 @@ var require_parse3 = __commonJS({
           if (value === "$" || value === "^") {
             value = `\\${value}`;
           }
-          const match = REGEX_NON_SPECIAL_CHARS.exec(remaining());
-          if (match) {
-            value += match[0];
-            state.index += match[0].length;
+          const match3 = REGEX_NON_SPECIAL_CHARS.exec(remaining());
+          if (match3) {
+            value += match3[0];
+            state.index += match3[0].length;
           }
           push({ type: "text", value });
           continue;
@@ -14298,13 +14298,13 @@ var require_parse3 = __commonJS({
           case "**/.*":
             return `(?:${nodot}${globstar(opts)}${SLASH_LITERAL})?${DOT_LITERAL}${ONE_CHAR}${star}`;
           default: {
-            const match = /^(.*?)\.(\w+)$/.exec(str);
-            if (!match)
+            const match3 = /^(.*?)\.(\w+)$/.exec(str);
+            if (!match3)
               return;
-            const source2 = create(match[1]);
+            const source2 = create(match3[1]);
             if (!source2)
               return;
-            return source2 + DOT_LITERAL + match[2];
+            return source2 + DOT_LITERAL + match3[2];
           }
         }
       };
@@ -14357,8 +14357,8 @@ var require_picomatch = __commonJS({
         isIgnored = picomatch(opts.ignore, ignoreOpts, returnState);
       }
       const matcher = (input, returnObject = false) => {
-        const { isMatch, match, output } = picomatch.test(input, regex, options, { glob, posix });
-        const result = { glob, state, regex, posix, input, output, match, isMatch };
+        const { isMatch, match: match3, output } = picomatch.test(input, regex, options, { glob, posix });
+        const result = { glob, state, regex, posix, input, output, match: match3, isMatch };
         if (typeof opts.onResult === "function") {
           opts.onResult(result);
         }
@@ -14392,20 +14392,20 @@ var require_picomatch = __commonJS({
       }
       const opts = options || {};
       const format = opts.format || (posix ? utils.toPosixSlashes : null);
-      let match = input === glob;
-      let output = match && format ? format(input) : input;
-      if (match === false) {
+      let match3 = input === glob;
+      let output = match3 && format ? format(input) : input;
+      if (match3 === false) {
         output = format ? format(input) : input;
-        match = output === glob;
+        match3 = output === glob;
       }
-      if (match === false || opts.capture === true) {
+      if (match3 === false || opts.capture === true) {
         if (opts.matchBase === true || opts.basename === true) {
-          match = picomatch.matchBase(input, regex, options, posix);
+          match3 = picomatch.matchBase(input, regex, options, posix);
         } else {
-          match = regex.exec(output);
+          match3 = regex.exec(output);
         }
       }
-      return { isMatch: Boolean(match), match, output };
+      return { isMatch: Boolean(match3), match: match3, output };
     };
     picomatch.matchBase = (input, glob, options, posix = utils.isWindows(options)) => {
       const regex = glob instanceof RegExp ? glob : picomatch.makeRe(glob, options);
@@ -14500,8 +14500,8 @@ var require_micromatch = __commonJS({
           negatives++;
         for (let item of list) {
           let matched = isMatch(item, true);
-          let match = negated ? !matched.isMatch : matched.isMatch;
-          if (!match)
+          let match3 = negated ? !matched.isMatch : matched.isMatch;
+          if (!match3)
             continue;
           if (negated) {
             omit.add(matched.output);
@@ -14600,9 +14600,9 @@ var require_micromatch = __commonJS({
     micromatch.capture = (glob, input, options) => {
       let posix = utils.isWindows(options);
       let regex = picomatch.makeRe(String(glob), { ...options, capture: true });
-      let match = regex.exec(posix ? utils.toPosixSlashes(input) : input);
-      if (match) {
-        return match.slice(1).map((v) => v === void 0 ? "" : v);
+      let match3 = regex.exec(posix ? utils.toPosixSlashes(input) : input);
+      if (match3) {
+        return match3.slice(1).map((v) => v === void 0 ? "" : v);
       }
     };
     micromatch.makeRe = (...args) => picomatch.makeRe(...args);
@@ -15525,7 +15525,7 @@ var require_queue = __commonJS({
       if (concurrency < 1) {
         throw new Error("fastqueue concurrency must be greater than 1");
       }
-      var cache = reusify(Task);
+      var cache2 = reusify(Task);
       var queueHead = null;
       var queueTail = null;
       var _running = 0;
@@ -15586,7 +15586,7 @@ var require_queue = __commonJS({
         return _running === 0 && self2.length() === 0;
       }
       function push(value, done) {
-        var current = cache.get();
+        var current = cache2.get();
         current.context = context;
         current.release = release;
         current.value = value;
@@ -15607,7 +15607,7 @@ var require_queue = __commonJS({
         }
       }
       function unshift(value, done) {
-        var current = cache.get();
+        var current = cache2.get();
         current.context = context;
         current.release = release;
         current.value = value;
@@ -15628,7 +15628,7 @@ var require_queue = __commonJS({
       }
       function release(holder) {
         if (holder) {
-          cache.release(holder);
+          cache2.release(holder);
         }
         var next = queueHead;
         if (next) {
@@ -16342,7 +16342,7 @@ var require_partial = __commonJS({
           if (!pattern.complete && levels > section.length) {
             return true;
           }
-          const match = parts.every((part, index) => {
+          const match3 = parts.every((part, index) => {
             const segment = pattern.segments[index];
             if (segment.dynamic && segment.patternRe.test(part)) {
               return true;
@@ -16352,7 +16352,7 @@ var require_partial = __commonJS({
             }
             return false;
           });
-          if (match) {
+          if (match3) {
             return true;
           }
         }
@@ -16999,7 +16999,7 @@ var require_ignore = __commonJS({
     var RETURN_FALSE = () => false;
     var sanitizeRange = (range) => range.replace(
       REGEX_REGEXP_RANGE,
-      (match, from, to) => from.charCodeAt(0) <= to.charCodeAt(0) ? match : EMPTY
+      (match3, from, to) => from.charCodeAt(0) <= to.charCodeAt(0) ? match3 : EMPTY
     );
     var cleanRangeBackSlash = (slashes) => {
       const { length } = slashes;
@@ -17012,7 +17012,7 @@ var require_ignore = __commonJS({
         // (a  ) -> (a)
         // (a \ ) -> (a  )
         /\\?\s+$/,
-        (match) => match.indexOf("\\") === 0 ? SPACE : EMPTY
+        (match3) => match3.indexOf("\\") === 0 ? SPACE : EMPTY
       ],
       // replace (\ ) with ' '
       [
@@ -17037,7 +17037,7 @@ var require_ignore = __commonJS({
       // > These special characters are often called "metacharacters".
       [
         /[\\$.|*+(){^]/g,
-        (match) => `\\${match}`
+        (match3) => `\\${match3}`
       ],
       [
         // > a question mark (?) matches a single character
@@ -17119,7 +17119,7 @@ var require_ignore = __commonJS({
         // > can be used to match one of the characters in a range.
         // `\` is escaped by step 3
         /(\\)?\[([^\]/]*?)(\\*)($|\])/g,
-        (match, leadEscape, range, endEscape, close) => leadEscape === ESCAPE ? `\\[${range}${cleanRangeBackSlash(endEscape)}${close}` : close === "]" ? endEscape.length % 2 === 0 ? `[${sanitizeRange(range)}${endEscape}]` : "[]" : "[]"
+        (match3, leadEscape, range, endEscape, close) => leadEscape === ESCAPE ? `\\[${range}${cleanRangeBackSlash(endEscape)}${close}` : close === "]" ? endEscape.length % 2 === 0 ? `[${sanitizeRange(range)}${endEscape}]` : "[]" : "[]"
       ],
       // ending
       [
@@ -17136,7 +17136,7 @@ var require_ignore = __commonJS({
         // 'js*' will not match 'a.js'
         // 'js/' will not match 'a.js'
         // 'js' will match 'a.js' and 'a.js/'
-        (match) => /\/$/.test(match) ? `${match}$` : `${match}(?=$|\\/$)`
+        (match3) => /\/$/.test(match3) ? `${match3}$` : `${match3}(?=$|\\/$)`
       ],
       // trailing wildcard
       [
@@ -17287,33 +17287,33 @@ var require_ignore = __commonJS({
         };
       }
       // @returns {TestResult}
-      _test(originalPath, cache, checkUnignored, slices) {
+      _test(originalPath, cache2, checkUnignored, slices) {
         const path6 = originalPath && checkPath.convert(originalPath);
         checkPath(
           path6,
           originalPath,
           this._allowRelativePaths ? RETURN_FALSE : throwError
         );
-        return this._t(path6, cache, checkUnignored, slices);
+        return this._t(path6, cache2, checkUnignored, slices);
       }
-      _t(path6, cache, checkUnignored, slices) {
-        if (path6 in cache) {
-          return cache[path6];
+      _t(path6, cache2, checkUnignored, slices) {
+        if (path6 in cache2) {
+          return cache2[path6];
         }
         if (!slices) {
           slices = path6.split(SLASH);
         }
         slices.pop();
         if (!slices.length) {
-          return cache[path6] = this._testOne(path6, checkUnignored);
+          return cache2[path6] = this._testOne(path6, checkUnignored);
         }
         const parent = this._t(
           slices.join(SLASH) + SLASH,
-          cache,
+          cache2,
           checkUnignored,
           slices
         );
-        return cache[path6] = parent.ignored ? parent : this._testOne(path6, checkUnignored);
+        return cache2[path6] = parent.ignored ? parent : this._testOne(path6, checkUnignored);
       }
       ignores(path6) {
         return this._test(path6, this._ignoreCache, false).ignored;
@@ -17763,10 +17763,10 @@ var require_warnAboutTSVersion = __commonJS({
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.warnAboutTSVersion = void 0;
     var semver_1 = __importDefault2(require_semver2());
-    var ts5 = __importStar2(require("typescript"));
+    var ts6 = __importStar2(require("typescript"));
     var SUPPORTED_TYPESCRIPT_VERSIONS = ">=3.3.1 <5.1.0";
     var SUPPORTED_PRERELEASE_RANGES = ["5.0.1-rc"];
-    var ACTIVE_TYPESCRIPT_VERSION = ts5.version;
+    var ACTIVE_TYPESCRIPT_VERSION = ts6.version;
     var isRunningSupportedTypeScriptVersion = semver_1.default.satisfies(ACTIVE_TYPESCRIPT_VERSION, [SUPPORTED_TYPESCRIPT_VERSIONS].concat(SUPPORTED_PRERELEASE_RANGES).join(" || "));
     var warnedAboutTSVersion = false;
     function warnAboutTSVersion(parseSettings) {
@@ -18594,50 +18594,50 @@ var require_eslint_utils = __commonJS({
         if (node.operator === "in" || node.operator === "instanceof") {
           return null;
         }
-        const left3 = getStaticValueR(node.left, initialScope);
-        const right4 = getStaticValueR(node.right, initialScope);
-        if (left3 != null && right4 != null) {
+        const left6 = getStaticValueR(node.left, initialScope);
+        const right7 = getStaticValueR(node.right, initialScope);
+        if (left6 != null && right7 != null) {
           switch (node.operator) {
             case "==":
-              return { value: left3.value == right4.value };
+              return { value: left6.value == right7.value };
             case "!=":
-              return { value: left3.value != right4.value };
+              return { value: left6.value != right7.value };
             case "===":
-              return { value: left3.value === right4.value };
+              return { value: left6.value === right7.value };
             case "!==":
-              return { value: left3.value !== right4.value };
+              return { value: left6.value !== right7.value };
             case "<":
-              return { value: left3.value < right4.value };
+              return { value: left6.value < right7.value };
             case "<=":
-              return { value: left3.value <= right4.value };
+              return { value: left6.value <= right7.value };
             case ">":
-              return { value: left3.value > right4.value };
+              return { value: left6.value > right7.value };
             case ">=":
-              return { value: left3.value >= right4.value };
+              return { value: left6.value >= right7.value };
             case "<<":
-              return { value: left3.value << right4.value };
+              return { value: left6.value << right7.value };
             case ">>":
-              return { value: left3.value >> right4.value };
+              return { value: left6.value >> right7.value };
             case ">>>":
-              return { value: left3.value >>> right4.value };
+              return { value: left6.value >>> right7.value };
             case "+":
-              return { value: left3.value + right4.value };
+              return { value: left6.value + right7.value };
             case "-":
-              return { value: left3.value - right4.value };
+              return { value: left6.value - right7.value };
             case "*":
-              return { value: left3.value * right4.value };
+              return { value: left6.value * right7.value };
             case "/":
-              return { value: left3.value / right4.value };
+              return { value: left6.value / right7.value };
             case "%":
-              return { value: left3.value % right4.value };
+              return { value: left6.value % right7.value };
             case "**":
-              return { value: left3.value ** right4.value };
+              return { value: left6.value ** right7.value };
             case "|":
-              return { value: left3.value | right4.value };
+              return { value: left6.value | right7.value };
             case "^":
-              return { value: left3.value ^ right4.value };
+              return { value: left6.value ^ right7.value };
             case "&":
-              return { value: left3.value & right4.value };
+              return { value: left6.value & right7.value };
           }
         }
         return null;
@@ -18721,14 +18721,14 @@ var require_eslint_utils = __commonJS({
         return { value: node.value };
       },
       LogicalExpression(node, initialScope) {
-        const left3 = getStaticValueR(node.left, initialScope);
-        if (left3 != null) {
-          if (node.operator === "||" && Boolean(left3.value) === true || node.operator === "&&" && Boolean(left3.value) === false || node.operator === "??" && left3.value != null) {
-            return left3;
+        const left6 = getStaticValueR(node.left, initialScope);
+        if (left6 != null) {
+          if (node.operator === "||" && Boolean(left6.value) === true || node.operator === "&&" && Boolean(left6.value) === false || node.operator === "??" && left6.value != null) {
+            return left6;
           }
-          const right4 = getStaticValueR(node.right, initialScope);
-          if (right4 != null) {
-            return right4;
+          const right7 = getStaticValueR(node.right, initialScope);
+          if (right7 != null) {
+            return right7;
           }
         }
         return null;
@@ -19206,30 +19206,30 @@ var require_eslint_utils = __commonJS({
     function replaceS(matcher, str, replacement) {
       const chunks = [];
       let index2 = 0;
-      let match = null;
+      let match3 = null;
       function replacer(key) {
         switch (key) {
           case "$$":
             return "$";
           case "$&":
-            return match[0];
+            return match3[0];
           case "$`":
-            return str.slice(0, match.index);
+            return str.slice(0, match3.index);
           case "$'":
-            return str.slice(match.index + match[0].length);
+            return str.slice(match3.index + match3[0].length);
           default: {
             const i = key.slice(1);
-            if (i in match) {
-              return match[i];
+            if (i in match3) {
+              return match3[i];
             }
             return key;
           }
         }
       }
-      for (match of matcher.execAll(str)) {
-        chunks.push(str.slice(index2, match.index));
+      for (match3 of matcher.execAll(str)) {
+        chunks.push(str.slice(index2, match3.index));
         chunks.push(replacement.replace(placeholder, replacer));
-        index2 = match.index + match[0].length;
+        index2 = match3.index + match3[0].length;
       }
       chunks.push(str.slice(index2));
       return chunks.join("");
@@ -19237,10 +19237,10 @@ var require_eslint_utils = __commonJS({
     function replaceF(matcher, str, replace) {
       const chunks = [];
       let index2 = 0;
-      for (const match of matcher.execAll(str)) {
-        chunks.push(str.slice(index2, match.index));
-        chunks.push(String(replace(...match, match.index, match.input)));
-        index2 = match.index + match[0].length;
+      for (const match3 of matcher.execAll(str)) {
+        chunks.push(str.slice(index2, match3.index));
+        chunks.push(String(replace(...match3, match3.index, match3.input)));
+        index2 = match3.index + match3[0].length;
       }
       chunks.push(str.slice(index2));
       return chunks.join("");
@@ -19270,13 +19270,13 @@ var require_eslint_utils = __commonJS({
        */
       *execAll(str) {
         const { pattern, escaped } = internal.get(this);
-        let match = null;
+        let match3 = null;
         let lastIndex = 0;
         pattern.lastIndex = 0;
-        while ((match = pattern.exec(str)) != null) {
-          if (escaped || !isEscaped(str, match.index)) {
+        while ((match3 = pattern.exec(str)) != null) {
+          if (escaped || !isEscaped(str, match3.index)) {
             lastIndex = pattern.lastIndex;
-            yield match;
+            yield match3;
             pattern.lastIndex = lastIndex;
           }
         }
@@ -20097,8 +20097,8 @@ var require_misc = __commonJS({
     exports.LINEBREAK_MATCHER = exports.isTokenOnSameLine = void 0;
     var LINEBREAK_MATCHER = /\r\n|[\r\n\u2028\u2029]/;
     exports.LINEBREAK_MATCHER = LINEBREAK_MATCHER;
-    function isTokenOnSameLine(left3, right4) {
-      return left3.loc.end.line === right4.loc.start.line;
+    function isTokenOnSameLine(left6, right7) {
+      return left6.loc.end.line === right7.loc.start.line;
     }
     exports.isTokenOnSameLine = isTokenOnSameLine;
   }
@@ -26485,17 +26485,17 @@ var require_Referencer = __commonJS({
         this.visitFunction(node);
       }
       AssignmentExpression(node) {
-        let left3 = node.left;
-        switch (left3.type) {
+        let left6 = node.left;
+        switch (left6.type) {
           case types_1.AST_NODE_TYPES.TSAsExpression:
           case types_1.AST_NODE_TYPES.TSTypeAssertion:
-            this.visitType(left3.typeAnnotation);
+            this.visitType(left6.typeAnnotation);
           case types_1.AST_NODE_TYPES.TSNonNullExpression:
-            left3 = left3.expression;
+            left6 = left6.expression;
         }
-        if (PatternVisitor_1.PatternVisitor.isPattern(left3)) {
+        if (PatternVisitor_1.PatternVisitor.isPattern(left6)) {
           if (node.operator === "=") {
-            this.visitPattern(left3, (pattern, info) => {
+            this.visitPattern(left6, (pattern, info) => {
               const maybeImplicitGlobal = !this.currentScope().isStrict ? {
                 pattern,
                 node
@@ -26503,11 +26503,11 @@ var require_Referencer = __commonJS({
               this.referencingDefaultValue(pattern, info.assignments, maybeImplicitGlobal, false);
               this.currentScope().referenceValue(pattern, Reference_1.ReferenceFlag.Write, node.right, maybeImplicitGlobal, false);
             }, { processRightHandNodes: true });
-          } else if (left3.type === types_1.AST_NODE_TYPES.Identifier) {
-            this.currentScope().referenceValue(left3, Reference_1.ReferenceFlag.ReadWrite, node.right);
+          } else if (left6.type === types_1.AST_NODE_TYPES.Identifier) {
+            this.currentScope().referenceValue(left6, Reference_1.ReferenceFlag.ReadWrite, node.right);
           }
         } else {
-          this.visit(left3);
+          this.visit(left6);
         }
         this.visit(node.right);
       }
@@ -30302,8 +30302,10 @@ module.exports = __toCommonJS(eslint_local_rules_exports);
 
 // eslint-local-rules/rules/sql-check.rule.ts
 var import_typescript_estree = __toESM(require_dist3());
-var E3 = __toESM(require("fp-ts/Either"));
-var import_function3 = require("fp-ts/function");
+var E5 = __toESM(require("fp-ts/Either"));
+var import_function4 = require("fp-ts/function");
+var import_path2 = __toESM(require("path"));
+var import_register2 = require("source-map-support/register");
 
 // node_modules/.pnpm/synckit@0.8.5/node_modules/synckit/lib/index.js
 var import_node_fs2 = __toESM(require("fs"), 1);
@@ -30568,6 +30570,38 @@ var ts4 = __toESM(require("typescript"));
 // mfsqlchecker/ErrorDiagnostic.ts
 var import_chalk = __toESM(require("chalk"));
 var ts = __toESM(require("typescript"));
+function fileLineCol(fileContents, position) {
+  let line = 1;
+  let col = 1;
+  for (let i = 0; i < position; ++i) {
+    if (fileContents.codePointAt(i) === 10) {
+      line++;
+      col = 0;
+    }
+    col++;
+  }
+  return {
+    type: "LineAndCol",
+    line,
+    col
+  };
+}
+function toSrcSpan(fileContents, position) {
+  return fileLineCol(fileContents, position - 1);
+}
+function postgresqlErrorDiagnostic(fileName, fileContents, err, span, message) {
+  return {
+    fileName,
+    fileContents,
+    span,
+    messages: (message !== null ? [message] : []).concat([
+      import_chalk.default.bold(err.message),
+      import_chalk.default.bold("code:") + " " + err.code
+    ]).concat(err.detail !== null && err.detail !== err.message ? import_chalk.default.bold("detail:") + " " + err.detail : []),
+    epilogue: err.hint !== null ? import_chalk.default.bold("hint:") + " " + err.hint : null,
+    quickFix: null
+  };
+}
 function nodeErrorDiagnostic(node, message) {
   const sourceFile = node.getSourceFile();
   return {
@@ -30640,7 +30674,26 @@ function identifierImportedFrom(sourceFile, ident) {
   }
 }
 
+// mfsqlchecker/view_names.ts
+var crypto = __toESM(require("crypto"));
+var POSTGRES_IDENT_MAX_LEN = 63;
+function calcViewName(varName, query) {
+  const hash = crypto.createHash("sha1").update(query).digest("hex");
+  const prefix = "$$mfv_";
+  if (varName === null) {
+    return prefix + hash.slice(0, 12);
+  }
+  const overflow = prefix.length + varName.length + 1 + 12 - POSTGRES_IDENT_MAX_LEN;
+  const varName2 = overflow > 0 ? varName.substr(0, varName.length - overflow) : varName;
+  return prefix + varName2 + "_" + hash.slice(0, 12);
+}
+
 // mfsqlchecker/views.ts
+var E = __toESM(require("fp-ts/Either"));
+var import_function = require("fp-ts/function");
+function viewNameLength(varName) {
+  return escapeIdentifier(calcViewName(varName, "")).length;
+}
 function resolveViewIdentifier(projectDir, sourceFile, ident) {
   const importedFromModule = identifierImportedFrom(sourceFile, ident);
   if (importedFromModule !== null) {
@@ -30648,6 +30701,241 @@ function resolveViewIdentifier(projectDir, sourceFile, ident) {
   } else {
     return QualifiedSqlViewName.create(sourceFileModuleName(projectDir, sourceFile), ident.text);
   }
+}
+var SqlViewDefinition = class {
+  static parseFromTemplateExpression(projectDir, sourceFile, checker, varName, node) {
+    if (ts3.isNoSubstitutionTemplateLiteral(node)) {
+      const sourceMap = [[node.end - node.text.length, 0, node.text.length]];
+      return {
+        type: "Right",
+        value: new SqlViewDefinition(sourceFile.fileName, sourceFile.text, varName, [{ type: "StringFragment", text: node.text }], sourceMap)
+      };
+    } else if (ts3.isTemplateExpression(node)) {
+      const sourceMap = [];
+      const fragments = [];
+      fragments.push({ type: "StringFragment", text: node.head.text });
+      let c = 0;
+      sourceMap.push([node.head.end - node.head.text.length - 1, c, c + node.head.text.length]);
+      c += node.head.text.length;
+      for (let i = 0; i < node.templateSpans.length; ++i) {
+        const span = node.templateSpans[i];
+        const type = checker.getTypeAtLocation(span.expression);
+        const maybeSqlFrag = tryTypeSqlFrag(type);
+        switch (maybeSqlFrag.type) {
+          case "Left":
+            return {
+              type: "Left",
+              value: nodeErrorDiagnostic(span, maybeSqlFrag.value)
+            };
+          case "Right":
+            if (maybeSqlFrag.value !== null) {
+              fragments.push({ type: "StringFragment", text: maybeSqlFrag.value });
+              c += maybeSqlFrag.value.length;
+            } else {
+              if (!ts3.isIdentifier(span.expression)) {
+                return {
+                  type: "Left",
+                  value: nodeErrorDiagnostic(span, "defineSqlView template spans can only be identifiers (no other expressions allowed)")
+                };
+              }
+              const qualifiedSqlViewName = resolveViewIdentifier(projectDir, sourceFile, span.expression);
+              fragments.push({ type: "ViewReference", qualifiedSqlViewName });
+              c += viewNameLength(span.expression.text);
+            }
+            break;
+          default:
+            (0, import_assert_never.assertNever)(maybeSqlFrag);
+        }
+        fragments.push({ type: "StringFragment", text: span.literal.text });
+        sourceMap.push([
+          span.literal.end - span.literal.text.length - (i < node.templateSpans.length - 1 ? 1 : 0),
+          c,
+          c + span.literal.text.length
+        ]);
+        c += span.literal.text.length;
+      }
+      return {
+        type: "Right",
+        value: new SqlViewDefinition(sourceFile.fileName, sourceFile.text, varName, fragments, sourceMap)
+      };
+    } else {
+      return (0, import_assert_never.assertNever)(node);
+    }
+  }
+  isFullyResolved() {
+    for (const frag of this.fragments) {
+      if (frag.type === "ViewReference") {
+        return false;
+      }
+    }
+    return true;
+  }
+  /**
+   * Only call this if `isFullyResolved` returns true
+   */
+  fullyResolvedQuery() {
+    let result = "";
+    for (const frag of this.fragments) {
+      if (frag.type === "ViewReference") {
+        throw new Error(`SqlViewDefinition "${frag.qualifiedSqlViewName}" is not fully resolved`);
+      }
+      result += frag.text;
+    }
+    return result;
+  }
+  getDependencies() {
+    return this.dependencies;
+  }
+  inject(dependency, viewName) {
+    for (let i = 0; i < this.fragments.length; ++i) {
+      const frag = this.fragments[i];
+      if (frag.type === "ViewReference" && frag.qualifiedSqlViewName === dependency) {
+        this.fragments[i] = { type: "StringFragment", text: escapeIdentifier(viewName) };
+      }
+    }
+  }
+  /**
+   * Only call this if `isFullyResolved` returns true
+   */
+  getName() {
+    if (this.viewName === null) {
+      this.viewName = calcViewName(this.varName, this.fullyResolvedQuery());
+    }
+    return this.viewName;
+  }
+  getFileName() {
+    return this.fileName;
+  }
+  getFileContents() {
+    return this.fileContents;
+  }
+  getSourceMap() {
+    return this.sourceMap;
+  }
+  /**
+   * Call this if any of the dependencies have changed
+   */
+  resetToInitialFragments() {
+    this.viewName = null;
+    this.fragments = [...this.initialFragments];
+  }
+  isEqual(other) {
+    if (this.initialFragments.length !== other.initialFragments.length) {
+      return false;
+    }
+    for (let i = 0; i < this.initialFragments.length; ++i) {
+      if (!SqlViewDefinition.fragmentsEqual(this.initialFragments[i], other.initialFragments[i])) {
+        return false;
+      }
+    }
+    return true;
+  }
+  debugDump() {
+    return `${this.varName} ${JSON.stringify(this.dependencies)} ${JSON.stringify(this.fragments)}`;
+  }
+  constructor(fileName, fileContents, varName, fragments, sourceMap) {
+    this.fileName = fileName;
+    this.fileContents = fileContents;
+    this.sourceMap = sourceMap;
+    this.varName = varName;
+    this.initialFragments = fragments;
+    this.fragments = [...fragments];
+    this.dependencies = [];
+    for (let i = 0; i < fragments.length; ++i) {
+      const frag = this.fragments[i];
+      if (frag.type === "ViewReference") {
+        this.dependencies.push(frag.qualifiedSqlViewName);
+      }
+    }
+  }
+  fileName;
+  fileContents;
+  sourceMap;
+  varName;
+  initialFragments;
+  dependencies;
+  // Mutable
+  fragments;
+  viewName = null;
+  static fragmentsEqual(lhs, rhs) {
+    switch (lhs.type) {
+      case "StringFragment":
+        return rhs.type === "StringFragment" && lhs.text === rhs.text;
+      case "ViewReference":
+        return rhs.type === "ViewReference" && lhs.qualifiedSqlViewName === rhs.qualifiedSqlViewName;
+      default:
+        return (0, import_assert_never.assertNever)(lhs);
+    }
+  }
+};
+function fullyResolveSqlViewDefinition(v, myName, library) {
+  if (v.isFullyResolved()) {
+    return [];
+  }
+  for (const depName of v.getDependencies()) {
+    if (depName === myName) {
+      return [{
+        fileName: v.getFileName(),
+        fileContents: v.getFileContents(),
+        span: fileLineCol(v.getFileContents(), v.getSourceMap()[0][0]),
+        messages: [`View depends on itself: "${QualifiedSqlViewName.viewName(myName)}"`],
+        epilogue: null,
+        quickFix: null
+      }];
+    }
+    const dep = library.get(depName);
+    if (dep === void 0) {
+      return [{
+        fileName: v.getFileName(),
+        fileContents: v.getFileContents(),
+        span: fileLineCol(v.getFileContents(), v.getSourceMap()[0][0]),
+        messages: [`Missing dependency in view "${QualifiedSqlViewName.viewName(myName)}": "${QualifiedSqlViewName.viewName(depName)}" (from module "${QualifiedSqlViewName.moduleId(depName)}"`],
+        epilogue: null,
+        quickFix: null
+      }];
+    }
+    if (!dep.isFullyResolved()) {
+      fullyResolveSqlViewDefinition(dep, depName, library);
+    }
+    v.inject(depName, dep.getName());
+  }
+  return [];
+}
+function resolveAllViewDefinitions(library) {
+  let errorDiagnostics = [];
+  library.forEach((value, key) => {
+    const errors = fullyResolveSqlViewDefinition(value, key, library);
+    errorDiagnostics = errorDiagnostics.concat(errors);
+  });
+  const result = [];
+  const added = /* @__PURE__ */ new Set();
+  function addView(name, view) {
+    if (added.has(name)) {
+      return;
+    }
+    for (const depName of view.getDependencies()) {
+      const dep = library.get(depName);
+      if (dep === void 0) {
+        throw new Error(`The Impossible happened: Missing dependency in view ${name}: ${depName}`);
+      }
+      addView(depName, dep);
+    }
+    result.push({
+      qualifiedViewname: name,
+      viewName: view.getName(),
+      createQuery: view.fullyResolvedQuery(),
+      fileName: view.getFileName(),
+      fileContents: view.getFileContents(),
+      sourceMap: view.getSourceMap()
+    });
+    added.add(name);
+  }
+  library.forEach((value, key) => {
+    if (value.isFullyResolved()) {
+      addView(key, value);
+    }
+  });
+  return [result, errorDiagnostics];
 }
 var QualifiedSqlViewName = class {
   static create(moduleId, viewName) {
@@ -30721,6 +31009,78 @@ function tryTypeSqlFrag(type) {
     type: "Right",
     value: null
   };
+}
+function isSqlViewDefinition(checker, decl) {
+  const name = checker.getTypeAtLocation(decl).symbol.name;
+  return name === "SqlView";
+}
+function getSqlDefinitionE(params) {
+  const { projectDir, sf, checker, node } = params;
+  if (!ts3.isVariableStatement(node)) {
+    return;
+  }
+  for (const decl of node.declarationList.declarations) {
+    if (decl.initializer === void 0 || !ts3.isTaggedTemplateExpression(decl.initializer)) {
+      return;
+    }
+    if (!ts3.isIdentifier(decl.initializer.tag) || !isSqlViewDefinition(checker, decl) || !ts3.isIdentifier(decl.name)) {
+      return;
+    }
+    if ((node.declarationList.flags & ts3.NodeFlags.Const) === 0) {
+      return E.left(nodeErrorDiagnostic(decl.name, "defineSqlView assigned to a non-const variable"));
+    }
+    const viewName = decl.name.text;
+    const qualifiedSqlViewName = QualifiedSqlViewName.create(sourceFileModuleName(projectDir, sf), viewName);
+    const sqlViewDefinition = SqlViewDefinition.parseFromTemplateExpression(projectDir, sf, checker, viewName, decl.initializer.template);
+    switch (sqlViewDefinition.type) {
+      case "Left":
+        return E.left(sqlViewDefinition.value);
+      case "Right":
+        return E.right({
+          viewName,
+          qualifiedSqlViewName,
+          sqlViewDefinition: sqlViewDefinition.value
+        });
+      default:
+        (0, import_assert_never.assertNever)(sqlViewDefinition);
+    }
+  }
+  return;
+}
+function sqlViewsLibraryAddFromSourceFile(projectDir, checker, sourceFile) {
+  const viewLibrary = /* @__PURE__ */ new Map();
+  const errorDiagnostics = [];
+  function visit(sf, node) {
+    const sqlDefinitionE = getSqlDefinitionE({ projectDir, sf, checker, node });
+    if (sqlDefinitionE !== void 0) {
+      (0, import_function.pipe)(
+        sqlDefinitionE,
+        E.match(
+          (diagnostic) => {
+            errorDiagnostics.push(diagnostic);
+          },
+          ({ sqlViewDefinition, qualifiedSqlViewName }) => {
+            viewLibrary.set(qualifiedSqlViewName, sqlViewDefinition);
+          }
+        )
+      );
+    }
+  }
+  ts3.forEachChild(sourceFile, (node) => visit(sourceFile, node));
+  return [viewLibrary, errorDiagnostics];
+}
+function sqlViewLibraryResetToInitialFragmentsIncludingDeps(viewName, viewLibrary) {
+  const view = viewLibrary.get(viewName);
+  if (view !== void 0) {
+    view.resetToInitialFragments();
+    viewLibrary.forEach((value, key) => {
+      if (value.getDependencies().indexOf(viewName) >= 0) {
+        if (key !== viewName) {
+          sqlViewLibraryResetToInitialFragmentsIncludingDeps(key, viewLibrary);
+        }
+      }
+    });
+  }
 }
 
 // mfsqlchecker/queries.ts
@@ -31369,6 +31729,101 @@ var configFileSchema = {
   "$ref": "#/definitions/ConfigFile"
 };
 
+// mfsqlchecker/formatters/jsonFormatter.ts
+var import_assert_never4 = require("assert-never");
+function formatJsonDiagnostic(errorDiagnostic) {
+  let location;
+  switch (errorDiagnostic.span.type) {
+    case "LineAndColRange":
+      location = {
+        startLine: errorDiagnostic.span.startLine - 1,
+        startCharacter: errorDiagnostic.span.startCol - 1,
+        endLine: errorDiagnostic.span.endLine - 1,
+        endCharacter: errorDiagnostic.span.endCol - 1
+      };
+      break;
+    case "LineAndCol":
+      location = {
+        startLine: errorDiagnostic.span.line - 1,
+        startCharacter: errorDiagnostic.span.col - 1,
+        endLine: errorDiagnostic.span.line - 1,
+        endCharacter: errorDiagnostic.span.col - 1
+      };
+      break;
+    case "File":
+      location = {
+        startLine: 0,
+        startCharacter: 0,
+        endLine: 0,
+        endCharacter: 0
+      };
+      break;
+    default:
+      return (0, import_assert_never4.assertNever)(errorDiagnostic.span);
+  }
+  let message = "";
+  for (const msg of errorDiagnostic.messages) {
+    message += "* " + msg + "\n";
+  }
+  if (errorDiagnostic.epilogue !== null) {
+    message += "* " + errorDiagnostic.epilogue;
+  }
+  return {
+    fileName: errorDiagnostic.fileName,
+    location,
+    message,
+    quickFix: errorDiagnostic.quickFix
+  };
+}
+
+// mfsqlchecker/sqlchecker_engine.ts
+var import_register = require("source-map-support/register");
+var import_assert_never5 = require("assert-never");
+var ts5 = __toESM(require("typescript"));
+var E2 = __toESM(require("fp-ts/Either"));
+function getSqlViews(params) {
+  const { projectDir, program, checker, sourceFiles } = params;
+  const viewLibrary = /* @__PURE__ */ new Map();
+  const progSourceFiles = program.getSourceFiles().filter((s) => !s.isDeclarationFile);
+  let errorDiagnostics = [];
+  for (const sourceFile of sourceFiles) {
+    const sf = progSourceFiles.find((s) => s.fileName === sourceFile);
+    if (sf === void 0) {
+      throw new Error("SourceFile not found: " + sourceFile);
+    }
+    const [views, errs] = sqlViewsLibraryAddFromSourceFile(projectDir, checker, sf);
+    errorDiagnostics = errorDiagnostics.concat(errs);
+    for (const key of viewLibrary.keys()) {
+      if (QualifiedSqlViewName.moduleId(key) === sourceFileModuleName(projectDir, sf)) {
+        const newView = views.get(key);
+        if (newView === void 0) {
+          viewLibrary.delete(key);
+        } else {
+          const oldView = viewLibrary.get(key);
+          if (oldView === void 0) {
+            throw new Error("The Impossible Happened");
+          }
+          if (!oldView.isEqual(newView)) {
+            viewLibrary.set(key, newView);
+            sqlViewLibraryResetToInitialFragmentsIncludingDeps(key, viewLibrary);
+          }
+        }
+      }
+    }
+    views.forEach((value, key) => {
+      if (!viewLibrary.has(key)) {
+        viewLibrary.set(key, value);
+      }
+    });
+  }
+  const [sqlViews, viewErrors] = resolveAllViewDefinitions(viewLibrary);
+  errorDiagnostics = errorDiagnostics.concat(viewErrors);
+  if (errorDiagnostics.length > 0) {
+    return E2.left(errorDiagnostics);
+  }
+  return E2.right({ viewLibrary, sqlViews });
+}
+
 // eslint-local-rules/utils.ts
 var import_utils2 = __toESM(require_dist5());
 var createRule = import_utils2.ESLintUtils.RuleCreator((name) => `https://github.com/MedFlyt/mfsqlchecker#${name}`);
@@ -31385,28 +31840,305 @@ function memoize(params) {
   return result;
 }
 
-// eslint-local-rules/rules/sql-check.utils.ts
-var import_assert_never5 = __toESM(require("assert-never"));
-var E2 = __toESM(require("fp-ts/Either"));
-var TE2 = __toESM(require("fp-ts/TaskEither"));
+// eslint-local-rules/rules/DbConnector.ts
+var import_assert_never7 = require("assert-never");
+var import_chalk4 = __toESM(require("chalk"));
+var import_cli_progress = require("cli-progress");
+var import_tiny_invariant = __toESM(require("tiny-invariant"));
+var TE = __toESM(require("fp-ts/TaskEither"));
+var E3 = __toESM(require("fp-ts/Either"));
 var import_function2 = require("fp-ts/function");
-var import_fs2 = __toESM(require("fs"));
-var import_path = __toESM(require("path"));
 
 // mfsqlchecker/pg_test_db.ts
 var import_pg_connection_string = require("pg-connection-string");
 
-// eslint-local-rules/rules/DbConnector.ts
-var import_assert_never4 = require("assert-never");
+// mfsqlchecker/source_maps.ts
+function resolveFromSourceMap(fileContents, position, sourceMap) {
+  if (sourceMap.length === 0) {
+    throw new Error("Empty sourceMap");
+  }
+  let i = 0;
+  while (true) {
+    if (position >= sourceMap[i][1] && position < sourceMap[i][2]) {
+      return toSrcSpan(fileContents, sourceMap[i][0] + (position - sourceMap[i][1]));
+    }
+    if (position < sourceMap[i][1]) {
+      if (i > 0) {
+        const start = toSrcSpan(fileContents, sourceMap[i - 1][0] + sourceMap[i - 1][2] - sourceMap[i - 1][1]);
+        const end = toSrcSpan(fileContents, sourceMap[i][0]);
+        return {
+          type: "LineAndColRange",
+          startLine: start.line,
+          startCol: start.col,
+          endLine: end.line,
+          endCol: end.col
+        };
+      } else {
+        return toSrcSpan(fileContents, sourceMap[0][0]);
+      }
+    }
+    if (i === sourceMap.length - 1) {
+      return toSrcSpan(fileContents, sourceMap[i][0] + sourceMap[i][2] - sourceMap[i][1] - 1);
+    }
+    i++;
+  }
+}
+
+// mfsqlchecker/formatters/codeFrameFormatter.ts
+var import_assert_never6 = require("assert-never");
 var import_chalk3 = __toESM(require("chalk"));
-var import_cli_progress = require("cli-progress");
-var import_tiny_invariant = __toESM(require("tiny-invariant"));
-var TE = __toESM(require("fp-ts/TaskEither"));
-var E = __toESM(require("fp-ts/Either"));
-var import_function = require("fp-ts/function");
+function codeFrameFormatter(errorDiagnostic) {
+  let result = "\n";
+  result += renderFileLocation(errorDiagnostic);
+  result += renderMessages(errorDiagnostic);
+  result += renderCodeFrame(errorDiagnostic);
+  result += renderEpilogue(errorDiagnostic);
+  return result;
+}
+function renderFileLocation(errorDiagnostic) {
+  let result = "";
+  result += import_chalk3.default.cyanBright(errorDiagnostic.fileName);
+  switch (errorDiagnostic.span.type) {
+    case "LineAndColRange":
+      result += ":" + import_chalk3.default.yellowBright(`${errorDiagnostic.span.startLine}`) + ":" + import_chalk3.default.yellowBright(`${errorDiagnostic.span.startCol}`) + ":";
+      break;
+    case "LineAndCol":
+      result += ":" + import_chalk3.default.yellowBright(`${errorDiagnostic.span.line}`) + ":" + import_chalk3.default.yellowBright(`${errorDiagnostic.span.col}`) + ":";
+      break;
+    case "File":
+      result += ":";
+      break;
+    default:
+      (0, import_assert_never6.assertNever)(errorDiagnostic.span);
+  }
+  result += " " + import_chalk3.default.redBright.bold("error:");
+  result += "\n";
+  return result;
+}
+function renderMessages(errorDiagnostic) {
+  let result = "";
+  for (const message of errorDiagnostic.messages) {
+    const msg = message.replace(/\n/g, "\n      ");
+    result += "    * " + msg + "\n";
+  }
+  return result;
+}
+function renderCodeFrame(errorDiagnostic) {
+  let result = "";
+  let startLine;
+  let endLine;
+  switch (errorDiagnostic.span.type) {
+    case "LineAndCol":
+      startLine = errorDiagnostic.span.line - 1;
+      endLine = errorDiagnostic.span.line - 1;
+      break;
+    case "LineAndColRange":
+      startLine = errorDiagnostic.span.startLine - 1;
+      endLine = errorDiagnostic.span.endLine - 1;
+      break;
+    case "File":
+      return result;
+    default:
+      return (0, import_assert_never6.assertNever)(errorDiagnostic.span);
+  }
+  result += "\n";
+  const lines = errorDiagnostic.fileContents.split("\n");
+  const LINES_MARGIN = 6;
+  const minLine = Math.max(0, startLine - LINES_MARGIN);
+  const maxLine = Math.min(lines.length - 1, endLine + LINES_MARGIN);
+  const padding = `${maxLine + 1}`.length;
+  for (let l = minLine; l <= maxLine; ++l) {
+    switch (errorDiagnostic.span.type) {
+      case "LineAndCol":
+        if (l === errorDiagnostic.span.line - 1) {
+          const prefix = lines[l].substr(0, errorDiagnostic.span.col - 1);
+          const target = lines[l].substr(errorDiagnostic.span.col - 1, 1);
+          const suffix = lines[l].substr(errorDiagnostic.span.col);
+          result += import_chalk3.default.blueBright(` ${pad(`${l + 1}`, padding, " ")} |`) + " " + prefix + import_chalk3.default.redBright.bold(target) + suffix + "\n";
+        } else {
+          result += import_chalk3.default.blueBright(` ${pad(`${l + 1}`, padding, " ")} |`) + " " + lines[l] + "\n";
+        }
+        if (l === errorDiagnostic.span.line - 1) {
+          result += import_chalk3.default.blueBright(` ${pad("", padding, " ")} |`) + " ".repeat(errorDiagnostic.span.col) + import_chalk3.default.redBright.bold("^") + "\n";
+        }
+        break;
+      case "LineAndColRange":
+        if (l > errorDiagnostic.span.startLine - 1 && l < errorDiagnostic.span.endLine - 1) {
+          result += import_chalk3.default.blueBright(` ${pad(`${l + 1}`, padding, " ")} |`) + " " + import_chalk3.default.redBright.bold(lines[l]) + "\n";
+          const spaces = lines[l].search(/(\S|$)/);
+          result += import_chalk3.default.blueBright(` ${pad("", padding, " ")} |`) + " ".repeat(spaces + 1) + import_chalk3.default.redBright.bold("~".repeat(lines[l].length - spaces)) + "\n";
+        } else if (l === errorDiagnostic.span.startLine - 1 && l !== errorDiagnostic.span.endLine - 1) {
+          const prefix = lines[l].substr(0, errorDiagnostic.span.startCol - 1);
+          const suffix = lines[l].substr(errorDiagnostic.span.startCol - 1);
+          const spaces = prefix.length;
+          result += import_chalk3.default.blueBright(` ${pad(`${l + 1}`, padding, " ")} |`) + " " + prefix + import_chalk3.default.redBright.bold(suffix) + "\n";
+          if (lines[l].length > spaces) {
+            result += import_chalk3.default.blueBright(` ${pad("", padding, " ")} |`) + " ".repeat(spaces + 1) + import_chalk3.default.redBright.bold("~".repeat(lines[l].length - spaces)) + "\n";
+          }
+        } else if (l === errorDiagnostic.span.endLine - 1 && l !== errorDiagnostic.span.startLine - 1) {
+          const prefix = lines[l].substr(0, errorDiagnostic.span.endCol - 1);
+          const suffix = lines[l].substr(errorDiagnostic.span.endCol - 1);
+          const spaces = lines[l].search(/(\S|$)/);
+          result += import_chalk3.default.blueBright(` ${pad(`${l + 1}`, padding, " ")} |`) + " " + import_chalk3.default.redBright.bold(prefix) + suffix + "\n";
+          result += import_chalk3.default.blueBright(` ${pad("", padding, " ")} |`) + " ".repeat(spaces + 1) + import_chalk3.default.redBright.bold("~".repeat(prefix.length - spaces)) + "\n";
+        } else if (l === errorDiagnostic.span.endLine - 1 && l === errorDiagnostic.span.startLine - 1) {
+          const prefix = lines[l].substr(0, errorDiagnostic.span.startCol - 1);
+          const target = lines[l].substring(errorDiagnostic.span.startCol - 1, errorDiagnostic.span.endCol - 1);
+          const suffix = lines[l].substr(errorDiagnostic.span.endCol - 1);
+          result += import_chalk3.default.blueBright(` ${pad(`${l + 1}`, padding, " ")} |`) + " " + prefix + import_chalk3.default.redBright.bold(target) + suffix + "\n";
+          result += import_chalk3.default.blueBright(` ${pad("", padding, " ")} |`) + " ".repeat(prefix.length + 1) + import_chalk3.default.redBright.bold("~".repeat(lines[l].length - suffix.length - prefix.length)) + "\n";
+        } else {
+          result += import_chalk3.default.blueBright(` ${pad(`${l + 1}`, padding, " ")} |`) + " " + lines[l] + "\n";
+        }
+        break;
+      default:
+        (0, import_assert_never6.assertNever)(errorDiagnostic.span);
+    }
+  }
+  result += "\n";
+  return result;
+}
+function renderEpilogue(errorDiagnostic) {
+  let result = "";
+  if (errorDiagnostic.epilogue === null) {
+    return result;
+  }
+  const msg = errorDiagnostic.epilogue.replace(/\n/g, "\n      ");
+  result += "    * " + msg + "\n";
+  return result;
+}
+function pad(str, width, z) {
+  return str.length >= width ? str : new Array(width - str.length + 1).join(z) + str;
+}
+
+// eslint-local-rules/rules/sql-check.errors.ts
+var InvalidQueryError = class extends Error {
+  _tag = "InvalidQueryError";
+  constructor(diagnostics) {
+    super(diagnostics.map(codeFrameFormatter).join("\n"));
+    this.name = "InvalidQueryError";
+  }
+  static to(error) {
+    return error instanceof InvalidQueryError ? error : new Error(`${error}`);
+  }
+  toJSON() {
+    return { _tag: this._tag, message: this.message };
+  }
+};
+
+// eslint-local-rules/rules/DbConnector.ts
 var SELECT_STAR_REGEX = new RegExp("(select|\\.|\\,)\\s*\\*", "i");
+function querySourceStart(fileContents, sourceMap) {
+  return toSrcSpan(
+    fileContents,
+    fileContents.slice(sourceMap[0][0] + 1).search(/\S/) + sourceMap[0][0] + 2
+  );
+}
+function queryAnswerToErrorDiagnostics(query, queryAnswer, colTypesFormat) {
+  switch (queryAnswer.type) {
+    case "NoErrors":
+      return [];
+    case "DescribeError":
+      if (queryAnswer.perr.position !== null) {
+        const srcSpan = resolveFromSourceMap(
+          query.fileContents,
+          queryAnswer.perr.position - 1,
+          query.sourceMap
+        );
+        return [
+          postgresqlErrorDiagnostic(
+            query.fileName,
+            query.fileContents,
+            queryAnswer.perr,
+            srcSpan,
+            null
+          )
+        ];
+      } else {
+        return [
+          postgresqlErrorDiagnostic(
+            query.fileName,
+            query.fileContents,
+            queryAnswer.perr,
+            querySourceStart(query.fileContents, query.sourceMap),
+            null
+          )
+        ];
+      }
+    case "DuplicateColNamesError":
+      return [
+        {
+          fileName: query.fileName,
+          fileContents: query.fileContents,
+          span: querySourceStart(query.fileContents, query.sourceMap),
+          messages: [
+            `Query return row contains duplicate column names:
+${JSON.stringify(
+              queryAnswer.duplicateResultColumns,
+              null,
+              2
+            )}`
+          ],
+          epilogue: import_chalk4.default.bold("hint") + ': Specify a different name for the column using the Sql "AS" keyword',
+          quickFix: null
+        }
+      ];
+    case "WrongColumnTypes":
+      let replacementText;
+      let colTypes = queryAnswer.renderedColTypes.split("\n");
+      if (colTypes.length <= 2) {
+        replacementText = "<{}>";
+      } else if (colTypes.length === 3) {
+        colTypes = colTypes.map((c) => c.trimLeft());
+        colTypes[1] = " ".repeat(query.indentLevel + 4) + colTypes[1];
+        colTypes[2] = " ".repeat(query.indentLevel) + colTypes[2];
+        replacementText = "<" + colTypes.join("\n") + ">";
+      } else if (colTypes.length > 3) {
+        colTypes = colTypes.map((c) => c.trimLeft());
+        for (let i = 1; i < colTypes.length - 1; ++i) {
+          colTypes[i] = " ".repeat(query.indentLevel + 4) + colTypes[i];
+        }
+        colTypes[colTypes.length - 1] = " ".repeat(query.indentLevel) + colTypes[colTypes.length - 1];
+        if (colTypesFormat.includeRegionMarker) {
+          colTypes.splice(1, 0, " ".repeat(query.indentLevel + 4) + "//#region ColTypes");
+          colTypes.splice(
+            colTypes.length - 1,
+            0,
+            " ".repeat(query.indentLevel + 4) + "//#endregion"
+          );
+        }
+        replacementText = "<" + colTypes.join("\n") + ">";
+      } else {
+        throw new Error(`Invalid colTypes.length: ${queryAnswer.renderedColTypes}`);
+      }
+      if (query.queryMethodName !== null) {
+        replacementText = query.queryMethodName + replacementText;
+      }
+      return [
+        {
+          fileName: query.fileName,
+          fileContents: query.fileContents,
+          span: query.colTypeSpan,
+          messages: ["Wrong Column Types"],
+          epilogue: import_chalk4.default.bold("Fix it to:") + "\n" + queryAnswer.renderedColTypes,
+          quickFix: {
+            name: "Fix Column Types",
+            replacementText
+          }
+        }
+      ];
+    default:
+      return (0, import_assert_never7.assertNever)(queryAnswer);
+  }
+}
 
 // eslint-local-rules/rules/sql-check.utils.ts
+var import_assert_never8 = __toESM(require("assert-never"));
+var E4 = __toESM(require("fp-ts/Either"));
+var TE2 = __toESM(require("fp-ts/TaskEither"));
+var import_function3 = require("fp-ts/function");
+var import_fs2 = __toESM(require("fs"));
+var import_path = __toESM(require("path"));
 var import_embedded_postgres = __toESM(require("embedded-postgres"));
 var QUERY_METHOD_NAMES = /* @__PURE__ */ new Set(["query", "queryOne", "queryOneOrNone"]);
 var INSERT_METHOD_NAMES = /* @__PURE__ */ new Set(["insert", "insertMaybe"]);
@@ -31421,8 +32153,6 @@ function locateNearestPackageJsonDir(filePath) {
 }
 
 // eslint-local-rules/rules/sql-check.rule.ts
-var import_path2 = __toESM(require("path"));
-var import_chalk4 = __toESM(require("chalk"));
 var messages = {
   missing: "Missing: {{value}}",
   invalid: "Invalid: {{value}}",
@@ -31451,111 +32181,188 @@ var sqlCheck = createRule({
   }
 });
 var workerPath = require.resolve("./sql-check.worker");
-var runWorker = createSyncFn(
-  workerPath,
-  {
-    tsRunner: TsRunner.EsbuildRegister,
-    timeout: 5e3
-    // timeout: 1000 * 60 * 5
-  }
-);
-var isInitial = true;
-var config = void 0;
+var runWorker = createSyncFn(workerPath, {
+  tsRunner: TsRunner.TSX,
+  // timeout: 9000
+  timeout: 1e3 * 60 * 5
+});
+var cache = {
+  isInitial: true,
+  viewLibrary: /* @__PURE__ */ new Map()
+};
 function checkCallExpression(params) {
-  const { node, context } = params;
+  const { node, context, projectDir } = params;
   const callExpressionValidityE = getCallExpressionValidity(node);
-  if (E3.isLeft(callExpressionValidityE) || context.parserServices === void 0) {
+  if (E5.isLeft(callExpressionValidityE) || context.parserServices === void 0) {
     return;
   }
-  if (isInitial) {
-    runWorker({ action: "INITIALIZE", projectDir: params.projectDir });
+  const parser = context.parserServices;
+  const sourceCode = context.getSourceCode();
+  const { callee, calleeProperty } = callExpressionValidityE.right;
+  const tsCallExpression = parser.esTreeNodeToTSNodeMap.get(node);
+  const checker = parser.program.getTypeChecker();
+  const tsObject = parser.esTreeNodeToTSNodeMap.get(callee.object);
+  const tsObjectType = checker.getTypeAtLocation(tsObject);
+  if (tsObjectType.getProperty("MfConnectionTypeTag") === void 0) {
+    return;
+  }
+  if (cache.isInitial) {
     const configE = toFpTsEither(
-      loadConfigFile(import_path2.default.join(params.projectDir, "demo/mfsqlchecker.json"))
+      loadConfigFile(import_path2.default.join(projectDir, "demo/mfsqlchecker.json"))
     );
-    if (E3.isLeft(configE)) {
+    if (E5.isLeft(configE)) {
       return context.report({
         node,
         messageId: "internal",
         data: { value: JSON.stringify(configE.left) }
       });
     }
-    config = configE.right;
-    isInitial = false;
+    const config2 = configE.right;
+    const uniqueTableColumnTypes = getTSUniqueColumnTypes(config2.uniqueTableColumnTypes);
+    const program = context.parserServices.program;
+    const sourceFiles = program.getSourceFiles().filter((s) => !s.isDeclarationFile);
+    const initE = (0, import_function4.pipe)(
+      E5.Do,
+      E5.chain(() => {
+        return getSqlViews({
+          projectDir,
+          checker,
+          program,
+          sourceFiles: sourceFiles.map((x) => x.fileName)
+        });
+      }),
+      E5.mapLeft(InvalidQueryError.to),
+      E5.chainFirst(() => {
+        return runWorker({
+          action: "INITIALIZE",
+          projectDir,
+          strictDateTimeChecking: true,
+          uniqueTableColumnTypes: config2.uniqueTableColumnTypes,
+          viewLibrary: []
+        });
+      })
+    );
+    if (E5.isLeft(initE)) {
+      return context.report({
+        node,
+        messageId: "internal",
+        data: { value: initE.left.message }
+      });
+    }
+    cache.isInitial = false;
+    cache.config = config2;
+    cache.tsUniqueTableColumnTypes = uniqueTableColumnTypes;
+    cache.viewLibrary = initE.right.viewLibrary;
   }
-  (0, import_tiny_invariant2.default)(config !== void 0, "config should already be defined at this point");
-  if (E3.isLeft(callExpressionValidityE) || context.parserServices === void 0) {
-    return;
+  (0, import_tiny_invariant2.default)(cache.config !== void 0, "config is undefined");
+  (0, import_tiny_invariant2.default)(
+    cache.tsUniqueTableColumnTypes !== void 0,
+    "tsUniqueTableColumnTypes is undefined"
+  );
+  (0, import_tiny_invariant2.default)(cache.viewLibrary !== void 0, "viewLibrary is undefined");
+  const { config, tsUniqueTableColumnTypes, viewLibrary } = cache;
+  const resolvedStmtE = (0, import_function4.pipe)(
+    E5.Do,
+    E5.chain(() => buildQueryCallExpressionE(calleeProperty.name, tsCallExpression)),
+    E5.chainW((query) => {
+      return resolveQueryFragmentE(
+        tsUniqueTableColumnTypes,
+        params.projectDir,
+        checker,
+        query,
+        (name) => viewLibrary.get(name)?.getName()
+      );
+    })
+  );
+  if (E5.isLeft(resolvedStmtE)) {
+    return context.report({
+      node,
+      messageId: "internal",
+      data: { value: resolvedStmtE.left.message }
+    });
   }
-  const { callee, calleeProperty } = callExpressionValidityE.right;
-  const tsCallExpression = context.parserServices.esTreeNodeToTSNodeMap.get(node);
-  const checker = context.parserServices.program.getTypeChecker();
-  const tsObject = context.parserServices.esTreeNodeToTSNodeMap.get(callee.object);
-  const tsObjectType = checker.getTypeAtLocation(tsObject);
-  if (tsObjectType.getProperty("MfConnectionTypeTag") === void 0) {
-    return;
-  }
-  const typeScriptUniqueColumnTypes = /* @__PURE__ */ new Map();
-  for (const uniqueTableColumnType of config.uniqueTableColumnTypes) {
-    typeScriptUniqueColumnTypes.set(
+  const resolvedStmt = resolvedStmtE.right;
+  (0, import_function4.pipe)(
+    E5.Do,
+    E5.chain(() => runWorker({ action: "CHECK", query: resolvedStmt })),
+    E5.chainW((r) => r.type === "NoErrors" ? E5.right(r) : E5.left(r)),
+    E5.mapLeft((error) => {
+      if (error instanceof Error) {
+        return context.report({
+          node,
+          messageId: "internal",
+          data: { value: error.message }
+        });
+      }
+      const diagnostics = queryAnswerToErrorDiagnostics(
+        resolvedStmt,
+        error,
+        defaultColTypesFormat
+      );
+      for (const diagnostic of diagnostics) {
+        const formatted = formatJsonDiagnostic(diagnostic);
+        context.report({
+          node,
+          messageId: "internal",
+          loc: {
+            start: {
+              line: formatted.location.startLine + 1,
+              column: formatted.location.startCharacter + 1
+            },
+            end: {
+              line: formatted.location.endLine + 1,
+              column: formatted.location.endCharacter + 1
+            }
+          },
+          data: { value: diagnostic.messages.join("\n") }
+        });
+      }
+    })
+  );
+}
+var resolveQueryFragmentE = (0, import_function4.flow)(
+  resolveQueryFragment,
+  toFpTsEither,
+  E5.mapLeft((diagnostics) => new InvalidQueryError(diagnostics))
+);
+var buildQueryCallExpressionE = (0, import_function4.flow)(
+  buildQueryCallExpression,
+  toFpTsEither,
+  E5.mapLeft((diagnostics) => new InvalidQueryError(diagnostics))
+);
+function getTSUniqueColumnTypes(uniqueTableColumnTypes) {
+  const tsUniqueColumnTypes = /* @__PURE__ */ new Map();
+  for (const uniqueTableColumnType of uniqueTableColumnTypes) {
+    tsUniqueColumnTypes.set(
       uniqueTableColumnType.typeScriptTypeName,
       SqlType.wrap(
         sqlUniqueTypeName(uniqueTableColumnType.tableName, uniqueTableColumnType.columnName)
       )
     );
   }
-  const lookupViewName = (qualifiedSqlViewName) => {
-    return void 0;
-  };
-  const queryFragmentE = (0, import_function3.pipe)(
-    E3.Do,
-    E3.bindW("query", () => buildQueryCallExpressionE(calleeProperty.name, tsCallExpression)),
-    E3.chain(({ query }) => {
-      return toFpTsEither(
-        resolveQueryFragment(
-          typeScriptUniqueColumnTypes,
-          params.projectDir,
-          checker,
-          query,
-          lookupViewName
-        )
-      );
-    })
-  );
-  if (queryFragmentE._tag === "Left") {
-    queryFragmentE.left.map((l) => l.messages).forEach((message) => {
-      console.log((0, import_chalk4.default)(...message));
-    });
-  }
-  if (E3.isRight(queryFragmentE)) {
-    const x = runWorker({ action: "CHECK", query: queryFragmentE.right });
-    console.log(x);
-  }
+  return tsUniqueColumnTypes;
 }
 function toFpTsEither(either) {
-  return either.type === "Left" ? E3.left(either.value) : E3.right(either.value);
-}
-function buildQueryCallExpressionE(methodName, node) {
-  const result = buildQueryCallExpression(methodName, node);
-  return result.type === "Left" ? E3.left(result.value) : E3.right(result.value);
+  return either.type === "Left" ? E5.left(either.value) : E5.right(either.value);
 }
 function getCallExpressionValidity(node) {
   if (node.callee.type !== import_typescript_estree.TSESTree.AST_NODE_TYPES.MemberExpression) {
-    return E3.left("CALLEE_NOT_MEMBER_EXPRESSION");
+    return E5.left("CALLEE_NOT_MEMBER_EXPRESSION");
   }
   if (node.callee.property.type !== import_typescript_estree.TSESTree.AST_NODE_TYPES.Identifier) {
-    return E3.left("CALLEE_PROPERTY_NOT_IDENTIFIER");
+    return E5.left("CALLEE_PROPERTY_NOT_IDENTIFIER");
   }
   if (!VALID_METHOD_NAMES.has(node.callee.property.name)) {
-    return E3.left("CALLEE_PROPERTY_NOT_VALID");
+    return E5.left("CALLEE_PROPERTY_NOT_VALID");
   }
   const argument = node.arguments[0];
   if (argument === void 0) {
-    return E3.left("NO_ARGUMENT");
+    return E5.left("NO_ARGUMENT");
   }
   if (argument.type !== import_typescript_estree.TSESTree.AST_NODE_TYPES.TaggedTemplateExpression) {
-    return E3.left("ARGUMENT_NOT_TAGGED_TEMPLATE_EXPRESSION");
+    return E5.left("ARGUMENT_NOT_TAGGED_TEMPLATE_EXPRESSION");
   }
-  return E3.right({
+  return E5.right({
     callee: node.callee,
     calleeProperty: node.callee.property,
     argument
@@ -31630,3 +32437,4 @@ queue-microtask/index.js:
 run-parallel/index.js:
   (*! run-parallel. MIT License. Feross Aboukhadijeh <https://feross.org/opensource> *)
 */
+//# sourceMappingURL=eslint-local-rules.js.map
