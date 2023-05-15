@@ -1,16 +1,17 @@
 import assertNever from "assert-never";
+import EmbeddedPostgres from "embedded-postgres";
 import * as E from "fp-ts/Either";
-import * as TE from "fp-ts/TaskEither";
 import { pipe } from "fp-ts/function";
+import * as TE from "fp-ts/TaskEither";
 import fs from "fs";
 import path from "path";
+import { Sql } from "postgres";
 import { loadConfigFile, UniqueTableColumnType } from "../../mfsqlchecker/ConfigFile";
+import { connectPg } from "../../mfsqlchecker/pg_extra";
 import { isTestDatabaseCluster } from "../../mfsqlchecker/pg_test_db";
-import { QueryRunner } from "./DbConnector";
-import EmbeddedPostgres from "embedded-postgres";
-import { Client } from "pg";
 import { SqlCreateView } from "../../mfsqlchecker/views";
-import { execSync } from "child_process";
+import { QueryRunner } from "./DbConnector";
+import { RunnerError } from "./sql-check.errors";
 
 type PostgresVersion = "14.6.0";
 
@@ -40,6 +41,7 @@ export function initializeTE(params: {
     return pipe(
         TE.Do,
         TE.bindW("options", () => {
+            console.log("Loading config file...");
             return initOptionsTE({
                 projectDir: params.projectDir,
                 configFile: "demo/mfsqlchecker.json",
@@ -47,20 +49,28 @@ export function initializeTE(params: {
                 postgresConnection: null
             });
         }),
-        TE.bindW("server", ({ options }) => initPgServerTE(options)),
+        TE.bindW("server", ({ options }) => {
+            return initPgServerTE(options);
+        }),
         TE.bindW("runner", ({ server, options }) => {
+            console.log("Connecting to database...");
             return QueryRunner.ConnectTE({
+                sql: server.sql,
                 adminUrl: server.adminUrl,
                 name: server.dbName,
                 migrationsDir: options.migrationsDir
             });
         }),
         TE.chainFirstW(({ runner }) => {
+            console.log("Initializing database...");
             return runner.initializeTE({
                 strictDateTimeChecking: params.strictDateTimeChecking,
                 uniqueTableColumnTypes: params.uniqueTableColumnTypes,
                 viewLibrary: params.viewLibrary
             });
+        }),
+        TE.mapLeft((x) => {
+            return x instanceof Error ? new RunnerError(x.message) : x;
         })
     );
 }
@@ -184,69 +194,79 @@ function createEmbeddedPostgresTE(options: { projectDir: string }) {
         ? TE.tryCatch(() => pg.initialise(), E.toError)
         : TE.right(undefined);
 
-    const recreateDatabaseTE = (client: Client) =>
+    const recreateDatabaseTE = (sql: Sql) =>
         pipe(
             TE.Do,
-            TE.bind("dbName", () => TE.right(client.escapeIdentifier(testDbName))),
+            TE.bind("dbName", () => TE.right((sql(testDbName) as any).value)),
+            TE.chainFirst(({ dbName }) => {
+                return TE.tryCatch(
+                    () => sql.unsafe(`DROP DATABASE IF EXISTS ${dbName} WITH (FORCE)`),
+                    E.toError
+                );
+            }),
             TE.chainFirst(({ dbName }) =>
-                TE.tryCatch(() => client.query(`DROP DATABASE IF EXISTS ${dbName} WITH (FORCE)`), E.toError)
-            ),
-            TE.chainFirst(({ dbName }) =>
-                TE.tryCatch(() => client.query(`CREATE DATABASE ${dbName}`), E.toError)
+                TE.tryCatch(() => sql.unsafe(`CREATE DATABASE ${dbName}`), E.toError)
             )
         );
 
     return pipe(
         TE.Do,
         TE.chain(() => conditionalInitializeAndStartTE),
-        TE.bind("isPostmasterStale", () =>
-            TE.tryCatch(() => isPostmasterPidStale(databaseDir), E.toError)
-        ),
-        TE.chainFirst(({ isPostmasterStale }) => {
-            return isPostmasterStale
-                ? pipe(
-                      TE.tryCatch(() => fs.promises.rmdir(databaseDir), E.toError),
-                      TE.chain(() => TE.tryCatch(() => pg.start(), E.toError))
-                  )
-                : TE.right(undefined);
+        // TE.chainFirstEitherKW(() => tryTerminatePostmaster(databaseDir)),
+        // TE.chainFirst(() => TE.tryCatch(() => pg.start(), E.toError)),
+        TE.chainFirst(() => {
+            const x = isPostmasterAlive(databaseDir)
+                ? TE.right(undefined)
+                : TE.tryCatch(() => pg.start(), E.toError);
+
+            return x;
         }),
-        TE.bind("client", () => TE.right(pg.getPgClient())),
-        TE.chainFirst(({ client }) => TE.tryCatch(() => client.connect(), E.toError)),
-        TE.chainFirst(({ client }) => recreateDatabaseTE(client)),
-        TE.map(() => ({ pg, options: postgresOptions, adminUrl, dbName: testDbName }))
+        TE.bind("sql", () => TE.right(connectPg(adminUrl))),
+        // TE.chainFirst(({ client }) => TE.tryCatch(() => client.connect(), E.toError)),
+        TE.chainFirst(({ sql }) => {
+            return recreateDatabaseTE(sql);
+        }),
+        TE.map(({ sql }) => ({ pg, options: postgresOptions, adminUrl, dbName: testDbName, sql }))
     );
 }
 
-// const startOrGetPgServer = (
-//     options: Pick<Options, "postgresConnection"> & { postgresVersion: PostgresVersion }
-// ): TE.TaskEither<
-//     Error,
-//     { url: string; dbName: string | undefined; pgServer: PostgresServer | null }
-// > => {
-//     if (options.postgresConnection !== null) {
-//         return TE.right({
-//             url: options.postgresConnection.url,
-//             dbName: options.postgresConnection.databaseName,
-//             pgServer: null
-//         });
-//     } else {
-//         return pipe(
-//             TE.tryCatch(() => PostgresServer.start(options.postgresVersion), E.toError),
-//             TE.map((pgServer) => ({
-//                 url: pgServer.url,
-//                 dbName: undefined,
-//                 pgServer
-//             }))
-//         );
-//     }
-// };
+function isPostmasterAlive(path: string) {
+    const pid = getPostmasterPid(path);
+
+    if (pid === undefined) {
+        return false;
+    }
+
+    try {
+        process.kill(pid, 0);
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
+function tryTerminatePostmaster(path: string) {
+    console.log("Terminating postmaster");
+    const pid = getPostmasterPid(path);
+    console.log("Terminating postmaster", pid);
+
+    if (pid !== undefined) {
+        console.log(`Terminating postmaster with pid: ${pid}`);
+        process.kill(pid, "SIGQUIT");
+    }
+
+    return E.right(undefined);
+}
 
 export function initPgServerTE(options: Options & { postgresVersion: PostgresVersion }) {
     return pipe(
         createEmbeddedPostgresTE(options),
         TE.map((result) => {
-            process.on("crash", () => result.pg.stop());
-            process.on("SIGINT", () => result.pg.stop());
+            process.on("exit", () => {
+                result.sql.end();
+                result.pg.stop();
+            });
+
             return result;
         })
     );
@@ -261,27 +281,20 @@ export function locateNearestPackageJsonDir(filePath: string): string {
     return locateNearestPackageJsonDir(dir);
 }
 
-function isPostmasterPidStale(filePath: string) {
-    return fs.promises
-        .readFile(path.join(filePath, "postmaster.pid"), "utf8")
-        .then((data) => {
-            const lines = data.split("\n");
-            const pid = parseInt(lines[0]);
+function getPostmasterPid(filePath: string): number | undefined {
+    const pidFile = path.join(filePath, "postmaster.pid");
 
-            if (isNaN(pid)) {
-                console.error("Invalid PID format");
-                throw new Error("Invalid PID format");
-            }
+    if (!fs.existsSync(pidFile)) {
+        return;
+    }
 
-            return execSync(`ps -p ${pid} -o comm=`);
-        })
-        .then((buffer) => {
-            const stdout = buffer.toString();
-            // Check for 'postgres' in the output to verify it's the intended process
-            return stdout.trim() !== "postgres";
-        })
-        .catch((error) => {
-            // An error occurred, which could mean the process doesn't exist or there was a problem reading the file
-            return true;
-        });
+    const fileContents = fs.readFileSync(pidFile, "utf8");
+    const lines = fileContents.split("\n");
+    const pid = parseInt(lines[0]);
+
+    if (isNaN(pid)) {
+        return;
+    }
+
+    return pid;
 }

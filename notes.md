@@ -9,8 +9,8 @@ kern.sysv.shmmax: 4194304 -> 16777216
 
 
 TODO:
- - lookup views
- - autofix
+ - [x] lookup views
+ - [x] autofix
  - inserts
  - epilogue
 

@@ -8,10 +8,14 @@ import { UniqueTableColumnType } from "../../mfsqlchecker/ConfigFile";
 import { ResolvedSelect } from "../../mfsqlchecker/queries";
 import { SqlCreateView } from "../../mfsqlchecker/views";
 import { QueryRunner } from "./DbConnector";
-import { RunnerError } from "./sql-check.errors";
+import { InvalidQueryError, RunnerError } from "./sql-check.errors";
 import { initializeTE, Options, PostgresOptions } from "./sql-check.utils";
 
-export type WorkerParams = InitializeParams | CheckParams | EndParams;
+export type WorkerParams =
+    | InitializeParams
+    | CheckParams
+    | UpdateViewsParams
+    | EndParams;
 
 type TaskEitherToEither<T> = T extends TE.TaskEither<infer E, infer A> ? E.Either<E, A> : never;
 
@@ -19,6 +23,7 @@ export type WorkerResult<Action extends WorkerParams["action"]> = TaskEitherToEi
     {
         INITIALIZE: ReturnType<typeof runInitialize>;
         CHECK: ReturnType<typeof runCheck>;
+        UPDATE_VIEWS: ReturnType<typeof runUpdateViews>;
         END: ReturnType<typeof runEnd>;
     }[Action]
 >;
@@ -34,14 +39,20 @@ let cache: {
     readonly runner: QueryRunner;
 } | null = null;
 
-let i = 1;
+let initializePromiseInstance: Promise<WorkerResult<"INITIALIZE">> | null = null;
 
 async function handler(params: WorkerParams) {
     switch (params.action) {
-        case "INITIALIZE":
-            return await runInitialize(params)();
+        case "INITIALIZE": {
+            if (initializePromiseInstance === null || params.force) {
+                initializePromiseInstance = runInitialize(params)();
+            }
+            return await initializePromiseInstance;
+        }
         case "CHECK":
             return await runCheck(params)();
+        case "UPDATE_VIEWS":
+            return await runUpdateViews(params)();
         case "END":
             return await runEnd(params)();
     }
@@ -53,9 +64,11 @@ type InitializeParams = {
     uniqueTableColumnTypes: UniqueTableColumnType[];
     strictDateTimeChecking: boolean;
     viewLibrary: SqlCreateView[];
+    force: boolean;
 };
 
-function runInitialize(params: InitializeParams) {
+function runInitialize(params: InitializeParams): TE.TaskEither<RunnerError, void> {
+    console.log("initialize");
     return pipe(
         initializeTE({
             projectDir: params.projectDir,
@@ -81,15 +94,47 @@ function runCheck(params: CheckParams) {
     return pipe(TE.tryCatch(() => runner.runQuery({ query: params.query }), RunnerError.to));
 }
 
+type UpdateViewsParams = {
+    action: "UPDATE_VIEWS";
+    strictDateTimeChecking: boolean;
+    viewLibrary: SqlCreateView[];
+};
+
+function runUpdateViews(params: UpdateViewsParams) {
+    if (cache?.runner === undefined) {
+        return TE.left(new Error("runner is not initialized"));
+    }
+
+    const runner = cache.runner;
+
+    return pipe(
+        TE.tryCatch(
+            () =>
+                runner.updateViews({
+                    strictDateTimeChecking: params.strictDateTimeChecking,
+                    viewLibrary: params.viewLibrary
+                }),
+            RunnerError.to
+        ),
+        TE.chain((diagnostics) => {
+            return diagnostics.length === 0
+                ? TE.right(undefined)
+                : TE.left(new InvalidQueryError(diagnostics));
+        })
+    );
+}
+
 type EndParams = { action: "END" };
 
 function runEnd(params: Extract<WorkerParams, { action: "END" }>) {
     return pipe(
         TE.Do,
         TE.chain(() => TE.tryCatch(() => cache?.runner.end() ?? Promise.resolve(), E.toError)),
-        TE.chain(() => TE.tryCatch(() => {
-            return cache?.server.pg.stop() ?? Promise.resolve();
-        }, E.toError))
+        TE.chain(() =>
+            TE.tryCatch(() => {
+                return cache?.server.pg.stop() ?? Promise.resolve();
+            }, E.toError)
+        )
     );
 }
 

@@ -3,7 +3,6 @@ import postgres from "postgres";
 
 export function connectPg(url: string): postgres.Sql {
     return postgres(url, {
-        max: 1,
         onnotice: () => {
             /* do nothing */
         }

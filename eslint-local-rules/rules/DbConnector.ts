@@ -76,12 +76,22 @@ export class QueryRunner {
         this.client = config.client;
     }
 
-    static async Connect(params: { adminUrl: string; name?: string; migrationsDir: string }) {
-        const client = await newConnect(params.adminUrl, params.name);
+    static async Connect(params: {
+        sql: postgres.Sql;
+        adminUrl: string;
+        name?: string;
+        migrationsDir: string;
+    }) {
+        const client = await newConnect(params.sql, params.adminUrl, params.name);
         return new QueryRunner({ migrationsDir: params.migrationsDir, client });
     }
 
-    static ConnectTE(params: { adminUrl: string; name?: string; migrationsDir: string }) {
+    static ConnectTE(params: {
+        sql: postgres.Sql;
+        adminUrl: string;
+        name?: string;
+        migrationsDir: string;
+    }) {
         return pipe(
             TE.tryCatch(() => QueryRunner.Connect(params), E.toError),
             TE.mapLeft(formatPgError)
@@ -109,12 +119,43 @@ export class QueryRunner {
             TE.match(
                 (error) => E.left(error),
                 (result) => {
-                    return result === undefined
+                    return result.length === 0
                         ? E.right(undefined)
                         : E.left(new InvalidQueryError(result));
                 }
             )
         );
+    }
+
+    async updateViews(params: { strictDateTimeChecking: boolean; viewLibrary: SqlCreateView[] }) {
+        if (params.strictDateTimeChecking !== this.prevStrictDateTimeChecking) {
+            await this.dropViews();
+        }
+
+        this.prevStrictDateTimeChecking = params.strictDateTimeChecking;
+
+        let queryErrors: ErrorDiagnostic[] = [];
+
+        const [updated, newViewNames] = await updateViews(
+            this.client,
+            params.strictDateTimeChecking,
+            this.viewNames,
+            params.viewLibrary
+        );
+
+        if (updated) {
+            await this.tableColsLibrary.refreshViews(this.client);
+        }
+
+        this.viewNames = newViewNames;
+
+        for (const [viewName, viewAnswer] of this.viewNames) {
+            const createView = params.viewLibrary.find((x) => x.viewName === viewName);
+            invariant(createView !== undefined, `view ${viewName} not found (probably a bug).`);
+            queryErrors = queryErrors.concat(viewAnswerToErrorDiagnostics(createView, viewAnswer));
+        }
+
+        return queryErrors;
     }
 
     async initialize(params: {
@@ -198,31 +239,7 @@ export class QueryRunner {
             this.dbMigrationsHash = hash;
         }
 
-        if (params.strictDateTimeChecking !== this.prevStrictDateTimeChecking) {
-            await this.dropViews();
-        }
-        this.prevStrictDateTimeChecking = params.strictDateTimeChecking;
-
-        let queryErrors: ErrorDiagnostic[] = [];
-
-        const [updated, newViewNames] = await updateViews(
-            this.client,
-            params.strictDateTimeChecking,
-            this.viewNames,
-            params.viewLibrary
-        );
-
-        if (updated) {
-            await this.tableColsLibrary.refreshViews(this.client);
-        }
-
-        this.viewNames = newViewNames;
-
-        for (const [viewName, viewAnswer] of this.viewNames) {
-            const createView = params.viewLibrary.find((x) => x.viewName === viewName);
-            invariant(createView !== undefined, `view ${viewName} not found (probably a bug).`);
-            queryErrors = queryErrors.concat(viewAnswerToErrorDiagnostics(createView, viewAnswer));
-        }
+        const diagnostics = await this.updateViews(params);
 
         // We modify the system catalogs only inside a transaction, so that we
         // can ROLLBACK the changes later. This is needed so that in the
@@ -233,6 +250,8 @@ export class QueryRunner {
         if (params.strictDateTimeChecking) {
             await modifySystemCatalogs(this.client);
         }
+
+        return diagnostics;
     }
 
     async runQuery(params: { query: ResolvedSelect }) {
@@ -545,7 +564,7 @@ export class DbConnector {
         // can ROLLBACK the changes later. This is needed so that in the
         // future if we need to run our migrations again, they can be run on
         // the original system catalogs.
-        await this.client.unsafe("BEGIN");
+        // await this.client.unsafe("BEGIN");
 
         if (manifest.strictDateTimeChecking) {
             await modifySystemCatalogs(this.client);
@@ -756,7 +775,7 @@ async function processCreateView(
     strictDateTimeChecking: boolean,
     view: SqlCreateView
 ): Promise<ViewAnswer> {
-    await client.unsafe("BEGIN");
+    // await client.unsafe("BEGIN");
     if (strictDateTimeChecking) {
         await modifySystemCatalogs(client);
     }
@@ -1866,18 +1885,21 @@ function stringifyColTypes(colTypes: Map<string, [ColNullability, TypeScriptType
     return result;
 }
 
-async function newConnect(adminUrl: string, name?: string): Promise<postgres.Sql> {
+async function newConnect(
+    sql: postgres.Sql,
+    adminUrl: string,
+    name?: string
+): Promise<postgres.Sql> {
     const newDbName = name !== undefined ? name : await testDatabaseName();
 
-    const adminConn1 = connectPg(adminUrl);
     try {
         if (name !== undefined) {
-            await dropDatabase(adminConn1, name);
+            await dropDatabase(sql, name);
         }
 
-        await createBlankDatabase(adminConn1, newDbName);
+        await createBlankDatabase(sql, newDbName);
     } finally {
-        await closePg(adminConn1);
+        await closePg(sql);
     }
 
     const client = connectPg(connReplaceDbName(adminUrl, newDbName));

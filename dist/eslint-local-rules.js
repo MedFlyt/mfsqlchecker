@@ -32134,12 +32134,12 @@ ${JSON.stringify(
 
 // eslint-local-rules/rules/sql-check.utils.ts
 var import_assert_never8 = __toESM(require("assert-never"));
+var import_embedded_postgres = __toESM(require("embedded-postgres"));
 var E4 = __toESM(require("fp-ts/Either"));
-var TE2 = __toESM(require("fp-ts/TaskEither"));
 var import_function3 = require("fp-ts/function");
+var TE2 = __toESM(require("fp-ts/TaskEither"));
 var import_fs2 = __toESM(require("fs"));
 var import_path = __toESM(require("path"));
-var import_embedded_postgres = __toESM(require("embedded-postgres"));
 var QUERY_METHOD_NAMES = /* @__PURE__ */ new Set(["query", "queryOne", "queryOneOrNone"]);
 var INSERT_METHOD_NAMES = /* @__PURE__ */ new Set(["insert", "insertMaybe"]);
 var VALID_METHOD_NAMES = /* @__PURE__ */ new Set([...QUERY_METHOD_NAMES, ...INSERT_METHOD_NAMES]);
@@ -32166,8 +32166,9 @@ var sqlCheck = createRule({
       recommended: "error"
     },
     messages,
-    type: "suggestion",
-    schema: []
+    type: "problem",
+    schema: [],
+    fixable: "code"
   },
   defaultOptions: [],
   create(context) {
@@ -32176,7 +32177,8 @@ var sqlCheck = createRule({
       value: () => locateNearestPackageJsonDir(context.getFilename())
     });
     return {
-      CallExpression: (node) => checkCallExpression({ node, context, projectDir })
+      CallExpression: (node) => checkCallExpression({ node, context, projectDir }),
+      TaggedTemplateExpression: (node) => checkTaggedTemplateExpression({ node, context, projectDir })
     };
   }
 });
@@ -32188,8 +32190,109 @@ var runWorker = createSyncFn(workerPath, {
 });
 var cache = {
   isInitial: true,
+  isInitialView: true,
   viewLibrary: /* @__PURE__ */ new Map()
 };
+var checkedViews = /* @__PURE__ */ new Map();
+function checkTaggedTemplateExpression(params) {
+  const { node, context, projectDir } = params;
+  const parser = context.parserServices;
+  const program = parser?.program;
+  const checker = program?.getTypeChecker();
+  const sourceCode = context.getSourceCode();
+  const scopeManager = sourceCode.scopeManager;
+  const viewDeclaration = node.parent;
+  if (program === void 0 || checker === void 0 || parser === void 0 || node.tag.type !== import_typescript_estree.TSESTree.AST_NODE_TYPES.Identifier || node.tag.name !== "defineSqlView") {
+    return;
+  }
+  if (scopeManager === null || viewDeclaration === void 0) {
+    return;
+  }
+  const tsNode = parser.esTreeNodeToTSNodeMap.get(node);
+  const fileName = tsNode.getSourceFile().fileName;
+  const nodeId = `${fileName}:${node.loc.start.line}`;
+  if (cache.isInitial) {
+    const initE = runInitialize({
+      context,
+      node,
+      parser,
+      checker,
+      projectDir,
+      force: cache.isInitial === true
+    });
+    if (E5.isLeft(initE)) {
+      return;
+    }
+  }
+  let wasInitialView = cache.isInitialView;
+  if (cache.isInitialView) {
+    cache.isInitialView = false;
+  }
+  if (!checkedViews.has(nodeId)) {
+    checkedViews.set(nodeId, true);
+    if (!cache.isInitialView) {
+      return;
+    }
+  }
+  (0, import_function4.pipe)(
+    E5.Do,
+    E5.bind(
+      "sqlViews",
+      () => getSqlViews({
+        projectDir,
+        checker,
+        program,
+        sourceFiles: [fileName]
+      })
+    ),
+    E5.mapLeft(InvalidQueryError.to),
+    E5.chainFirst(
+      ({ sqlViews }) => runWorker({
+        action: "UPDATE_VIEWS",
+        viewLibrary: sqlViews.sqlViews,
+        strictDateTimeChecking: true
+      })
+    ),
+    E5.fold(
+      (error) => {
+        if (!error.message.includes(nodeId) && !wasInitialView) {
+          return;
+        }
+        context.report({
+          node,
+          messageId: "invalid",
+          data: { value: error.message }
+        });
+      },
+      ({ sqlViews }) => {
+        cache.viewLibrary = sqlViews.viewLibrary;
+      }
+    )
+  );
+  const viewVariable = scopeManager.getDeclaredVariables(viewDeclaration)[0];
+  for (const reference of viewVariable.references) {
+    const ancestor = reference.identifier.parent?.parent;
+    if (ancestor === void 0) {
+      continue;
+    }
+    if (ancestor.type === import_typescript_estree.TSESTree.AST_NODE_TYPES.CallExpression) {
+      checkCallExpression({
+        node: ancestor,
+        context,
+        projectDir
+      });
+      continue;
+    }
+    if (ancestor.type === import_typescript_estree.TSESTree.AST_NODE_TYPES.TaggedTemplateExpression) {
+      checkTaggedTemplateExpression({
+        node: ancestor,
+        context,
+        projectDir
+      });
+      continue;
+    }
+  }
+}
 function checkCallExpression(params) {
   const { node, context, projectDir } = params;
   const callExpressionValidityE = getCallExpressionValidity(node);
@@ -32197,7 +32300,6 @@ function checkCallExpression(params) {
     return;
   }
   const parser = context.parserServices;
-  const sourceCode = context.getSourceCode();
   const { callee, calleeProperty } = callExpressionValidityE.right;
   const tsCallExpression = parser.esTreeNodeToTSNodeMap.get(node);
   const checker = parser.program.getTypeChecker();
@@ -32207,52 +32309,17 @@ function checkCallExpression(params) {
     return;
   }
   if (cache.isInitial) {
-    const configE = toFpTsEither(
-      loadConfigFile(import_path2.default.join(projectDir, "demo/mfsqlchecker.json"))
-    );
-    if (E5.isLeft(configE)) {
-      return context.report({
-        node,
-        messageId: "internal",
-        data: { value: JSON.stringify(configE.left) }
-      });
-    }
-    const config2 = configE.right;
-    const uniqueTableColumnTypes = getTSUniqueColumnTypes(config2.uniqueTableColumnTypes);
-    const program = context.parserServices.program;
-    const sourceFiles = program.getSourceFiles().filter((s) => !s.isDeclarationFile);
-    const initE = (0, import_function4.pipe)(
-      E5.Do,
-      E5.chain(() => {
-        return getSqlViews({
-          projectDir,
-          checker,
-          program,
-          sourceFiles: sourceFiles.map((x) => x.fileName)
-        });
-      }),
-      E5.mapLeft(InvalidQueryError.to),
-      E5.chainFirst(() => {
-        return runWorker({
-          action: "INITIALIZE",
-          projectDir,
-          strictDateTimeChecking: true,
-          uniqueTableColumnTypes: config2.uniqueTableColumnTypes,
-          viewLibrary: []
-        });
-      })
-    );
+    const initE = runInitialize({
+      context,
+      node,
+      parser,
+      checker,
+      projectDir,
+      force: cache.isInitial === true
+    });
     if (E5.isLeft(initE)) {
-      return context.report({
-        node,
-        messageId: "internal",
-        data: { value: initE.left.message }
-      });
+      return;
     }
-    cache.isInitial = false;
-    cache.config = config2;
-    cache.tsUniqueTableColumnTypes = uniqueTableColumnTypes;
-    cache.viewLibrary = initE.right.viewLibrary;
   }
   (0, import_tiny_invariant2.default)(cache.config !== void 0, "config is undefined");
   (0, import_tiny_invariant2.default)(
@@ -32277,7 +32344,7 @@ function checkCallExpression(params) {
   if (E5.isLeft(resolvedStmtE)) {
     return context.report({
       node,
-      messageId: "internal",
+      messageId: "invalid",
       data: { value: resolvedStmtE.left.message }
     });
   }
@@ -32303,7 +32370,7 @@ function checkCallExpression(params) {
         const formatted = formatJsonDiagnostic(diagnostic);
         context.report({
           node,
-          messageId: "internal",
+          messageId: "invalid",
           loc: {
             start: {
               line: formatted.location.startLine + 1,
@@ -32314,7 +32381,11 @@ function checkCallExpression(params) {
               column: formatted.location.endCharacter + 1
             }
           },
-          data: { value: diagnostic.messages.join("\n") }
+          data: { value: diagnostic.messages.join("\n") },
+          fix: diagnostic.quickFix === null ? null : (fixer) => {
+            const replacement = diagnostic.quickFix?.replacementText ?? "";
+            return node.typeParameters === void 0 ? fixer.replaceText(calleeProperty, replacement) : fixer.replaceText(node.typeParameters, replacement);
+          }
         });
       }
     })
@@ -32367,6 +32438,57 @@ function getCallExpressionValidity(node) {
     calleeProperty: node.callee.property,
     argument
   });
+}
+function runInitialize(params) {
+  const { node, context, parser, checker, projectDir } = params;
+  const configE = toFpTsEither(loadConfigFile(import_path2.default.join(projectDir, "demo/mfsqlchecker.json")));
+  if (E5.isLeft(configE)) {
+    context.report({
+      node,
+      messageId: "internal",
+      data: { value: JSON.stringify(configE.left) }
+    });
+    return configE;
+  }
+  const config = configE.right;
+  const uniqueTableColumnTypes = getTSUniqueColumnTypes(config.uniqueTableColumnTypes);
+  const program = parser.program;
+  const sourceFiles = program.getSourceFiles().filter((s) => !s.isDeclarationFile);
+  const initE = (0, import_function4.pipe)(
+    E5.Do,
+    E5.bind("sqlViews", () => {
+      return getSqlViews({
+        projectDir,
+        checker,
+        program,
+        sourceFiles: sourceFiles.map((x) => x.fileName)
+      });
+    }),
+    E5.mapLeft(InvalidQueryError.to),
+    E5.chainFirstW(({ sqlViews }) => {
+      return runWorker({
+        action: "INITIALIZE",
+        projectDir,
+        strictDateTimeChecking: true,
+        uniqueTableColumnTypes: config.uniqueTableColumnTypes,
+        viewLibrary: sqlViews.sqlViews,
+        force: params.force
+      });
+    })
+  );
+  if (E5.isLeft(initE)) {
+    context.report({
+      node,
+      messageId: "internal",
+      data: { value: initE.left.message }
+    });
+    return initE;
+  }
+  cache.isInitial = false;
+  cache.config = config;
+  cache.tsUniqueTableColumnTypes = uniqueTableColumnTypes;
+  cache.viewLibrary = initE.right.sqlViews.viewLibrary;
+  return E5.right(void 0);
 }
 
 // eslint-local-rules/index.ts
