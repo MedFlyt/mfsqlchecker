@@ -9,10 +9,16 @@ kern.sysv.shmmax: 4194304 -> 16777216
 
 
 TODO:
+ - [x] ...
  - [x] lookup views
  - [x] autofix
  - inserts
  - epilogue
+ - tests
+ - test on medflyt_server2
+ - publish as separate package
+ - publish as new repository
+ - cleanup
 
 
 
