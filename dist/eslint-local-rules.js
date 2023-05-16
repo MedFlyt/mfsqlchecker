@@ -45,7 +45,7 @@ var require_ms = __commonJS({
       options = options || {};
       var type = typeof val;
       if (type === "string" && val.length > 0) {
-        return parse2(val);
+        return parse3(val);
       } else if (type === "number" && isFinite(val)) {
         return options.long ? fmtLong(val) : fmtShort(val);
       }
@@ -53,7 +53,7 @@ var require_ms = __commonJS({
         "val is not a non-empty string or a valid number. val=" + JSON.stringify(val)
       );
     };
-    function parse2(str) {
+    function parse3(str) {
       str = String(str);
       if (str.length > 100) {
         return;
@@ -1158,7 +1158,7 @@ var require_semver = __commonJS({
 var require_parse = __commonJS({
   "node_modules/.pnpm/semver@7.5.0/node_modules/semver/functions/parse.js"(exports, module2) {
     var SemVer = require_semver();
-    var parse2 = (version, options, throwErrors = false) => {
+    var parse3 = (version, options, throwErrors = false) => {
       if (version instanceof SemVer) {
         return version;
       }
@@ -1171,16 +1171,16 @@ var require_parse = __commonJS({
         throw er;
       }
     };
-    module2.exports = parse2;
+    module2.exports = parse3;
   }
 });
 
 // node_modules/.pnpm/semver@7.5.0/node_modules/semver/functions/valid.js
 var require_valid = __commonJS({
   "node_modules/.pnpm/semver@7.5.0/node_modules/semver/functions/valid.js"(exports, module2) {
-    var parse2 = require_parse();
+    var parse3 = require_parse();
     var valid = (version, options) => {
-      const v = parse2(version, options);
+      const v = parse3(version, options);
       return v ? v.version : null;
     };
     module2.exports = valid;
@@ -1190,9 +1190,9 @@ var require_valid = __commonJS({
 // node_modules/.pnpm/semver@7.5.0/node_modules/semver/functions/clean.js
 var require_clean = __commonJS({
   "node_modules/.pnpm/semver@7.5.0/node_modules/semver/functions/clean.js"(exports, module2) {
-    var parse2 = require_parse();
+    var parse3 = require_parse();
     var clean = (version, options) => {
-      const s = parse2(version.trim().replace(/^[=v]+/, ""), options);
+      const s = parse3(version.trim().replace(/^[=v]+/, ""), options);
       return s ? s.version : null;
     };
     module2.exports = clean;
@@ -1225,10 +1225,10 @@ var require_inc = __commonJS({
 // node_modules/.pnpm/semver@7.5.0/node_modules/semver/functions/diff.js
 var require_diff = __commonJS({
   "node_modules/.pnpm/semver@7.5.0/node_modules/semver/functions/diff.js"(exports, module2) {
-    var parse2 = require_parse();
+    var parse3 = require_parse();
     var diff = (version1, version2) => {
-      const v1 = parse2(version1, null, true);
-      const v2 = parse2(version2, null, true);
+      const v1 = parse3(version1, null, true);
+      const v2 = parse3(version2, null, true);
       const comparison = v1.compare(v2);
       if (comparison === 0) {
         return null;
@@ -1292,9 +1292,9 @@ var require_patch = __commonJS({
 // node_modules/.pnpm/semver@7.5.0/node_modules/semver/functions/prerelease.js
 var require_prerelease = __commonJS({
   "node_modules/.pnpm/semver@7.5.0/node_modules/semver/functions/prerelease.js"(exports, module2) {
-    var parse2 = require_parse();
+    var parse3 = require_parse();
     var prerelease = (version, options) => {
-      const parsed = parse2(version, options);
+      const parsed = parse3(version, options);
       return parsed && parsed.prerelease.length ? parsed.prerelease : null;
     };
     module2.exports = prerelease;
@@ -1466,7 +1466,7 @@ var require_cmp = __commonJS({
 var require_coerce = __commonJS({
   "node_modules/.pnpm/semver@7.5.0/node_modules/semver/functions/coerce.js"(exports, module2) {
     var SemVer = require_semver();
-    var parse2 = require_parse();
+    var parse3 = require_parse();
     var { re, t } = require_re();
     var coerce = (version, options) => {
       if (version instanceof SemVer) {
@@ -1495,7 +1495,7 @@ var require_coerce = __commonJS({
       if (match3 === null) {
         return null;
       }
-      return parse2(`${match3[2]}.${match3[3] || "0"}.${match3[4] || "0"}`, options);
+      return parse3(`${match3[2]}.${match3[3] || "0"}.${match3[4] || "0"}`, options);
     };
     module2.exports = coerce;
   }
@@ -3095,7 +3095,7 @@ var require_semver2 = __commonJS({
     var constants = require_constants();
     var SemVer = require_semver();
     var identifiers = require_identifiers();
-    var parse2 = require_parse();
+    var parse3 = require_parse();
     var valid = require_valid();
     var clean = require_clean();
     var inc = require_inc();
@@ -3133,7 +3133,7 @@ var require_semver2 = __commonJS({
     var simplifyRange = require_simplify();
     var subset = require_subset();
     module2.exports = {
-      parse: parse2,
+      parse: parse3,
       valid,
       clean,
       inc,
@@ -12672,7 +12672,7 @@ var require_parse2 = __commonJS({
       CHAR_NO_BREAK_SPACE,
       CHAR_ZERO_WIDTH_NOBREAK_SPACE
     } = require_constants2();
-    var parse2 = (input, options = {}) => {
+    var parse3 = (input, options = {}) => {
       if (typeof input !== "string") {
         throw new TypeError("Expected a string");
       }
@@ -12878,7 +12878,7 @@ var require_parse2 = __commonJS({
       push({ type: "eos" });
       return ast;
     };
-    module2.exports = parse2;
+    module2.exports = parse3;
   }
 });
 
@@ -12889,7 +12889,7 @@ var require_braces = __commonJS({
     var stringify = require_stringify();
     var compile = require_compile();
     var expand = require_expand();
-    var parse2 = require_parse2();
+    var parse3 = require_parse2();
     var braces = (input, options = {}) => {
       let output = [];
       if (Array.isArray(input)) {
@@ -12909,7 +12909,7 @@ var require_braces = __commonJS({
       }
       return output;
     };
-    braces.parse = (input, options = {}) => parse2(input, options);
+    braces.parse = (input, options = {}) => parse3(input, options);
     braces.stringify = (input, options = {}) => {
       if (typeof input === "string") {
         return stringify(braces.parse(input, options), options);
@@ -13567,7 +13567,7 @@ var require_parse3 = __commonJS({
     var syntaxError = (type, char) => {
       return `Missing ${type}: "${char}" - use "\\\\${char}" to match literal characters`;
     };
-    var parse2 = (input, options) => {
+    var parse3 = (input, options) => {
       if (typeof input !== "string") {
         throw new TypeError("Expected a string");
       }
@@ -13717,7 +13717,7 @@ var require_parse3 = __commonJS({
             output = token.close = `)$))${extglobStar}`;
           }
           if (token.inner.includes("*") && (rest = remaining()) && /^\.[^\\/.]+$/.test(rest)) {
-            const expression = parse2(rest, { ...options, fastpaths: false }).output;
+            const expression = parse3(rest, { ...options, fastpaths: false }).output;
             output = token.close = `)${expression})${extglobStar})`;
           }
           if (token.prev.type === "bos") {
@@ -14246,7 +14246,7 @@ var require_parse3 = __commonJS({
       }
       return state;
     };
-    parse2.fastpaths = (input, options) => {
+    parse3.fastpaths = (input, options) => {
       const opts = { ...options };
       const max = typeof opts.maxLength === "number" ? Math.min(MAX_LENGTH, opts.maxLength) : MAX_LENGTH;
       const len = input.length;
@@ -14315,7 +14315,7 @@ var require_parse3 = __commonJS({
       }
       return source;
     };
-    module2.exports = parse2;
+    module2.exports = parse3;
   }
 });
 
@@ -14325,7 +14325,7 @@ var require_picomatch = __commonJS({
     "use strict";
     var path6 = require("path");
     var scan = require_scan();
-    var parse2 = require_parse3();
+    var parse3 = require_parse3();
     var utils = require_utils2();
     var constants = require_constants3();
     var isObject = (val) => val && typeof val === "object" && !Array.isArray(val);
@@ -14415,7 +14415,7 @@ var require_picomatch = __commonJS({
     picomatch.parse = (pattern, options) => {
       if (Array.isArray(pattern))
         return pattern.map((p) => picomatch.parse(p, options));
-      return parse2(pattern, { ...options, fastpaths: false });
+      return parse3(pattern, { ...options, fastpaths: false });
     };
     picomatch.scan = (input, options) => scan(input, options);
     picomatch.compileRe = (state, options, returnOutput = false, returnState = false) => {
@@ -14441,10 +14441,10 @@ var require_picomatch = __commonJS({
       }
       let parsed = { negated: false, fastpaths: true };
       if (options.fastpaths !== false && (input[0] === "." || input[0] === "*")) {
-        parsed.output = parse2.fastpaths(input, options);
+        parsed.output = parse3.fastpaths(input, options);
       }
       if (!parsed.output) {
-        parsed = parse2(input, options);
+        parsed = parse3(input, options);
       }
       return picomatch.compileRe(parsed, options, returnOutput, returnState);
     };
@@ -17992,11 +17992,11 @@ var require_parser = __commonJS({
     function getProgramAndAST(parseSettings, shouldProvideParserServices) {
       return parseSettings.programs && (0, useProvidedPrograms_1.useProvidedPrograms)(parseSettings.programs, parseSettings) || shouldProvideParserServices && (0, createProjectProgram_1.createProjectProgram)(parseSettings) || shouldProvideParserServices && parseSettings.createDefaultProgram && (0, createDefaultProgram_1.createDefaultProgram)(parseSettings) || (0, createIsolatedProgram_1.createIsolatedProgram)(parseSettings);
     }
-    function parse2(code, options) {
+    function parse3(code, options) {
       const { ast } = parseWithNodeMapsInternal(code, options, false);
       return ast;
     }
-    exports.parse = parse2;
+    exports.parse = parse3;
     function parseWithNodeMapsInternal(code, options, shouldPreserveNodeMaps) {
       const parseSettings = (0, createParseSettings_1.createParseSettings)(code, options);
       if (options === null || options === void 0 ? void 0 : options.errorOnTypeScriptSyntacticAndSemanticIssues) {
@@ -30304,6 +30304,7 @@ module.exports = __toCommonJS(eslint_local_rules_exports);
 var import_typescript_estree = __toESM(require_dist3());
 var E5 = __toESM(require("fp-ts/Either"));
 var import_function4 = require("fp-ts/function");
+var J = __toESM(require("fp-ts/Json"));
 var import_path2 = __toESM(require("path"));
 var import_register2 = require("source-map-support/register");
 
@@ -30584,22 +30585,6 @@ function fileLineCol(fileContents, position) {
     type: "LineAndCol",
     line,
     col
-  };
-}
-function toSrcSpan(fileContents, position) {
-  return fileLineCol(fileContents, position - 1);
-}
-function postgresqlErrorDiagnostic(fileName, fileContents, err, span, message) {
-  return {
-    fileName,
-    fileContents,
-    span,
-    messages: (message !== null ? [message] : []).concat([
-      import_chalk.default.bold(err.message),
-      import_chalk.default.bold("code:") + " " + err.code
-    ]).concat(err.detail !== null && err.detail !== err.message ? import_chalk.default.bold("detail:") + " " + err.detail : []),
-    epilogue: err.hint !== null ? import_chalk.default.bold("hint:") + " " + err.hint : null,
-    quickFix: null
   };
 }
 function nodeErrorDiagnostic(node, message) {
@@ -31201,12 +31186,95 @@ function buildQueryCallExpression(methodName, node) {
       return (0, import_assert_never2.assertNever)(queryFragments);
   }
 }
+function buildInsertCallExpression(checker, methodName, node) {
+  if (node.arguments.length < 2) {
+    return {
+      type: "Left",
+      value: []
+    };
+  }
+  const tableNameArg = node.arguments[0];
+  if (!(ts4.isStringLiteral(tableNameArg) || ts4.isNoSubstitutionTemplateLiteral(tableNameArg))) {
+    return {
+      type: "Left",
+      value: [nodeErrorDiagnostic(tableNameArg, "Argument must be a String Literal")]
+    };
+  }
+  const valuesArg = node.arguments[1];
+  const valuesType = checker.getTypeAtLocation(valuesArg);
+  if (getArrayType(valuesType) !== null) {
+    return {
+      type: "Left",
+      value: [nodeErrorDiagnostic(valuesArg, "Argument must not be an array (must be a single object)")]
+    };
+  }
+  const valuesElemType = valuesType;
+  const sourceFile = node.getSourceFile();
+  const [typeArgument, typeArgumentSpan] = buildTypeArgumentData(sourceFile, node);
+  let epilougeFragments;
+  if (node.arguments.length >= 3) {
+    const epilougeSqlExp = node.arguments[2];
+    const queryFragments = buildQueryFragments(epilougeSqlExp);
+    switch (queryFragments.type) {
+      case "Left":
+        return {
+          type: "Left",
+          value: queryFragments.value
+        };
+      case "Right":
+        epilougeFragments = queryFragments.value;
+        break;
+      default:
+        return (0, import_assert_never2.assertNever)(queryFragments);
+    }
+  } else {
+    epilougeFragments = [];
+  }
+  const objectFieldTypes = getObjectFieldTypes(checker, valuesElemType);
+  switch (objectFieldTypes.type) {
+    case "Left":
+      return {
+        type: "Left",
+        value: [nodeErrorDiagnostic(valuesArg, objectFieldTypes.value)]
+      };
+    case "Right":
+      return {
+        type: "Right",
+        value: {
+          fileName: sourceFile.fileName,
+          fileContents: sourceFile.text,
+          queryMethodName: typeArgument === null ? methodName : null,
+          typeArgument,
+          typeArgumentSpan,
+          tableName: tableNameArg.text,
+          tableNameExprSpan: nodeLineAndColSpan(sourceFile, tableNameArg),
+          insertExprSpan: nodeLineAndColSpan(sourceFile, valuesArg),
+          indentLevel: getIndentLevel(sourceFile, node),
+          insertColumns: objectFieldTypes.value,
+          epilougeFragments
+        }
+      };
+    default:
+      return (0, import_assert_never2.assertNever)(objectFieldTypes);
+  }
+}
 function isTypeSqlView(type) {
   const symbol = type.symbol;
   if (symbol === void 0) {
     return false;
   }
   return symbol.name === "SqlView";
+}
+function isNullableType(type) {
+  if (!type.isUnion()) {
+    return type.flags === ts4.TypeFlags.Null;
+  }
+  for (const typ of type.types) {
+    if (typ.flags === ts4.TypeFlags.Null) {
+      return true;
+    }
+  }
+  return false;
 }
 function nonNullType(type) {
   if (!type.isUnion()) {
@@ -31251,6 +31319,38 @@ function getArrayType(type) {
     }
   }
   return null;
+}
+function getObjectFieldTypes(checker, type) {
+  const errors = [];
+  const result = /* @__PURE__ */ new Map();
+  const addResult = (fieldName, typ) => {
+    if ((typ.flags & ts4.TypeFlags.StringLiteral) !== 0 || // tslint:disable-line:no-bitwise
+    isUnionOfStringLiterals(typ)) {
+      result.set(fieldName, [TypeScriptType.wrap("string"), !isNullableType(typ)]);
+    } else if ((typ.flags & ts4.TypeFlags.BooleanLiteral) !== 0 || // tslint:disable-line:no-bitwise
+    isUnionOfBooleanLiterals(typ)) {
+      result.set(fieldName, [TypeScriptType.wrap("boolean"), !isNullableType(typ)]);
+    } else {
+      result.set(fieldName, [TypeScriptType.wrap(checker.typeToString(nonNullType(typ))), !isNullableType(typ)]);
+    }
+  };
+  type.getProperties().forEach((value) => {
+    if (value.valueDeclaration === void 0) {
+      throw new Error("valueDeclaration is undefined");
+    }
+    addResult(value.name, checker.getTypeAtLocation(value.valueDeclaration));
+  });
+  if (errors.length > 0) {
+    return {
+      type: "Left",
+      value: "Values array argument element type has invalid fields:\n" + errors.join("\n")
+    };
+  } else {
+    return {
+      type: "Right",
+      value: result
+    };
+  }
 }
 function isUnionOfStringLiterals(type) {
   if ((type.flags & ts4.TypeFlags.Union) === 0) {
@@ -31543,6 +31643,98 @@ function resolveQueryFragment(typeScriptUniqueColumnTypes, projectDir, checker, 
     };
   }
 }
+function resolveInsertMany(typeScriptUniqueColumnTypes, projectDir, checker, query, lookupViewName) {
+  const errors = [];
+  let text = "";
+  const insertFragment = [{
+    type: "StringFragment",
+    text: `INSERT INTO ${escapeIdentifier(query.tableName)} DEFAULT VALUES `,
+    sourcePosStart: 0
+  }];
+  const queryFragments = insertFragment.concat(query.epilougeFragments);
+  const sourceMap = [];
+  let numParams = 0;
+  for (const frag of queryFragments) {
+    switch (frag.type) {
+      case "StringFragment":
+        sourceMap.push([frag.sourcePosStart, text.length, text.length + frag.text.length]);
+        text += frag.text;
+        break;
+      case "Expression":
+        const type = checker.getTypeAtLocation(frag.exp);
+        const maybeSqlFrag = tryTypeSqlFrag(type);
+        switch (maybeSqlFrag.type) {
+          case "Left":
+            errors.push(nodeErrorDiagnostic(frag.exp, maybeSqlFrag.value));
+            break;
+          case "Right":
+            if (maybeSqlFrag.value !== null) {
+              text += maybeSqlFrag.value;
+            } else if (isTypeSqlView(type)) {
+              if (!ts4.isIdentifier(frag.exp)) {
+                errors.push(nodeErrorDiagnostic(frag.exp, "SQL View Reference must be an identifier (not an expression)"));
+              } else {
+                const qualifiedSqlViewName = resolveViewIdentifier(projectDir, frag.exp.getSourceFile(), frag.exp);
+                const viewName = lookupViewName(qualifiedSqlViewName);
+                if (viewName === void 0) {
+                  errors.push(nodeErrorDiagnostic(frag.exp, 'SQL View Reference not found or has errors: "' + import_chalk2.default.bold(QualifiedSqlViewName.viewName(qualifiedSqlViewName)) + '"'));
+                } else {
+                  text += '"' + viewName + '"';
+                }
+              }
+            } else {
+              const sqlType = typescriptTypeToSqlType(typeScriptUniqueColumnTypes, nonNullType(type));
+              if (sqlType === null) {
+                const typeStr = checker.typeToString(type, frag.exp);
+                errors.push(nodeErrorDiagnostic(frag.exp, `Invalid type for SQL parameter: ${typeStr}`));
+              } else {
+                numParams++;
+                const sqlTypeStr = SqlType.unwrap(sqlType);
+                const escapedSqlTypeStr = sqlTypeStr.endsWith("[]") ? escapeIdentifier(sqlTypeStr.substring(0, sqlTypeStr.length - 2)) + "[]" : escapeIdentifier(sqlTypeStr);
+                text += "($" + numParams + (sqlTypeStr !== "" ? "::" + escapedSqlTypeStr : "") + ")";
+              }
+            }
+            break;
+          default:
+            (0, import_assert_never2.assertNever)(maybeSqlFrag);
+        }
+        break;
+      default:
+        (0, import_assert_never2.assertNever)(frag);
+    }
+  }
+  if (errors.length === 0) {
+    let colTypes;
+    if (query.typeArgument === null) {
+      colTypes = /* @__PURE__ */ new Map();
+    } else {
+      colTypes = typescriptRowTypeToColTypes(checker, query.typeArgument, (e) => errors.push(e));
+    }
+    return {
+      type: "Right",
+      value: {
+        fileName: query.fileName,
+        fileContents: query.fileContents,
+        insertColumns: query.insertColumns,
+        tableName: query.tableName,
+        text,
+        sourceMap,
+        colTypes,
+        queryMethodName: query.queryMethodName,
+        colTypeSpan: query.typeArgumentSpan,
+        tableNameExprSpan: query.tableNameExprSpan,
+        insertExprSpan: query.insertExprSpan,
+        indentLevel: query.indentLevel,
+        errors
+      }
+    };
+  } else {
+    return {
+      type: "Left",
+      value: errors
+    };
+  }
+}
 
 // mfsqlchecker/ConfigFile.ts
 var defaultColTypesFormat = {
@@ -31729,51 +31921,131 @@ var configFileSchema = {
   "$ref": "#/definitions/ConfigFile"
 };
 
-// mfsqlchecker/formatters/jsonFormatter.ts
+// mfsqlchecker/formatters/codeFrameFormatter.ts
 var import_assert_never4 = require("assert-never");
-function formatJsonDiagnostic(errorDiagnostic) {
-  let location;
+var import_chalk3 = __toESM(require("chalk"));
+function codeFrameFormatter(errorDiagnostic) {
+  let result = "\n";
+  result += renderFileLocation(errorDiagnostic);
+  result += renderMessages(errorDiagnostic);
+  result += renderCodeFrame(errorDiagnostic);
+  result += renderEpilogue(errorDiagnostic);
+  return result;
+}
+function renderFileLocation(errorDiagnostic) {
+  let result = "";
+  result += import_chalk3.default.cyanBright(errorDiagnostic.fileName);
   switch (errorDiagnostic.span.type) {
     case "LineAndColRange":
-      location = {
-        startLine: errorDiagnostic.span.startLine - 1,
-        startCharacter: errorDiagnostic.span.startCol - 1,
-        endLine: errorDiagnostic.span.endLine - 1,
-        endCharacter: errorDiagnostic.span.endCol - 1
-      };
+      result += ":" + import_chalk3.default.yellowBright(`${errorDiagnostic.span.startLine}`) + ":" + import_chalk3.default.yellowBright(`${errorDiagnostic.span.startCol}`) + ":";
       break;
     case "LineAndCol":
-      location = {
-        startLine: errorDiagnostic.span.line - 1,
-        startCharacter: errorDiagnostic.span.col - 1,
-        endLine: errorDiagnostic.span.line - 1,
-        endCharacter: errorDiagnostic.span.col - 1
-      };
+      result += ":" + import_chalk3.default.yellowBright(`${errorDiagnostic.span.line}`) + ":" + import_chalk3.default.yellowBright(`${errorDiagnostic.span.col}`) + ":";
       break;
     case "File":
-      location = {
-        startLine: 0,
-        startCharacter: 0,
-        endLine: 0,
-        endCharacter: 0
-      };
+      result += ":";
       break;
+    default:
+      (0, import_assert_never4.assertNever)(errorDiagnostic.span);
+  }
+  result += " " + import_chalk3.default.redBright.bold("error:");
+  result += "\n";
+  return result;
+}
+function renderMessages(errorDiagnostic) {
+  let result = "";
+  for (const message of errorDiagnostic.messages) {
+    const msg = message.replace(/\n/g, "\n      ");
+    result += "    * " + msg + "\n";
+  }
+  return result;
+}
+function renderCodeFrame(errorDiagnostic) {
+  let result = "";
+  let startLine;
+  let endLine;
+  switch (errorDiagnostic.span.type) {
+    case "LineAndCol":
+      startLine = errorDiagnostic.span.line - 1;
+      endLine = errorDiagnostic.span.line - 1;
+      break;
+    case "LineAndColRange":
+      startLine = errorDiagnostic.span.startLine - 1;
+      endLine = errorDiagnostic.span.endLine - 1;
+      break;
+    case "File":
+      return result;
     default:
       return (0, import_assert_never4.assertNever)(errorDiagnostic.span);
   }
-  let message = "";
-  for (const msg of errorDiagnostic.messages) {
-    message += "* " + msg + "\n";
+  result += "\n";
+  const lines = errorDiagnostic.fileContents.split("\n");
+  const LINES_MARGIN = 6;
+  const minLine = Math.max(0, startLine - LINES_MARGIN);
+  const maxLine = Math.min(lines.length - 1, endLine + LINES_MARGIN);
+  const padding = `${maxLine + 1}`.length;
+  for (let l = minLine; l <= maxLine; ++l) {
+    switch (errorDiagnostic.span.type) {
+      case "LineAndCol":
+        if (l === errorDiagnostic.span.line - 1) {
+          const prefix = lines[l].substr(0, errorDiagnostic.span.col - 1);
+          const target = lines[l].substr(errorDiagnostic.span.col - 1, 1);
+          const suffix = lines[l].substr(errorDiagnostic.span.col);
+          result += import_chalk3.default.blueBright(` ${pad(`${l + 1}`, padding, " ")} |`) + " " + prefix + import_chalk3.default.redBright.bold(target) + suffix + "\n";
+        } else {
+          result += import_chalk3.default.blueBright(` ${pad(`${l + 1}`, padding, " ")} |`) + " " + lines[l] + "\n";
+        }
+        if (l === errorDiagnostic.span.line - 1) {
+          result += import_chalk3.default.blueBright(` ${pad("", padding, " ")} |`) + " ".repeat(errorDiagnostic.span.col) + import_chalk3.default.redBright.bold("^") + "\n";
+        }
+        break;
+      case "LineAndColRange":
+        if (l > errorDiagnostic.span.startLine - 1 && l < errorDiagnostic.span.endLine - 1) {
+          result += import_chalk3.default.blueBright(` ${pad(`${l + 1}`, padding, " ")} |`) + " " + import_chalk3.default.redBright.bold(lines[l]) + "\n";
+          const spaces = lines[l].search(/(\S|$)/);
+          result += import_chalk3.default.blueBright(` ${pad("", padding, " ")} |`) + " ".repeat(spaces + 1) + import_chalk3.default.redBright.bold("~".repeat(lines[l].length - spaces)) + "\n";
+        } else if (l === errorDiagnostic.span.startLine - 1 && l !== errorDiagnostic.span.endLine - 1) {
+          const prefix = lines[l].substr(0, errorDiagnostic.span.startCol - 1);
+          const suffix = lines[l].substr(errorDiagnostic.span.startCol - 1);
+          const spaces = prefix.length;
+          result += import_chalk3.default.blueBright(` ${pad(`${l + 1}`, padding, " ")} |`) + " " + prefix + import_chalk3.default.redBright.bold(suffix) + "\n";
+          if (lines[l].length > spaces) {
+            result += import_chalk3.default.blueBright(` ${pad("", padding, " ")} |`) + " ".repeat(spaces + 1) + import_chalk3.default.redBright.bold("~".repeat(lines[l].length - spaces)) + "\n";
+          }
+        } else if (l === errorDiagnostic.span.endLine - 1 && l !== errorDiagnostic.span.startLine - 1) {
+          const prefix = lines[l].substr(0, errorDiagnostic.span.endCol - 1);
+          const suffix = lines[l].substr(errorDiagnostic.span.endCol - 1);
+          const spaces = lines[l].search(/(\S|$)/);
+          result += import_chalk3.default.blueBright(` ${pad(`${l + 1}`, padding, " ")} |`) + " " + import_chalk3.default.redBright.bold(prefix) + suffix + "\n";
+          result += import_chalk3.default.blueBright(` ${pad("", padding, " ")} |`) + " ".repeat(spaces + 1) + import_chalk3.default.redBright.bold("~".repeat(prefix.length - spaces)) + "\n";
+        } else if (l === errorDiagnostic.span.endLine - 1 && l === errorDiagnostic.span.startLine - 1) {
+          const prefix = lines[l].substr(0, errorDiagnostic.span.startCol - 1);
+          const target = lines[l].substring(errorDiagnostic.span.startCol - 1, errorDiagnostic.span.endCol - 1);
+          const suffix = lines[l].substr(errorDiagnostic.span.endCol - 1);
+          result += import_chalk3.default.blueBright(` ${pad(`${l + 1}`, padding, " ")} |`) + " " + prefix + import_chalk3.default.redBright.bold(target) + suffix + "\n";
+          result += import_chalk3.default.blueBright(` ${pad("", padding, " ")} |`) + " ".repeat(prefix.length + 1) + import_chalk3.default.redBright.bold("~".repeat(lines[l].length - suffix.length - prefix.length)) + "\n";
+        } else {
+          result += import_chalk3.default.blueBright(` ${pad(`${l + 1}`, padding, " ")} |`) + " " + lines[l] + "\n";
+        }
+        break;
+      default:
+        (0, import_assert_never4.assertNever)(errorDiagnostic.span);
+    }
   }
-  if (errorDiagnostic.epilogue !== null) {
-    message += "* " + errorDiagnostic.epilogue;
+  result += "\n";
+  return result;
+}
+function renderEpilogue(errorDiagnostic) {
+  let result = "";
+  if (errorDiagnostic.epilogue === null) {
+    return result;
   }
-  return {
-    fileName: errorDiagnostic.fileName,
-    location,
-    message,
-    quickFix: errorDiagnostic.quickFix
-  };
+  const msg = errorDiagnostic.epilogue.replace(/\n/g, "\n      ");
+  result += "    * " + msg + "\n";
+  return result;
+}
+function pad(str, width, z) {
+  return str.length >= width ? str : new Array(width - str.length + 1).join(z) + str;
 }
 
 // mfsqlchecker/sqlchecker_engine.ts
@@ -31840,306 +32112,46 @@ function memoize(params) {
   return result;
 }
 
-// eslint-local-rules/rules/DbConnector.ts
-var import_assert_never7 = require("assert-never");
-var import_chalk4 = __toESM(require("chalk"));
-var import_cli_progress = require("cli-progress");
-var import_tiny_invariant = __toESM(require("tiny-invariant"));
-var TE = __toESM(require("fp-ts/TaskEither"));
-var E3 = __toESM(require("fp-ts/Either"));
-var import_function2 = require("fp-ts/function");
-
-// mfsqlchecker/pg_test_db.ts
-var import_pg_connection_string = require("pg-connection-string");
-
-// mfsqlchecker/source_maps.ts
-function resolveFromSourceMap(fileContents, position, sourceMap) {
-  if (sourceMap.length === 0) {
-    throw new Error("Empty sourceMap");
-  }
-  let i = 0;
-  while (true) {
-    if (position >= sourceMap[i][1] && position < sourceMap[i][2]) {
-      return toSrcSpan(fileContents, sourceMap[i][0] + (position - sourceMap[i][1]));
-    }
-    if (position < sourceMap[i][1]) {
-      if (i > 0) {
-        const start = toSrcSpan(fileContents, sourceMap[i - 1][0] + sourceMap[i - 1][2] - sourceMap[i - 1][1]);
-        const end = toSrcSpan(fileContents, sourceMap[i][0]);
-        return {
-          type: "LineAndColRange",
-          startLine: start.line,
-          startCol: start.col,
-          endLine: end.line,
-          endCol: end.col
-        };
-      } else {
-        return toSrcSpan(fileContents, sourceMap[0][0]);
-      }
-    }
-    if (i === sourceMap.length - 1) {
-      return toSrcSpan(fileContents, sourceMap[i][0] + sourceMap[i][2] - sourceMap[i][1] - 1);
-    }
-    i++;
-  }
-}
-
-// mfsqlchecker/formatters/codeFrameFormatter.ts
-var import_assert_never6 = require("assert-never");
-var import_chalk3 = __toESM(require("chalk"));
-function codeFrameFormatter(errorDiagnostic) {
-  let result = "\n";
-  result += renderFileLocation(errorDiagnostic);
-  result += renderMessages(errorDiagnostic);
-  result += renderCodeFrame(errorDiagnostic);
-  result += renderEpilogue(errorDiagnostic);
-  return result;
-}
-function renderFileLocation(errorDiagnostic) {
-  let result = "";
-  result += import_chalk3.default.cyanBright(errorDiagnostic.fileName);
-  switch (errorDiagnostic.span.type) {
-    case "LineAndColRange":
-      result += ":" + import_chalk3.default.yellowBright(`${errorDiagnostic.span.startLine}`) + ":" + import_chalk3.default.yellowBright(`${errorDiagnostic.span.startCol}`) + ":";
-      break;
-    case "LineAndCol":
-      result += ":" + import_chalk3.default.yellowBright(`${errorDiagnostic.span.line}`) + ":" + import_chalk3.default.yellowBright(`${errorDiagnostic.span.col}`) + ":";
-      break;
-    case "File":
-      result += ":";
-      break;
-    default:
-      (0, import_assert_never6.assertNever)(errorDiagnostic.span);
-  }
-  result += " " + import_chalk3.default.redBright.bold("error:");
-  result += "\n";
-  return result;
-}
-function renderMessages(errorDiagnostic) {
-  let result = "";
-  for (const message of errorDiagnostic.messages) {
-    const msg = message.replace(/\n/g, "\n      ");
-    result += "    * " + msg + "\n";
-  }
-  return result;
-}
-function renderCodeFrame(errorDiagnostic) {
-  let result = "";
-  let startLine;
-  let endLine;
-  switch (errorDiagnostic.span.type) {
-    case "LineAndCol":
-      startLine = errorDiagnostic.span.line - 1;
-      endLine = errorDiagnostic.span.line - 1;
-      break;
-    case "LineAndColRange":
-      startLine = errorDiagnostic.span.startLine - 1;
-      endLine = errorDiagnostic.span.endLine - 1;
-      break;
-    case "File":
-      return result;
-    default:
-      return (0, import_assert_never6.assertNever)(errorDiagnostic.span);
-  }
-  result += "\n";
-  const lines = errorDiagnostic.fileContents.split("\n");
-  const LINES_MARGIN = 6;
-  const minLine = Math.max(0, startLine - LINES_MARGIN);
-  const maxLine = Math.min(lines.length - 1, endLine + LINES_MARGIN);
-  const padding = `${maxLine + 1}`.length;
-  for (let l = minLine; l <= maxLine; ++l) {
-    switch (errorDiagnostic.span.type) {
-      case "LineAndCol":
-        if (l === errorDiagnostic.span.line - 1) {
-          const prefix = lines[l].substr(0, errorDiagnostic.span.col - 1);
-          const target = lines[l].substr(errorDiagnostic.span.col - 1, 1);
-          const suffix = lines[l].substr(errorDiagnostic.span.col);
-          result += import_chalk3.default.blueBright(` ${pad(`${l + 1}`, padding, " ")} |`) + " " + prefix + import_chalk3.default.redBright.bold(target) + suffix + "\n";
-        } else {
-          result += import_chalk3.default.blueBright(` ${pad(`${l + 1}`, padding, " ")} |`) + " " + lines[l] + "\n";
-        }
-        if (l === errorDiagnostic.span.line - 1) {
-          result += import_chalk3.default.blueBright(` ${pad("", padding, " ")} |`) + " ".repeat(errorDiagnostic.span.col) + import_chalk3.default.redBright.bold("^") + "\n";
-        }
-        break;
-      case "LineAndColRange":
-        if (l > errorDiagnostic.span.startLine - 1 && l < errorDiagnostic.span.endLine - 1) {
-          result += import_chalk3.default.blueBright(` ${pad(`${l + 1}`, padding, " ")} |`) + " " + import_chalk3.default.redBright.bold(lines[l]) + "\n";
-          const spaces = lines[l].search(/(\S|$)/);
-          result += import_chalk3.default.blueBright(` ${pad("", padding, " ")} |`) + " ".repeat(spaces + 1) + import_chalk3.default.redBright.bold("~".repeat(lines[l].length - spaces)) + "\n";
-        } else if (l === errorDiagnostic.span.startLine - 1 && l !== errorDiagnostic.span.endLine - 1) {
-          const prefix = lines[l].substr(0, errorDiagnostic.span.startCol - 1);
-          const suffix = lines[l].substr(errorDiagnostic.span.startCol - 1);
-          const spaces = prefix.length;
-          result += import_chalk3.default.blueBright(` ${pad(`${l + 1}`, padding, " ")} |`) + " " + prefix + import_chalk3.default.redBright.bold(suffix) + "\n";
-          if (lines[l].length > spaces) {
-            result += import_chalk3.default.blueBright(` ${pad("", padding, " ")} |`) + " ".repeat(spaces + 1) + import_chalk3.default.redBright.bold("~".repeat(lines[l].length - spaces)) + "\n";
-          }
-        } else if (l === errorDiagnostic.span.endLine - 1 && l !== errorDiagnostic.span.startLine - 1) {
-          const prefix = lines[l].substr(0, errorDiagnostic.span.endCol - 1);
-          const suffix = lines[l].substr(errorDiagnostic.span.endCol - 1);
-          const spaces = lines[l].search(/(\S|$)/);
-          result += import_chalk3.default.blueBright(` ${pad(`${l + 1}`, padding, " ")} |`) + " " + import_chalk3.default.redBright.bold(prefix) + suffix + "\n";
-          result += import_chalk3.default.blueBright(` ${pad("", padding, " ")} |`) + " ".repeat(spaces + 1) + import_chalk3.default.redBright.bold("~".repeat(prefix.length - spaces)) + "\n";
-        } else if (l === errorDiagnostic.span.endLine - 1 && l === errorDiagnostic.span.startLine - 1) {
-          const prefix = lines[l].substr(0, errorDiagnostic.span.startCol - 1);
-          const target = lines[l].substring(errorDiagnostic.span.startCol - 1, errorDiagnostic.span.endCol - 1);
-          const suffix = lines[l].substr(errorDiagnostic.span.endCol - 1);
-          result += import_chalk3.default.blueBright(` ${pad(`${l + 1}`, padding, " ")} |`) + " " + prefix + import_chalk3.default.redBright.bold(target) + suffix + "\n";
-          result += import_chalk3.default.blueBright(` ${pad("", padding, " ")} |`) + " ".repeat(prefix.length + 1) + import_chalk3.default.redBright.bold("~".repeat(lines[l].length - suffix.length - prefix.length)) + "\n";
-        } else {
-          result += import_chalk3.default.blueBright(` ${pad(`${l + 1}`, padding, " ")} |`) + " " + lines[l] + "\n";
-        }
-        break;
-      default:
-        (0, import_assert_never6.assertNever)(errorDiagnostic.span);
-    }
-  }
-  result += "\n";
-  return result;
-}
-function renderEpilogue(errorDiagnostic) {
-  let result = "";
-  if (errorDiagnostic.epilogue === null) {
-    return result;
-  }
-  const msg = errorDiagnostic.epilogue.replace(/\n/g, "\n      ");
-  result += "    * " + msg + "\n";
-  return result;
-}
-function pad(str, width, z) {
-  return str.length >= width ? str : new Array(width - str.length + 1).join(z) + str;
-}
-
 // eslint-local-rules/rules/sql-check.errors.ts
 var InvalidQueryError = class extends Error {
   _tag = "InvalidQueryError";
+  diagnostics;
   constructor(diagnostics) {
     super(diagnostics.map(codeFrameFormatter).join("\n"));
     this.name = "InvalidQueryError";
+    this.diagnostics = diagnostics;
   }
   static to(error) {
     return error instanceof InvalidQueryError ? error : new Error(`${error}`);
   }
   toJSON() {
-    return { _tag: this._tag, message: this.message };
+    return { _tag: this._tag, message: this.message, diagnostics: this.diagnostics };
   }
 };
 
-// eslint-local-rules/rules/DbConnector.ts
-var SELECT_STAR_REGEX = new RegExp("(select|\\.|\\,)\\s*\\*", "i");
-function querySourceStart(fileContents, sourceMap) {
-  return toSrcSpan(
-    fileContents,
-    fileContents.slice(sourceMap[0][0] + 1).search(/\S/) + sourceMap[0][0] + 2
-  );
-}
-function queryAnswerToErrorDiagnostics(query, queryAnswer, colTypesFormat) {
-  switch (queryAnswer.type) {
-    case "NoErrors":
-      return [];
-    case "DescribeError":
-      if (queryAnswer.perr.position !== null) {
-        const srcSpan = resolveFromSourceMap(
-          query.fileContents,
-          queryAnswer.perr.position - 1,
-          query.sourceMap
-        );
-        return [
-          postgresqlErrorDiagnostic(
-            query.fileName,
-            query.fileContents,
-            queryAnswer.perr,
-            srcSpan,
-            null
-          )
-        ];
-      } else {
-        return [
-          postgresqlErrorDiagnostic(
-            query.fileName,
-            query.fileContents,
-            queryAnswer.perr,
-            querySourceStart(query.fileContents, query.sourceMap),
-            null
-          )
-        ];
-      }
-    case "DuplicateColNamesError":
-      return [
-        {
-          fileName: query.fileName,
-          fileContents: query.fileContents,
-          span: querySourceStart(query.fileContents, query.sourceMap),
-          messages: [
-            `Query return row contains duplicate column names:
-${JSON.stringify(
-              queryAnswer.duplicateResultColumns,
-              null,
-              2
-            )}`
-          ],
-          epilogue: import_chalk4.default.bold("hint") + ': Specify a different name for the column using the Sql "AS" keyword',
-          quickFix: null
-        }
-      ];
-    case "WrongColumnTypes":
-      let replacementText;
-      let colTypes = queryAnswer.renderedColTypes.split("\n");
-      if (colTypes.length <= 2) {
-        replacementText = "<{}>";
-      } else if (colTypes.length === 3) {
-        colTypes = colTypes.map((c) => c.trimLeft());
-        colTypes[1] = " ".repeat(query.indentLevel + 4) + colTypes[1];
-        colTypes[2] = " ".repeat(query.indentLevel) + colTypes[2];
-        replacementText = "<" + colTypes.join("\n") + ">";
-      } else if (colTypes.length > 3) {
-        colTypes = colTypes.map((c) => c.trimLeft());
-        for (let i = 1; i < colTypes.length - 1; ++i) {
-          colTypes[i] = " ".repeat(query.indentLevel + 4) + colTypes[i];
-        }
-        colTypes[colTypes.length - 1] = " ".repeat(query.indentLevel) + colTypes[colTypes.length - 1];
-        if (colTypesFormat.includeRegionMarker) {
-          colTypes.splice(1, 0, " ".repeat(query.indentLevel + 4) + "//#region ColTypes");
-          colTypes.splice(
-            colTypes.length - 1,
-            0,
-            " ".repeat(query.indentLevel + 4) + "//#endregion"
-          );
-        }
-        replacementText = "<" + colTypes.join("\n") + ">";
-      } else {
-        throw new Error(`Invalid colTypes.length: ${queryAnswer.renderedColTypes}`);
-      }
-      if (query.queryMethodName !== null) {
-        replacementText = query.queryMethodName + replacementText;
-      }
-      return [
-        {
-          fileName: query.fileName,
-          fileContents: query.fileContents,
-          span: query.colTypeSpan,
-          messages: ["Wrong Column Types"],
-          epilogue: import_chalk4.default.bold("Fix it to:") + "\n" + queryAnswer.renderedColTypes,
-          quickFix: {
-            name: "Fix Column Types",
-            replacementText
-          }
-        }
-      ];
-    default:
-      return (0, import_assert_never7.assertNever)(queryAnswer);
-  }
-}
-
 // eslint-local-rules/rules/sql-check.utils.ts
-var import_assert_never8 = __toESM(require("assert-never"));
+var import_assert_never7 = __toESM(require("assert-never"));
 var import_embedded_postgres = __toESM(require("embedded-postgres"));
 var E4 = __toESM(require("fp-ts/Either"));
 var import_function3 = require("fp-ts/function");
 var TE2 = __toESM(require("fp-ts/TaskEither"));
 var import_fs2 = __toESM(require("fs"));
 var import_path = __toESM(require("path"));
+
+// mfsqlchecker/pg_test_db.ts
+var import_pg_connection_string = require("pg-connection-string");
+
+// eslint-local-rules/rules/DbConnector.ts
+var import_assert_never6 = require("assert-never");
+var import_chalk4 = __toESM(require("chalk"));
+var import_cli_progress = require("cli-progress");
+var import_tiny_invariant = __toESM(require("tiny-invariant"));
+var TE = __toESM(require("fp-ts/TaskEither"));
+var E3 = __toESM(require("fp-ts/Either"));
+var import_function2 = require("fp-ts/function");
+var SELECT_STAR_REGEX = new RegExp("(select|\\.|\\,)\\s*\\*", "i");
+
+// eslint-local-rules/rules/sql-check.utils.ts
 var QUERY_METHOD_NAMES = /* @__PURE__ */ new Set(["query", "queryOne", "queryOneOrNone"]);
 var INSERT_METHOD_NAMES = /* @__PURE__ */ new Set(["insert", "insertMaybe"]);
 var VALID_METHOD_NAMES = /* @__PURE__ */ new Set([...QUERY_METHOD_NAMES, ...INSERT_METHOD_NAMES]);
@@ -32183,11 +32195,17 @@ var sqlCheck = createRule({
   }
 });
 var workerPath = require.resolve("./sql-check.worker");
-var runWorker = createSyncFn(workerPath, {
+var runWorkerX = createSyncFn(workerPath, {
   tsRunner: TsRunner.TSX,
   // timeout: 9000
   timeout: 1e3 * 60 * 5
 });
+var runWorker = (0, import_function4.flow)(
+  runWorkerX,
+  E5.chain(J.parse),
+  E5.chainW((parsed) => parsed),
+  E5.mapLeft((error) => error)
+);
 var cache = {
   isInitial: true,
   isInitialView: true,
@@ -32293,6 +32311,142 @@ function checkTaggedTemplateExpression(params) {
     }
   }
 }
+function checkQueryExpression(params) {
+  const { context, parser, checker, node, projectDir, calleeProperty } = params;
+  const tsCallExpression = parser.esTreeNodeToTSNodeMap.get(node);
+  (0, import_tiny_invariant2.default)(cache.config !== void 0, "config is undefined");
+  (0, import_tiny_invariant2.default)(
+    cache.tsUniqueTableColumnTypes !== void 0,
+    "tsUniqueTableColumnTypes is undefined"
+  );
+  (0, import_tiny_invariant2.default)(cache.viewLibrary !== void 0, "viewLibrary is undefined");
+  const { config, tsUniqueTableColumnTypes, viewLibrary } = cache;
+  const resolvedE = (0, import_function4.pipe)(
+    E5.Do,
+    E5.chain(() => buildQueryCallExpressionE(calleeProperty.name, tsCallExpression)),
+    E5.chainW((query) => {
+      return resolveQueryFragmentE(
+        tsUniqueTableColumnTypes,
+        params.projectDir,
+        checker,
+        query,
+        (name) => viewLibrary.get(name)?.getName()
+      );
+    })
+  );
+  if (E5.isLeft(resolvedE)) {
+    return context.report({
+      node,
+      messageId: "invalid",
+      data: { value: resolvedE.left.message }
+    });
+  }
+  const resolved = resolvedE.right;
+  (0, import_function4.pipe)(
+    E5.Do,
+    E5.chain(() => runWorker({ action: "CHECK_QUERY", resolved })),
+    E5.mapLeft((error) => {
+      if ("_tag" in error && error._tag === "InvalidQueryError") {
+        return reportDiagnostics({
+          context,
+          node,
+          calleeProperty,
+          diagnostics: error.diagnostics
+        });
+      }
+      return context.report({
+        node,
+        messageId: "internal",
+        data: { value: error.message }
+      });
+    })
+  );
+}
+function reportDiagnostics(params) {
+  const { node, context, calleeProperty, diagnostics } = params;
+  for (const diagnostic of diagnostics) {
+    context.report({
+      node,
+      messageId: "invalid",
+      loc: mapSrcSpanToLoc(diagnostic.span),
+      data: { value: diagnostics.map(codeFrameFormatter).join("\n") },
+      fix: diagnostic.quickFix === null ? null : (fixer) => {
+        const replacement = diagnostic.quickFix?.replacementText ?? "";
+        return node.typeParameters === void 0 ? fixer.replaceText(calleeProperty, replacement) : fixer.replaceText(node.typeParameters, replacement);
+      }
+    });
+  }
+}
+function mapSrcSpanToLoc(span) {
+  switch (span.type) {
+    case "File":
+      return void 0;
+    case "LineAndCol":
+      return {
+        line: span.line,
+        column: span.col - 1
+      };
+    case "LineAndColRange":
+      return {
+        start: {
+          line: span.startLine,
+          column: span.startCol - 1
+        },
+        end: {
+          line: span.endLine,
+          column: span.endCol - 1
+        }
+      };
+  }
+}
+function checkInsertExpression(params) {
+  const { context, parser, checker, node, calleeProperty, projectDir } = params;
+  const tsNode = parser.esTreeNodeToTSNodeMap.get(node);
+  const { tsUniqueTableColumnTypes, viewLibrary } = cache;
+  (0, import_tiny_invariant2.default)(tsUniqueTableColumnTypes !== void 0, "tsUniqueTableColumnTypes");
+  (0, import_tiny_invariant2.default)(viewLibrary !== void 0, "viewLibrary");
+  const buildInsertCallExpressionE = (0, import_function4.flow)(
+    buildInsertCallExpression,
+    toFpTsEither,
+    E5.mapLeft(InvalidQueryError.to)
+  );
+  const resolveInsertManyE = (0, import_function4.flow)(
+    resolveInsertMany,
+    toFpTsEither,
+    E5.mapLeft(InvalidQueryError.to)
+  );
+  (0, import_function4.pipe)(
+    E5.Do,
+    E5.chain(() => buildInsertCallExpressionE(checker, calleeProperty.name, tsNode)),
+    E5.chain((query) => {
+      return resolveInsertManyE(
+        tsUniqueTableColumnTypes,
+        projectDir,
+        checker,
+        query,
+        (name) => viewLibrary.get(name)?.getName()
+      );
+    }),
+    E5.chain((resolved) => {
+      return runWorker({ action: "CHECK_INSERT", resolved });
+    }),
+    E5.mapLeft((error) => {
+      if ("_tag" in error && error._tag === "InvalidQueryError") {
+        return reportDiagnostics({
+          context,
+          node,
+          calleeProperty,
+          diagnostics: error.diagnostics
+        });
+      }
+      return context.report({
+        node,
+        messageId: "invalid",
+        data: { value: error.message }
+      });
+    })
+  );
+}
 function checkCallExpression(params) {
   const { node, context, projectDir } = params;
   const callExpressionValidityE = getCallExpressionValidity(node);
@@ -32300,10 +32454,9 @@ function checkCallExpression(params) {
     return;
   }
   const parser = context.parserServices;
-  const { callee, calleeProperty } = callExpressionValidityE.right;
-  const tsCallExpression = parser.esTreeNodeToTSNodeMap.get(node);
   const checker = parser.program.getTypeChecker();
-  const tsObject = parser.esTreeNodeToTSNodeMap.get(callee.object);
+  const callExpression = callExpressionValidityE.right;
+  const tsObject = parser.esTreeNodeToTSNodeMap.get(callExpression.callee.object);
   const tsObjectType = checker.getTypeAtLocation(tsObject);
   if (tsObjectType.getProperty("MfConnectionTypeTag") === void 0) {
     return;
@@ -32321,75 +32474,27 @@ function checkCallExpression(params) {
       return;
     }
   }
-  (0, import_tiny_invariant2.default)(cache.config !== void 0, "config is undefined");
-  (0, import_tiny_invariant2.default)(
-    cache.tsUniqueTableColumnTypes !== void 0,
-    "tsUniqueTableColumnTypes is undefined"
-  );
-  (0, import_tiny_invariant2.default)(cache.viewLibrary !== void 0, "viewLibrary is undefined");
-  const { config, tsUniqueTableColumnTypes, viewLibrary } = cache;
-  const resolvedStmtE = (0, import_function4.pipe)(
-    E5.Do,
-    E5.chain(() => buildQueryCallExpressionE(calleeProperty.name, tsCallExpression)),
-    E5.chainW((query) => {
-      return resolveQueryFragmentE(
-        tsUniqueTableColumnTypes,
-        params.projectDir,
+  switch (callExpression.type) {
+    case "QUERY":
+      return checkQueryExpression({
+        context,
+        parser,
         checker,
-        query,
-        (name) => viewLibrary.get(name)?.getName()
-      );
-    })
-  );
-  if (E5.isLeft(resolvedStmtE)) {
-    return context.report({
-      node,
-      messageId: "invalid",
-      data: { value: resolvedStmtE.left.message }
-    });
+        node,
+        projectDir,
+        calleeProperty: callExpression.calleeProperty
+      });
+    case "INSERT":
+      return checkInsertExpression({
+        context,
+        parser,
+        checker,
+        node,
+        projectDir,
+        callee: callExpression.callee,
+        calleeProperty: callExpression.calleeProperty
+      });
   }
-  const resolvedStmt = resolvedStmtE.right;
-  (0, import_function4.pipe)(
-    E5.Do,
-    E5.chain(() => runWorker({ action: "CHECK", query: resolvedStmt })),
-    E5.chainW((r) => r.type === "NoErrors" ? E5.right(r) : E5.left(r)),
-    E5.mapLeft((error) => {
-      if (error instanceof Error) {
-        return context.report({
-          node,
-          messageId: "internal",
-          data: { value: error.message }
-        });
-      }
-      const diagnostics = queryAnswerToErrorDiagnostics(
-        resolvedStmt,
-        error,
-        defaultColTypesFormat
-      );
-      for (const diagnostic of diagnostics) {
-        const formatted = formatJsonDiagnostic(diagnostic);
-        context.report({
-          node,
-          messageId: "invalid",
-          loc: {
-            start: {
-              line: formatted.location.startLine + 1,
-              column: formatted.location.startCharacter + 1
-            },
-            end: {
-              line: formatted.location.endLine + 1,
-              column: formatted.location.endCharacter + 1
-            }
-          },
-          data: { value: diagnostic.messages.join("\n") },
-          fix: diagnostic.quickFix === null ? null : (fixer) => {
-            const replacement = diagnostic.quickFix?.replacementText ?? "";
-            return node.typeParameters === void 0 ? fixer.replaceText(calleeProperty, replacement) : fixer.replaceText(node.typeParameters, replacement);
-          }
-        });
-      }
-    })
-  );
 }
 var resolveQueryFragmentE = (0, import_function4.flow)(
   resolveQueryFragment,
@@ -32423,21 +32528,47 @@ function getCallExpressionValidity(node) {
   if (node.callee.property.type !== import_typescript_estree.TSESTree.AST_NODE_TYPES.Identifier) {
     return E5.left("CALLEE_PROPERTY_NOT_IDENTIFIER");
   }
-  if (!VALID_METHOD_NAMES.has(node.callee.property.name)) {
-    return E5.left("CALLEE_PROPERTY_NOT_VALID");
+  if (QUERY_METHOD_NAMES.has(node.callee.property.name)) {
+    const argument = node.arguments[0];
+    if (argument === void 0) {
+      return E5.left("NO_ARGUMENT");
+    }
+    if (argument.type !== import_typescript_estree.TSESTree.AST_NODE_TYPES.TaggedTemplateExpression) {
+      return E5.left("ARGUMENT_NOT_TAGGED_TEMPLATE_EXPRESSION");
+    }
+    return E5.right({
+      type: "QUERY",
+      callee: node.callee,
+      calleeProperty: node.callee.property,
+      argument
+    });
   }
-  const argument = node.arguments[0];
-  if (argument === void 0) {
-    return E5.left("NO_ARGUMENT");
+  if (INSERT_METHOD_NAMES.has(node.callee.property.name)) {
+    const tableNameArgument = node.arguments.at(0);
+    const valueArgument = node.arguments.at(1);
+    const epilogueArgument = node.arguments.at(2);
+    if (tableNameArgument?.type !== import_typescript_estree.TSESTree.AST_NODE_TYPES.Literal) {
+      return E5.left("TABLE_NAME_ARGUMENT_NOT_LITERAL");
+    }
+    if (valueArgument?.type !== import_typescript_estree.TSESTree.AST_NODE_TYPES.ObjectExpression) {
+      return E5.left("VALUE_ARGUMENT_NOT_OBJECT_EXPRESSION");
+    }
+    if (epilogueArgument !== void 0 && epilogueArgument?.type !== import_typescript_estree.TSESTree.AST_NODE_TYPES.TaggedTemplateExpression) {
+      return E5.left("EPILOGUE_ARGUMENT_NOT_TAGGED_TEMPLATE_EXPRESSION");
+    }
+    return E5.right({
+      type: "INSERT",
+      callee: node.callee,
+      calleeProperty: node.callee.property,
+      // TODO @Newbie012 - do we really need this?
+      arguments: {
+        tableName: tableNameArgument,
+        value: valueArgument,
+        epilogue: epilogueArgument
+      }
+    });
   }
-  if (argument.type !== import_typescript_estree.TSESTree.AST_NODE_TYPES.TaggedTemplateExpression) {
-    return E5.left("ARGUMENT_NOT_TAGGED_TEMPLATE_EXPRESSION");
-  }
-  return E5.right({
-    callee: node.callee,
-    calleeProperty: node.callee.property,
-    argument
-  });
+  return E5.left("CALLEE_PROPERTY_NOT_QUERY_OR_INSERT");
 }
 function runInitialize(params) {
   const { node, context, parser, checker, projectDir } = params;

@@ -36,6 +36,7 @@
   ],
   "dependencies": {
     "@esbuild-kit/cjs-loader": "^2.4.2",
+    "@js-joda/core": "^5.5.3",
     "@types/adm-zip": "0.4.32",
     "@types/cli-progress": "1.8.1",
     "@types/node": "18.11.13",

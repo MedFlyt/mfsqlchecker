@@ -2,34 +2,33 @@ import { TSESTree } from "@typescript-eslint/typescript-estree";
 import { ParserServices, TSESLint } from "@typescript-eslint/utils";
 import * as E from "fp-ts/Either";
 import { flow, pipe } from "fp-ts/function";
+import * as J from "fp-ts/Json";
 import path from "path";
 import "source-map-support/register";
-import { TsRunner, createSyncFn } from "synckit";
+import { createSyncFn, TsRunner } from "synckit";
 import invariant from "tiny-invariant";
+import { TypeChecker } from "typescript";
 import {
-    Config,
-    defaultColTypesFormat,
-    loadConfigFile,
+    Config, loadConfigFile,
     sqlUniqueTypeName
 } from "../../mfsqlchecker/ConfigFile";
 import { Either as OldEither } from "../../mfsqlchecker/either";
-import { formatJsonDiagnostic } from "../../mfsqlchecker/formatters/jsonFormatter";
+import { ErrorDiagnostic, SrcSpan } from "../../mfsqlchecker/ErrorDiagnostic";
+import { codeFrameFormatter } from "../../mfsqlchecker/formatters/codeFrameFormatter";
 import {
-    SqlType,
-    TypeScriptType,
-    buildQueryCallExpression,
-    resolveQueryFragment
+    buildInsertCallExpression, buildQueryCallExpression, resolveInsertMany, resolveQueryFragment, SqlType,
+    TypeScriptType
 } from "../../mfsqlchecker/queries";
 import { getSqlViews } from "../../mfsqlchecker/sqlchecker_engine";
 import { QualifiedSqlViewName, SqlViewDefinition } from "../../mfsqlchecker/views";
 import { createRule } from "../utils";
 import { memoize } from "../utils/memoize";
-import { queryAnswerToErrorDiagnostics } from "./DbConnector";
 import { InvalidQueryError, RunnerError } from "./sql-check.errors";
-import { VALID_METHOD_NAMES, locateNearestPackageJsonDir } from "./sql-check.utils";
+import {
+    INSERT_METHOD_NAMES, locateNearestPackageJsonDir,
+    QUERY_METHOD_NAMES
+} from "./sql-check.utils";
 import { WorkerParams, WorkerResult } from "./sql-check.worker";
-import { TypeChecker } from "typescript";
-import { ErrorDiagnostic } from "../../mfsqlchecker/ErrorDiagnostic";
 
 export type RuleMessage = keyof typeof messages;
 export type RuleOptions = never[];
@@ -70,11 +69,18 @@ export const sqlCheck = createRule({
 });
 
 const workerPath = require.resolve("./sql-check.worker");
-const runWorker = createSyncFn(workerPath, {
+const runWorkerX = createSyncFn(workerPath, {
     tsRunner: TsRunner.TSX,
     // timeout: 9000
     timeout: 1000 * 60 * 5
-}) as <TWorkerParams extends WorkerParams>(
+});
+
+const runWorker = flow(
+    runWorkerX as any,
+    E.chain(J.parse),
+    E.chainW((parsed) => parsed as unknown as E.Either<unknown, unknown>),
+    E.mapLeft((error) => error)
+) as <TWorkerParams extends WorkerParams>(
     params: TWorkerParams
 ) => WorkerResult<TWorkerParams["action"]>;
 
@@ -217,6 +223,188 @@ function checkTaggedTemplateExpression(params: {
     }
 }
 
+function checkQueryExpression(params: {
+    context: RuleContext;
+    parser: ParserServices;
+    checker: TypeChecker;
+    projectDir: string;
+    node: TSESTree.CallExpression;
+    calleeProperty: TSESTree.Identifier;
+}) {
+    const { context, parser, checker, node, projectDir, calleeProperty } = params;
+    const tsCallExpression = parser.esTreeNodeToTSNodeMap.get(node);
+
+    invariant(cache.config !== undefined, "config is undefined");
+    invariant(
+        cache.tsUniqueTableColumnTypes !== undefined,
+        "tsUniqueTableColumnTypes is undefined"
+    );
+    invariant(cache.viewLibrary !== undefined, "viewLibrary is undefined");
+
+    const { config, tsUniqueTableColumnTypes, viewLibrary } = cache;
+
+    const resolvedE = pipe(
+        E.Do,
+        E.chain(() => buildQueryCallExpressionE(calleeProperty.name, tsCallExpression)),
+        E.chainW((query) => {
+            return resolveQueryFragmentE(
+                tsUniqueTableColumnTypes,
+                params.projectDir,
+                checker,
+                query,
+                (name) => viewLibrary.get(name)?.getName()
+            );
+        })
+    );
+
+    if (E.isLeft(resolvedE)) {
+        return context.report({
+            node: node,
+            messageId: "invalid",
+            data: { value: resolvedE.left.message }
+        });
+    }
+
+    const resolved = resolvedE.right;
+
+    pipe(
+        E.Do,
+        E.chain(() => runWorker({ action: "CHECK_QUERY", resolved })),
+        E.mapLeft((error) => {
+            if ("_tag" in error && error._tag === "InvalidQueryError") {
+                return reportDiagnostics({
+                    context,
+                    node,
+                    calleeProperty,
+                    diagnostics: error.diagnostics
+                });
+            }
+
+            return context.report({
+                node: node,
+                messageId: "internal",
+                data: { value: error.message }
+            });
+        })
+    );
+}
+
+function reportDiagnostics(params: {
+    node: TSESTree.CallExpression;
+    calleeProperty: TSESTree.Identifier;
+    context: RuleContext;
+    diagnostics: ErrorDiagnostic[];
+}) {
+    const { node, context, calleeProperty, diagnostics } = params;
+
+    for (const diagnostic of diagnostics) {
+        context.report({
+            node: node,
+            messageId: "invalid",
+            loc: mapSrcSpanToLoc(diagnostic.span),
+            data: { value: diagnostics.map(codeFrameFormatter).join("\n") },
+            fix:
+                diagnostic.quickFix === null
+                    ? null
+                    : (fixer) => {
+                          const replacement = diagnostic.quickFix?.replacementText ?? "";
+
+                          return node.typeParameters === undefined
+                              ? fixer.replaceText(calleeProperty, replacement)
+                              : fixer.replaceText(node.typeParameters, replacement);
+                      }
+        });
+    }
+}
+
+function mapSrcSpanToLoc(
+    span: SrcSpan
+): Readonly<TSESTree.SourceLocation> | Readonly<TSESTree.Position> | undefined {
+    switch (span.type) {
+        case "File":
+            return undefined;
+        case "LineAndCol":
+            return {
+                line: span.line,
+                column: span.col - 1
+            };
+        case "LineAndColRange":
+            return {
+                start: {
+                    line: span.startLine,
+                    column: span.startCol - 1
+                },
+                end: {
+                    line: span.endLine,
+                    column: span.endCol - 1
+                }
+            };
+    }
+}
+
+function checkInsertExpression(params: {
+    context: RuleContext;
+    parser: ParserServices;
+    checker: TypeChecker;
+    node: TSESTree.CallExpression;
+    callee: TSESTree.MemberExpression;
+    calleeProperty: TSESTree.Identifier;
+    projectDir: string;
+}) {
+    const { context, parser, checker, node, calleeProperty, projectDir } = params;
+    const tsNode = parser.esTreeNodeToTSNodeMap.get(node);
+
+    const { tsUniqueTableColumnTypes, viewLibrary } = cache;
+
+    invariant(tsUniqueTableColumnTypes !== undefined, "tsUniqueTableColumnTypes");
+    invariant(viewLibrary !== undefined, "viewLibrary");
+
+    const buildInsertCallExpressionE = flow(
+        buildInsertCallExpression,
+        toFpTsEither,
+        E.mapLeft(InvalidQueryError.to)
+    );
+
+    const resolveInsertManyE = flow(
+        resolveInsertMany,
+        toFpTsEither,
+        E.mapLeft(InvalidQueryError.to)
+    );
+
+    pipe(
+        E.Do,
+        E.chain(() => buildInsertCallExpressionE(checker, calleeProperty.name, tsNode)),
+        E.chain((query) => {
+            return resolveInsertManyE(
+                tsUniqueTableColumnTypes,
+                projectDir,
+                checker,
+                query,
+                (name) => viewLibrary.get(name)?.getName()
+            );
+        }),
+        E.chain((resolved) => {
+            return runWorker({ action: "CHECK_INSERT", resolved });
+        }),
+        E.mapLeft((error) => {
+            if ("_tag" in error && error._tag === "InvalidQueryError") {
+                return reportDiagnostics({
+                    context,
+                    node,
+                    calleeProperty,
+                    diagnostics: error.diagnostics
+                });
+            }
+
+            return context.report({
+                node: node,
+                messageId: "invalid",
+                data: { value: error.message }
+            });
+        })
+    );
+}
+
 function checkCallExpression(params: {
     node: TSESTree.CallExpression;
     context: RuleContext;
@@ -230,10 +418,9 @@ function checkCallExpression(params: {
     }
 
     const parser = context.parserServices;
-    const { callee, calleeProperty } = callExpressionValidityE.right;
-    const tsCallExpression = parser.esTreeNodeToTSNodeMap.get(node);
     const checker = parser.program.getTypeChecker();
-    const tsObject = parser.esTreeNodeToTSNodeMap.get(callee.object);
+    const callExpression = callExpressionValidityE.right;
+    const tsObject = parser.esTreeNodeToTSNodeMap.get(callExpression.callee.object);
     const tsObjectType = checker.getTypeAtLocation(tsObject);
 
     if (tsObjectType.getProperty("MfConnectionTypeTag") === undefined) {
@@ -255,89 +442,27 @@ function checkCallExpression(params: {
         }
     }
 
-    invariant(cache.config !== undefined, "config is undefined");
-    invariant(
-        cache.tsUniqueTableColumnTypes !== undefined,
-        "tsUniqueTableColumnTypes is undefined"
-    );
-    invariant(cache.viewLibrary !== undefined, "viewLibrary is undefined");
-
-    const { config, tsUniqueTableColumnTypes, viewLibrary } = cache;
-
-    const resolvedStmtE = pipe(
-        E.Do,
-        E.chain(() => buildQueryCallExpressionE(calleeProperty.name, tsCallExpression)),
-        E.chainW((query) => {
-            return resolveQueryFragmentE(
-                tsUniqueTableColumnTypes,
-                params.projectDir,
+    switch (callExpression.type) {
+        case "QUERY":
+            return checkQueryExpression({
+                context,
+                parser,
                 checker,
-                query,
-                (name) => viewLibrary.get(name)?.getName()
-            );
-        })
-    );
-
-    if (E.isLeft(resolvedStmtE)) {
-        return context.report({
-            node: node,
-            messageId: "invalid",
-            data: { value: resolvedStmtE.left.message }
-        });
+                node,
+                projectDir,
+                calleeProperty: callExpression.calleeProperty
+            });
+        case "INSERT":
+            return checkInsertExpression({
+                context,
+                parser,
+                checker,
+                node,
+                projectDir,
+                callee: callExpression.callee,
+                calleeProperty: callExpression.calleeProperty
+            });
     }
-
-    const resolvedStmt = resolvedStmtE.right;
-
-    pipe(
-        E.Do,
-        E.chain(() => runWorker({ action: "CHECK", query: resolvedStmt })),
-        E.chainW((r) => (r.type === "NoErrors" ? E.right(r) : E.left(r))),
-        E.mapLeft((error) => {
-            if (error instanceof Error) {
-                return context.report({
-                    node: node,
-                    messageId: "internal",
-                    data: { value: error.message }
-                });
-            }
-
-            const diagnostics = queryAnswerToErrorDiagnostics(
-                resolvedStmt,
-                error,
-                defaultColTypesFormat
-            );
-
-            for (const diagnostic of diagnostics) {
-                const formatted = formatJsonDiagnostic(diagnostic);
-
-                context.report({
-                    node: node,
-                    messageId: "invalid",
-                    loc: {
-                        start: {
-                            line: formatted.location.startLine + 1,
-                            column: formatted.location.startCharacter + 1
-                        },
-                        end: {
-                            line: formatted.location.endLine + 1,
-                            column: formatted.location.endCharacter + 1
-                        }
-                    },
-                    data: { value: diagnostic.messages.join("\n") },
-                    fix:
-                        diagnostic.quickFix === null
-                            ? null
-                            : (fixer) => {
-                                  const replacement = diagnostic.quickFix?.replacementText ?? "";
-
-                                  return node.typeParameters === undefined
-                                      ? fixer.replaceText(calleeProperty, replacement)
-                                      : fixer.replaceText(node.typeParameters, replacement);
-                              }
-                });
-            }
-        })
-    );
 }
 
 const resolveQueryFragmentE = flow(
@@ -380,25 +505,58 @@ function getCallExpressionValidity(node: TSESTree.CallExpression) {
         return E.left("CALLEE_PROPERTY_NOT_IDENTIFIER");
     }
 
-    if (!VALID_METHOD_NAMES.has(node.callee.property.name)) {
-        return E.left("CALLEE_PROPERTY_NOT_VALID");
+    if (QUERY_METHOD_NAMES.has(node.callee.property.name)) {
+        const argument = node.arguments[0];
+
+        if (argument === undefined) {
+            return E.left("NO_ARGUMENT");
+        }
+
+        if (argument.type !== TSESTree.AST_NODE_TYPES.TaggedTemplateExpression) {
+            return E.left("ARGUMENT_NOT_TAGGED_TEMPLATE_EXPRESSION");
+        }
+
+        return E.right({
+            type: "QUERY" as const,
+            callee: node.callee,
+            calleeProperty: node.callee.property,
+            argument: argument
+        });
+    }
+    if (INSERT_METHOD_NAMES.has(node.callee.property.name)) {
+        const tableNameArgument = node.arguments.at(0);
+        const valueArgument = node.arguments.at(1);
+        const epilogueArgument = node.arguments.at(2);
+
+        if (tableNameArgument?.type !== TSESTree.AST_NODE_TYPES.Literal) {
+            return E.left("TABLE_NAME_ARGUMENT_NOT_LITERAL");
+        }
+
+        if (valueArgument?.type !== TSESTree.AST_NODE_TYPES.ObjectExpression) {
+            return E.left("VALUE_ARGUMENT_NOT_OBJECT_EXPRESSION");
+        }
+
+        if (
+            epilogueArgument !== undefined &&
+            epilogueArgument?.type !== TSESTree.AST_NODE_TYPES.TaggedTemplateExpression
+        ) {
+            return E.left("EPILOGUE_ARGUMENT_NOT_TAGGED_TEMPLATE_EXPRESSION");
+        }
+
+        return E.right({
+            type: "INSERT" as const,
+            callee: node.callee,
+            calleeProperty: node.callee.property,
+            // TODO @Newbie012 - do we really need this?
+            arguments: {
+                tableName: tableNameArgument,
+                value: valueArgument,
+                epilogue: epilogueArgument
+            }
+        });
     }
 
-    const argument = node.arguments[0];
-
-    if (argument === undefined) {
-        return E.left("NO_ARGUMENT");
-    }
-
-    if (argument.type !== TSESTree.AST_NODE_TYPES.TaggedTemplateExpression) {
-        return E.left("ARGUMENT_NOT_TAGGED_TEMPLATE_EXPRESSION");
-    }
-
-    return E.right({
-        callee: node.callee,
-        calleeProperty: node.callee.property,
-        argument: argument
-    });
+    return E.left("CALLEE_PROPERTY_NOT_QUERY_OR_INSERT");
 }
 
 function runInitialize(params: {

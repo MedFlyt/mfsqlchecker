@@ -12,13 +12,15 @@ TODO:
  - [x] ...
  - [x] lookup views
  - [x] autofix
- - inserts
- - epilogue
+ - [x] inserts
+ - [x] epilogue
  - tests
  - test on medflyt_server2
  - publish as separate package
  - publish as new repository
  - cleanup
+ - load all views before initialization (or load on demand. feels buggy on cross-file reference).
+ - fragments?
 
 
 

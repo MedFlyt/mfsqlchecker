@@ -2,7 +2,7 @@ import { ErrorDiagnostic } from "../../mfsqlchecker/ErrorDiagnostic";
 import { codeFrameFormatter } from "../../mfsqlchecker/formatters/codeFrameFormatter";
 
 export class RunnerError extends Error {
-    _tag = "RunnerError";
+    _tag = "RunnerError" as const;
 
     constructor(message: string) {
         super(message);
@@ -19,18 +19,20 @@ export class RunnerError extends Error {
 }
 
 export class InvalidQueryError extends Error {
-    _tag = "InvalidQueryError";
+    _tag = "InvalidQueryError" as const;
+    diagnostics: ErrorDiagnostic[];
 
     constructor(diagnostics: ErrorDiagnostic[]) {
         super(diagnostics.map(codeFrameFormatter).join("\n"));
         this.name = "InvalidQueryError";
+        this.diagnostics = diagnostics;
     }
 
-    static to(error: unknown) {
+    static to(error: unknown): InvalidQueryError | Error {
         return error instanceof InvalidQueryError ? error : new Error(`${error}`);
     }
 
     toJSON() {
-        return { _tag: this._tag, message: this.message };
+        return { _tag: this._tag, message: this.message, diagnostics: this.diagnostics };
     }
 }

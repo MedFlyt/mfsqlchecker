@@ -2,10 +2,12 @@ import type EmbeddedPostgres from "embedded-postgres";
 import * as E from "fp-ts/Either";
 import { pipe } from "fp-ts/function";
 import * as TE from "fp-ts/TaskEither";
+import * as J from "fp-ts/Json";
 import "source-map-support/register";
 import { runAsWorker } from "synckit";
 import { UniqueTableColumnType } from "../../mfsqlchecker/ConfigFile";
-import { ResolvedSelect } from "../../mfsqlchecker/queries";
+import { ErrorDiagnostic } from "../../mfsqlchecker/ErrorDiagnostic";
+import { ResolvedInsert, ResolvedSelect } from "../../mfsqlchecker/queries";
 import { SqlCreateView } from "../../mfsqlchecker/views";
 import { QueryRunner } from "./DbConnector";
 import { InvalidQueryError, RunnerError } from "./sql-check.errors";
@@ -13,7 +15,8 @@ import { initializeTE, Options, PostgresOptions } from "./sql-check.utils";
 
 export type WorkerParams =
     | InitializeParams
-    | CheckParams
+    | CheckQueryParams
+    | CheckInsertParams
     | UpdateViewsParams
     | EndParams;
 
@@ -22,7 +25,8 @@ type TaskEitherToEither<T> = T extends TE.TaskEither<infer E, infer A> ? E.Eithe
 export type WorkerResult<Action extends WorkerParams["action"]> = TaskEitherToEither<
     {
         INITIALIZE: ReturnType<typeof runInitialize>;
-        CHECK: ReturnType<typeof runCheck>;
+        CHECK_QUERY: ReturnType<typeof runCheckQuery>;
+        CHECK_INSERT: ReturnType<typeof runCheckInsert>;
         UPDATE_VIEWS: ReturnType<typeof runUpdateViews>;
         END: ReturnType<typeof runEnd>;
     }[Action]
@@ -49,8 +53,10 @@ async function handler(params: WorkerParams) {
             }
             return await initializePromiseInstance;
         }
-        case "CHECK":
-            return await runCheck(params)();
+        case "CHECK_QUERY":
+            return await runCheckQuery(params)();
+        case "CHECK_INSERT":
+            return await runCheckInsert(params)();
         case "UPDATE_VIEWS":
             return await runUpdateViews(params)();
         case "END":
@@ -82,16 +88,46 @@ function runInitialize(params: InitializeParams): TE.TaskEither<RunnerError, voi
     );
 }
 
-type CheckParams = { action: "CHECK"; query: ResolvedSelect };
+type CheckQueryParams = { action: "CHECK_QUERY"; resolved: ResolvedSelect };
 
-function runCheck(params: CheckParams) {
+function mapDiagnosticsToError(diagnostics: ErrorDiagnostic[]) {
+    return diagnostics.length === 0
+        ? E.right(undefined)
+        : E.left(new InvalidQueryError(diagnostics));
+}
+
+function runCheckQuery(
+    params: CheckQueryParams
+): TE.TaskEither<InvalidQueryError | RunnerError | Error, undefined> {
     if (cache?.runner === undefined) {
         return TE.left(new Error("runner is not initialized"));
     }
 
     const runner = cache.runner;
 
-    return pipe(TE.tryCatch(() => runner.runQuery({ query: params.query }), RunnerError.to));
+    return pipe(
+        TE.Do,
+        TE.chain(() => TE.tryCatch(() => runner.runQuery(params), RunnerError.to)),
+        TE.chainEitherKW(mapDiagnosticsToError)
+    );
+}
+
+type CheckInsertParams = { action: "CHECK_INSERT"; resolved: ResolvedInsert };
+
+function runCheckInsert(
+    params: CheckInsertParams
+): TE.TaskEither<InvalidQueryError | RunnerError | Error, undefined> {
+    if (cache?.runner === undefined) {
+        return TE.left(new Error("runner is not initialized"));
+    }
+
+    const runner = cache.runner;
+
+    return pipe(
+        TE.Do,
+        TE.chain(() => TE.tryCatch(() => runner.runInsert(params), RunnerError.to)),
+        TE.chainEitherKW(mapDiagnosticsToError)
+    );
 }
 
 type UpdateViewsParams = {
@@ -138,4 +174,7 @@ function runEnd(params: Extract<WorkerParams, { action: "END" }>) {
     );
 }
 
-runAsWorker(handler);
+runAsWorker(async (params: WorkerParams) => {
+    const result = await handler(params);
+    return J.stringify(result);
+});

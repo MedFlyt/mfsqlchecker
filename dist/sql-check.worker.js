@@ -28,6 +28,7 @@ module.exports = __toCommonJS(sql_check_worker_exports);
 var E4 = __toESM(require("fp-ts/Either"));
 var import_function4 = require("fp-ts/function");
 var TE3 = __toESM(require("fp-ts/TaskEither"));
+var J = __toESM(require("fp-ts/Json"));
 var import_register = require("source-map-support/register");
 
 // node_modules/.pnpm/tslib@2.5.0/node_modules/tslib/tslib.es6.js
@@ -266,15 +267,17 @@ var RunnerError = class extends Error {
 };
 var InvalidQueryError = class extends Error {
   _tag = "InvalidQueryError";
+  diagnostics;
   constructor(diagnostics) {
     super(diagnostics.map(codeFrameFormatter).join("\n"));
     this.name = "InvalidQueryError";
+    this.diagnostics = diagnostics;
   }
   static to(error) {
     return error instanceof InvalidQueryError ? error : new Error(`${error}`);
   }
   toJSON() {
-    return { _tag: this._tag, message: this.message };
+    return { _tag: this._tag, message: this.message, diagnostics: this.diagnostics };
   }
 };
 
@@ -943,17 +946,26 @@ var QueryRunner = class {
     return diagnostics;
   }
   async runQuery(params) {
-    return processQuery(
+    const answer = await processQuery(
       this.client,
       defaultColTypesFormat,
       this.pgTypes,
       this.tableColsLibrary,
       this.uniqueColumnTypes,
-      {
-        colTypes: params.query.colTypes,
-        text: params.query.text
-      }
+      params.resolved
     );
+    return queryAnswerToErrorDiagnostics(params.resolved, answer, defaultColTypesFormat);
+  }
+  async runInsert(params) {
+    const answer = await processInsert(
+      this.client,
+      defaultColTypesFormat,
+      this.pgTypes,
+      this.tableColsLibrary,
+      this.uniqueColumnTypes,
+      params.resolved
+    );
+    return insertAnswerToErrorDiagnostics(params.resolved, answer, defaultColTypesFormat);
   }
   async end() {
     await this.client.end();
@@ -2482,8 +2494,10 @@ async function handler(params) {
       }
       return await initializePromiseInstance;
     }
-    case "CHECK":
-      return await runCheck(params)();
+    case "CHECK_QUERY":
+      return await runCheckQuery(params)();
+    case "CHECK_INSERT":
+      return await runCheckInsert(params)();
     case "UPDATE_VIEWS":
       return await runUpdateViews(params)();
     case "END":
@@ -2504,12 +2518,30 @@ function runInitialize(params) {
     })
   );
 }
-function runCheck(params) {
+function mapDiagnosticsToError(diagnostics) {
+  return diagnostics.length === 0 ? E4.right(void 0) : E4.left(new InvalidQueryError(diagnostics));
+}
+function runCheckQuery(params) {
   if (cache?.runner === void 0) {
     return TE3.left(new Error("runner is not initialized"));
   }
   const runner = cache.runner;
-  return (0, import_function4.pipe)(TE3.tryCatch(() => runner.runQuery({ query: params.query }), RunnerError.to));
+  return (0, import_function4.pipe)(
+    TE3.Do,
+    TE3.chain(() => TE3.tryCatch(() => runner.runQuery(params), RunnerError.to)),
+    TE3.chainEitherKW(mapDiagnosticsToError)
+  );
+}
+function runCheckInsert(params) {
+  if (cache?.runner === void 0) {
+    return TE3.left(new Error("runner is not initialized"));
+  }
+  const runner = cache.runner;
+  return (0, import_function4.pipe)(
+    TE3.Do,
+    TE3.chain(() => TE3.tryCatch(() => runner.runInsert(params), RunnerError.to)),
+    TE3.chainEitherKW(mapDiagnosticsToError)
+  );
 }
 function runUpdateViews(params) {
   if (cache?.runner === void 0) {
@@ -2540,5 +2572,8 @@ function runEnd(params) {
     )
   );
 }
-runAsWorker(handler);
+runAsWorker(async (params) => {
+  const result = await handler(params);
+  return J.stringify(result);
+});
 //# sourceMappingURL=sql-check.worker.js.map

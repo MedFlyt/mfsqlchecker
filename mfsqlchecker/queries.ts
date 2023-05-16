@@ -295,7 +295,7 @@ export function buildQueryCallExpression(methodName: string, node: ts.CallExpres
     }
 }
 
-function buildInsertCallExpression(checker: ts.TypeChecker, methodName: string, node: ts.CallExpression): Either<ErrorDiagnostic[], InsertManyExpression> {
+export function buildInsertCallExpression(checker: ts.TypeChecker, methodName: string, node: ts.CallExpression): Either<ErrorDiagnostic[], InsertManyExpression> {
     if (node.arguments.length < 2) {
         // The TypeScript typechecker will catch this error, so we don't need
         // to emit our own error message
@@ -1075,7 +1075,7 @@ export function resolveQueryFragment(typeScriptUniqueColumnTypes: Map<TypeScript
 }
 
 
-function resolveInsertMany(typeScriptUniqueColumnTypes: Map<TypeScriptType, SqlType>, projectDir: string, checker: ts.TypeChecker, query: InsertManyExpression, lookupViewName: (qualifiedSqlViewName: QualifiedSqlViewName) => string | undefined): Either<ErrorDiagnostic[], ResolvedInsert> {
+export function resolveInsertMany(typeScriptUniqueColumnTypes: Map<TypeScriptType, SqlType>, projectDir: string, checker: ts.TypeChecker, query: InsertManyExpression, lookupViewName: (qualifiedSqlViewName: QualifiedSqlViewName) => string | undefined): Either<ErrorDiagnostic[], ResolvedInsert> {
     // TODO This contains lots of copy&pasted code from
     // `resolveQueryFragment`. The common code should be refactored into
     // helper functions

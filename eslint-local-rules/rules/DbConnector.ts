@@ -254,18 +254,30 @@ export class QueryRunner {
         return diagnostics;
     }
 
-    async runQuery(params: { query: ResolvedSelect }) {
-        return processQuery(
+    async runQuery(params: { resolved: ResolvedSelect }) {
+        const answer = await processQuery(
             this.client,
             defaultColTypesFormat,
             this.pgTypes,
             this.tableColsLibrary,
             this.uniqueColumnTypes,
-            {
-                colTypes: params.query.colTypes,
-                text: params.query.text
-            }
+            params.resolved
         );
+
+        return queryAnswerToErrorDiagnostics(params.resolved, answer, defaultColTypesFormat);
+    }
+
+    async runInsert(params: { resolved: ResolvedInsert }) {
+        const answer = await processInsert(
+            this.client,
+            defaultColTypesFormat,
+            this.pgTypes,
+            this.tableColsLibrary,
+            this.uniqueColumnTypes,
+            params.resolved
+        );
+
+        return insertAnswerToErrorDiagnostics(params.resolved, answer, defaultColTypesFormat);
     }
 
     async end() {

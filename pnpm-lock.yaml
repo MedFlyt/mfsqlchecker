@@ -4,6 +4,9 @@ dependencies:
   '@esbuild-kit/cjs-loader':
     specifier: ^2.4.2
     version: 2.4.2
+  '@js-joda/core':
+    specifier: ^5.5.3
+    version: 5.5.3
   '@types/adm-zip':
     specifier: 0.4.32
     version: 0.4.32
@@ -517,6 +520,10 @@ packages:
       '@jridgewell/resolve-uri': 3.1.0
       '@jridgewell/sourcemap-codec': 1.4.14
     dev: true
+
+  /@js-joda/core@5.5.3:
+    resolution: {integrity: sha512-7dqNYwG8gCt4hfg5PKgM7xLEcgSBcx/UgC92OMnhMmvAnq11QzDFPrxUkNR/u5kn17WWLZ8beZ4A3Qrz4pZcmQ==}
+    dev: false
 
   /@nodelib/fs.scandir@2.1.5:
     resolution: {integrity: sha512-vq24Bq3ym5HEQm2NKCr3yXDwjc7vTsEThRDnkp2DK9p1uqLR+DHurm/NOTo0KG7HYHU7eppKZj3MyqYuMBf62g==}
