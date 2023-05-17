@@ -32637,27 +32637,20 @@ function getCallExpressionValidity(node) {
 function runInitialize(params) {
   const { node, context, parser, checker, projectDir } = params;
   const [{ configFile, migrationsDir }] = context.options;
-  const configE = (0, import_function4.pipe)(
-    E5.Do,
-    E5.chain(() => toFpTsEither(loadConfigFile(import_path2.default.join(projectDir, configFile)))),
-    E5.mapLeft((diagnostic) => new InvalidQueryError([diagnostic]))
-  );
-  if (E5.isLeft(configE)) {
-    cache.retries = true;
-    context.report({
-      node,
-      messageId: "internal",
-      data: { value: configE.left.message }
-    });
-    return configE;
-  }
-  const config = configE.right;
-  const uniqueTableColumnTypes = getTSUniqueColumnTypes(config.uniqueTableColumnTypes);
   const program = parser.program;
   const sourceFiles = program.getSourceFiles().filter((s) => !s.isDeclarationFile);
-  const initE = (0, import_function4.pipe)(
+  return (0, import_function4.pipe)(
     E5.Do,
-    E5.chain(() => {
+    E5.bind("config", () => {
+      customLog.success("loading config file");
+      return toFpTsEither(loadConfigFile(import_path2.default.join(projectDir, configFile)));
+    }),
+    E5.mapLeft((diagnostic) => [diagnostic]),
+    E5.bindW("uniqueTableColumnTypes", ({ config }) => {
+      customLog.success("getting unique table column types");
+      return E5.right(getTSUniqueColumnTypes(config.uniqueTableColumnTypes));
+    }),
+    E5.bindW("views", () => {
       customLog.success("getting sql views");
       return getSqlViews({
         projectDir,
@@ -32667,8 +32660,8 @@ function runInitialize(params) {
       });
     }),
     E5.mapLeft((diagnostics) => new InvalidQueryError(diagnostics)),
-    E5.chainFirstW(({ sqlViews }) => {
-      const totalSqlViews = [...sqlViews.values()].flat();
+    E5.chainFirstW(({ views, config }) => {
+      const totalSqlViews = [...views.sqlViews.values()].flat();
       customLog.success(`got ${totalSqlViews.length} sql views. initializing worker.`);
       return runWorker({
         action: "INITIALIZE",
@@ -32680,24 +32673,28 @@ function runInitialize(params) {
         sqlViews: totalSqlViews,
         force: params.force
       });
-    })
+    }),
+    E5.fold(
+      (error) => {
+        cache.retries = true;
+        context.report({
+          node,
+          messageId: "internal",
+          data: { value: error.message }
+        });
+        return E5.left(error);
+      },
+      ({ config, uniqueTableColumnTypes, views }) => {
+        cache.isInitial = false;
+        cache.retries = false;
+        cache.config = config;
+        cache.tsUniqueTableColumnTypes = uniqueTableColumnTypes;
+        cache.sqlViews = views.sqlViews;
+        cache.viewLibrary = views.viewLibrary;
+        return E5.right(void 0);
+      }
+    )
   );
-  if (E5.isLeft(initE)) {
-    cache.retries = true;
-    context.report({
-      node,
-      messageId: "internal",
-      data: { value: initE.left.message }
-    });
-    return initE;
-  }
-  cache.isInitial = false;
-  cache.retries = false;
-  cache.config = config;
-  cache.tsUniqueTableColumnTypes = uniqueTableColumnTypes;
-  cache.sqlViews = initE.right.sqlViews;
-  cache.viewLibrary = initE.right.viewLibrary;
-  return E5.right(void 0);
 }
 
 // eslint-local-rules/index.ts
