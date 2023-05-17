@@ -20,7 +20,10 @@
         "eslint-plugin-local-rules"
     ],
     "rules": {
-        "local-rules/sql-check": 2,
+        "local-rules/sql-check": ["error", {
+            "configFile": "demo/mfsqlchecker.json",
+            "migrationsDir": "../medflyt_server2/sql/migrations"
+        }],
         "@typescript-eslint/no-namespace": "off",
         "@typescript-eslint/no-inferrable-types": "off",
         "@typescript-eslint/no-explicit-any": "off",

@@ -1,44 +1,55 @@
 import { TSESTree } from "@typescript-eslint/typescript-estree";
 import { ParserServices, TSESLint } from "@typescript-eslint/utils";
 import * as E from "fp-ts/Either";
-import { flow, pipe } from "fp-ts/function";
 import * as J from "fp-ts/Json";
+import { flow, pipe } from "fp-ts/function";
 import path from "path";
 import "source-map-support/register";
-import { createSyncFn, TsRunner } from "synckit";
+import { TsRunner, createSyncFn } from "synckit";
 import invariant from "tiny-invariant";
 import { TypeChecker } from "typescript";
-import {
-    Config, loadConfigFile,
-    sqlUniqueTypeName
-} from "../../mfsqlchecker/ConfigFile";
-import { Either as OldEither } from "../../mfsqlchecker/either";
+import { Config, loadConfigFile, sqlUniqueTypeName } from "../../mfsqlchecker/ConfigFile";
 import { ErrorDiagnostic, SrcSpan } from "../../mfsqlchecker/ErrorDiagnostic";
+import { Either as OldEither } from "../../mfsqlchecker/either";
 import { codeFrameFormatter } from "../../mfsqlchecker/formatters/codeFrameFormatter";
+import zodToJsonSchema from "zod-to-json-schema";
 import {
-    buildInsertCallExpression, buildQueryCallExpression, resolveInsertMany, resolveQueryFragment, SqlType,
-    TypeScriptType
+    SqlType,
+    TypeScriptType,
+    buildInsertCallExpression,
+    buildQueryCallExpression,
+    resolveInsertMany,
+    resolveQueryFragment
 } from "../../mfsqlchecker/queries";
 import { getSqlViews } from "../../mfsqlchecker/sqlchecker_engine";
-import { QualifiedSqlViewName, SqlViewDefinition } from "../../mfsqlchecker/views";
+import { QualifiedSqlViewName, SqlCreateView, SqlViewDefinition } from "../../mfsqlchecker/views";
 import { createRule } from "../utils";
 import { memoize } from "../utils/memoize";
 import { InvalidQueryError, RunnerError } from "./sql-check.errors";
 import {
-    INSERT_METHOD_NAMES, locateNearestPackageJsonDir,
-    QUERY_METHOD_NAMES
+    INSERT_METHOD_NAMES,
+    QUERY_METHOD_NAMES,
+    locateNearestPackageJsonDir
 } from "./sql-check.utils";
 import { WorkerParams, WorkerResult } from "./sql-check.worker";
-
-export type RuleMessage = keyof typeof messages;
-export type RuleOptions = never[];
-export type RuleContext = TSESLint.RuleContext<RuleMessage, RuleOptions>;
+import { z } from "zod";
+import { customLog } from "../utils/log";
 
 const messages = {
     missing: "Missing: {{value}}",
     invalid: "Invalid: {{value}}",
     internal: "Internal error: {{value}}"
 };
+
+const zOptions = z.object({
+    configFile: z.string(),
+    migrationsDir: z.string()
+});
+
+export const zRuleOptions = z.tuple([zOptions]);
+export type RuleOptions = z.infer<typeof zRuleOptions>;
+export type RuleMessage = keyof typeof messages;
+export type RuleContext = Readonly<TSESLint.RuleContext<RuleMessage, RuleOptions>>;
 
 export const sqlCheck = createRule({
     name: "sql-check",
@@ -50,10 +61,10 @@ export const sqlCheck = createRule({
         },
         messages: messages,
         type: "problem",
-        schema: [],
+        schema: zodToJsonSchema(zRuleOptions, { target: "openApi3" }) as object,
         fixable: "code"
     },
-    defaultOptions: [],
+    defaultOptions: [{ configFile: "mfsqlchecker.json", migrationsDir: "migrations" }],
     create(context) {
         const projectDir = memoize({
             key: context.getFilename(),
@@ -84,16 +95,22 @@ const runWorker = flow(
     params: TWorkerParams
 ) => WorkerResult<TWorkerParams["action"]>;
 
+type FileName = string;
+
 let cache: Partial<{
+    retries: boolean;
     isInitial: boolean;
     isInitialView: boolean;
     config: Config;
     tsUniqueTableColumnTypes: Map<TypeScriptType, SqlType>;
     viewLibrary: Map<QualifiedSqlViewName, SqlViewDefinition>;
+    sqlViews: Map<FileName, SqlCreateView[]>;
 }> = {
+    retries: false,
     isInitial: true,
     isInitialView: true,
-    viewLibrary: new Map()
+    viewLibrary: new Map(),
+    sqlViews: new Map()
 };
 
 let checkedViews: Map<string, true> = new Map();
@@ -112,6 +129,7 @@ function checkTaggedTemplateExpression(params: {
     const viewDeclaration = node.parent;
 
     if (
+        cache.retries === true ||
         program === undefined ||
         checker === undefined ||
         parser === undefined ||
@@ -130,6 +148,7 @@ function checkTaggedTemplateExpression(params: {
     const nodeId = `${fileName}:${node.loc.start.line}`;
 
     if (cache.isInitial) {
+        customLog.success("initial load from tagged template expression");
         const initE = runInitialize({
             context,
             node,
@@ -140,8 +159,11 @@ function checkTaggedTemplateExpression(params: {
         });
 
         if (E.isLeft(initE)) {
+            customLog.error(`initial load failed: ${initE.left.message}`);
             return;
         }
+
+        customLog.success("initial load done");
     }
 
     let wasInitialView = cache.isInitialView;
@@ -160,7 +182,7 @@ function checkTaggedTemplateExpression(params: {
 
     pipe(
         E.Do,
-        E.bind("sqlViews", () =>
+        E.chain(() =>
             getSqlViews({
                 projectDir,
                 checker,
@@ -168,30 +190,55 @@ function checkTaggedTemplateExpression(params: {
                 sourceFiles: [fileName]
             })
         ),
-        E.mapLeft(InvalidQueryError.to),
+        E.mapLeft((diagnostics) => InvalidQueryError.to(diagnostics)),
+        E.chain((newSqlViews) => {
+            invariant(cache.sqlViews !== undefined);
+            invariant(cache.viewLibrary !== undefined);
+
+            cache.sqlViews.set(fileName, newSqlViews.sqlViews.get(fileName) ?? []);
+            cache.viewLibrary.forEach((view, name) => {
+                if (view.getFileName() === fileName) {
+                    cache.viewLibrary?.delete(name);
+                }
+            });
+
+            newSqlViews.viewLibrary.forEach((view, name) => {
+                cache.viewLibrary?.set(name, view);
+            });
+
+            return E.right({
+                sqlViews: cache.sqlViews,
+                viewLibrary: cache.viewLibrary
+            });
+        }),
         E.chainFirst(({ sqlViews }) =>
             runWorker({
                 action: "UPDATE_VIEWS",
-                viewLibrary: sqlViews.sqlViews,
+                sqlViews: [...sqlViews.values()].flat(),
                 strictDateTimeChecking: true
             })
         ),
-        E.fold(
-            (error) => {
-                if (!error.message.includes(nodeId) && !wasInitialView) {
-                    // this is really awkward check. should be more robust
-                    return;
-                }
-                context.report({
-                    node: node,
-                    messageId: "invalid",
-                    data: { value: error.message }
-                });
-            },
-            ({ sqlViews }) => {
-                cache.viewLibrary = sqlViews.viewLibrary;
+        E.mapLeft((error) => {
+            if (!error.message.includes(nodeId) && !wasInitialView) {
+                // this is really awkward check. should be more robust
+                return;
             }
-        )
+
+            if ("_tag" in error && error._tag === "InvalidQueryError") {
+                return reportDiagnostics({
+                    node,
+                    context,
+                    diagnostics: error.diagnostics,
+                    calleeProperty: null
+                });
+            }
+
+            context.report({
+                node: node,
+                messageId: "invalid",
+                data: { value: error.message }
+            });
+        })
     );
 
     const viewVariable = scopeManager.getDeclaredVariables(viewDeclaration)[0];
@@ -290,8 +337,8 @@ function checkQueryExpression(params: {
 }
 
 function reportDiagnostics(params: {
-    node: TSESTree.CallExpression;
-    calleeProperty: TSESTree.Identifier;
+    node: TSESTree.CallExpression | TSESTree.TaggedTemplateExpression;
+    calleeProperty: TSESTree.Identifier | null;
     context: RuleContext;
     diagnostics: ErrorDiagnostic[];
 }) {
@@ -304,7 +351,7 @@ function reportDiagnostics(params: {
             loc: mapSrcSpanToLoc(diagnostic.span),
             data: { value: diagnostics.map(codeFrameFormatter).join("\n") },
             fix:
-                diagnostic.quickFix === null
+                diagnostic.quickFix === null || calleeProperty === null
                     ? null
                     : (fixer) => {
                           const replacement = diagnostic.quickFix?.replacementText ?? "";
@@ -351,6 +398,10 @@ function checkInsertExpression(params: {
     calleeProperty: TSESTree.Identifier;
     projectDir: string;
 }) {
+    if (cache.retries === true) {
+        return;
+    }
+
     const { context, parser, checker, node, calleeProperty, projectDir } = params;
     const tsNode = parser.esTreeNodeToTSNodeMap.get(node);
 
@@ -410,6 +461,10 @@ function checkCallExpression(params: {
     context: RuleContext;
     projectDir: string;
 }) {
+    if (cache.retries === true) {
+        return;
+    }
+
     const { node, context, projectDir } = params;
     const callExpressionValidityE = getCallExpressionValidity(node);
 
@@ -428,6 +483,7 @@ function checkCallExpression(params: {
     }
 
     if (cache.isInitial) {
+        customLog.success("initial load from call expression");
         const initE = runInitialize({
             context,
             node,
@@ -438,8 +494,11 @@ function checkCallExpression(params: {
         });
 
         if (E.isLeft(initE)) {
+            customLog.error(`initial load failed: ${initE.left.message}`);
             return;
         }
+
+        customLog.success("initial load done");
     }
 
     switch (callExpression.type) {
@@ -566,15 +625,23 @@ function runInitialize(params: {
     checker: TypeChecker;
     projectDir: string;
     force: boolean;
-}): E.Either<ErrorDiagnostic | Error | RunnerError, undefined> {
+}): E.Either<InvalidQueryError | RunnerError, undefined> {
     const { node, context, parser, checker, projectDir } = params;
-    const configE = toFpTsEither(loadConfigFile(path.join(projectDir, "demo/mfsqlchecker.json")));
+    const [{ configFile, migrationsDir }] = context.options;
+
+    const configE = pipe(
+        E.Do,
+        E.chain(() => toFpTsEither(loadConfigFile(path.join(projectDir, configFile)))),
+        E.mapLeft((diagnostic) => new InvalidQueryError([diagnostic]))
+    );
 
     if (E.isLeft(configE)) {
+        cache.retries = true;
+
         context.report({
             node: node,
             messageId: "internal",
-            data: { value: JSON.stringify(configE.left) }
+            data: { value: configE.left.message }
         });
 
         return configE;
@@ -587,7 +654,9 @@ function runInitialize(params: {
 
     const initE = pipe(
         E.Do,
-        E.bind("sqlViews", () => {
+        E.chain(() => {
+            customLog.success("getting sql views");
+
             return getSqlViews({
                 projectDir,
                 checker,
@@ -595,20 +664,25 @@ function runInitialize(params: {
                 sourceFiles: sourceFiles.map((x) => x.fileName)
             });
         }),
-        E.mapLeft(InvalidQueryError.to),
+        E.mapLeft((diagnostics) => new InvalidQueryError(diagnostics)),
         E.chainFirstW(({ sqlViews }) => {
+            const totalSqlViews = [...sqlViews.values()].flat();
+            customLog.success(`got ${totalSqlViews.length} sql views. initializing worker.`);
             return runWorker({
                 action: "INITIALIZE",
                 projectDir: projectDir,
-                strictDateTimeChecking: true,
+                configFile: configFile,
+                migrationsDir: migrationsDir,
+                strictDateTimeChecking: config.strictDateTimeChecking ?? true,
                 uniqueTableColumnTypes: config.uniqueTableColumnTypes,
-                viewLibrary: sqlViews.sqlViews,
+                sqlViews: totalSqlViews,
                 force: params.force
             });
         })
     );
 
     if (E.isLeft(initE)) {
+        cache.retries = true;
         context.report({
             node: node,
             messageId: "internal",
@@ -619,9 +693,11 @@ function runInitialize(params: {
     }
 
     cache.isInitial = false;
+    cache.retries = false;
     cache.config = config;
     cache.tsUniqueTableColumnTypes = uniqueTableColumnTypes;
-    cache.viewLibrary = initE.right.sqlViews.viewLibrary;
+    cache.sqlViews = initE.right.sqlViews;
+    cache.viewLibrary = initE.right.viewLibrary;
 
     return E.right(undefined);
 }

@@ -1,5 +1,5 @@
 import { sqlCheck } from "./rules/sql-check.rule";
 
-export default {
+export const rules = {
     "sql-check": sqlCheck
 };

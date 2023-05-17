@@ -12,8 +12,7 @@ import { isTestDatabaseCluster } from "../../mfsqlchecker/pg_test_db";
 import { SqlCreateView } from "../../mfsqlchecker/views";
 import { QueryRunner } from "./DbConnector";
 import { RunnerError } from "./sql-check.errors";
-
-type PostgresVersion = "14.6.0";
+import { customLog } from "../utils/log";
 
 export interface PostgresConnection {
     readonly url: string;
@@ -27,33 +26,35 @@ export interface Options {
     readonly postgresConnection: PostgresConnection | null;
 }
 
-export const DEFAULT_POSTGRES_VERSION: PostgresVersion = "14.6.0";
 export const QUERY_METHOD_NAMES = new Set(["query", "queryOne", "queryOneOrNone"]);
 export const INSERT_METHOD_NAMES = new Set(["insert", "insertMaybe"]);
 export const VALID_METHOD_NAMES = new Set([...QUERY_METHOD_NAMES, ...INSERT_METHOD_NAMES]);
 
 export function initializeTE(params: {
     projectDir: string;
+    configFile: string;
+    migrationsDir: string;
     uniqueTableColumnTypes: UniqueTableColumnType[];
     strictDateTimeChecking: boolean;
-    viewLibrary: SqlCreateView[];
+    sqlViews: SqlCreateView[];
 }) {
     return pipe(
         TE.Do,
         TE.bindW("options", () => {
-            console.log("Loading config file...");
+            customLog.success("loading config file")
             return initOptionsTE({
                 projectDir: params.projectDir,
-                configFile: "demo/mfsqlchecker.json",
-                migrationsDir: "demo/migrations",
+                configFile: params.configFile,
+                migrationsDir: params.migrationsDir,
                 postgresConnection: null
             });
         }),
         TE.bindW("server", ({ options }) => {
+            customLog.success("initializing pg server")
             return initPgServerTE(options);
         }),
         TE.bindW("runner", ({ server, options }) => {
-            console.log("Connecting to database...");
+            customLog.success("connecting to database")
             return QueryRunner.ConnectTE({
                 sql: server.sql,
                 adminUrl: server.adminUrl,
@@ -62,11 +63,11 @@ export function initializeTE(params: {
             });
         }),
         TE.chainFirstW(({ runner }) => {
-            console.log("Initializing database...");
+            customLog.success("initializing database")
             return runner.initializeTE({
                 strictDateTimeChecking: params.strictDateTimeChecking,
                 uniqueTableColumnTypes: params.uniqueTableColumnTypes,
-                viewLibrary: params.viewLibrary
+                sqlViews: params.sqlViews
             });
         }),
         TE.mapLeft((x) => {
@@ -105,7 +106,6 @@ export function initOptionsE(options: Options) {
     }
 
     let migrationsDir: string | null = null;
-    let postgresVersion: PostgresVersion = DEFAULT_POSTGRES_VERSION;
 
     if (options.configFile !== null) {
         const absoluteConfigFile = path.join(options.projectDir, options.configFile);
@@ -119,9 +119,6 @@ export function initOptionsE(options: Options) {
                 return E.left(new Error(errors.join("\n")));
             }
             case "Right":
-                if (config.value.postgresVersion !== null) {
-                    postgresVersion = config.value.postgresVersion as PostgresVersion;
-                }
                 if (config.value.migrationsDir !== null) {
                     if (path.isAbsolute(config.value.migrationsDir)) {
                         migrationsDir = config.value.migrationsDir;
@@ -150,7 +147,6 @@ export function initOptionsE(options: Options) {
     return E.right({
         ...options,
         migrationsDir,
-        postgresVersion
     });
 }
 
@@ -172,12 +168,20 @@ export interface PostgresOptions {
     persistent: boolean;
 }
 
+// See: <https://en.wikipedia.org/wiki/Ephemeral_port>
+const MIN_PORT = 49152;
+const MAX_PORT = 65534;
+
+function randomPort(): number {
+    return MIN_PORT + Math.floor(Math.random() * (MAX_PORT - MIN_PORT));
+}
+
 function createEmbeddedPostgresTE(options: { projectDir: string }) {
     const databaseDir = path.join(options.projectDir, "embedded-pg");
     const postgresOptions: Pick<PostgresOptions, "user" | "port" | "password"> = {
         user: "postgres",
         password: "password",
-        port: 5431
+        port: randomPort()
     };
 
     const pg = new EmbeddedPostgres({
@@ -212,8 +216,8 @@ function createEmbeddedPostgresTE(options: { projectDir: string }) {
     return pipe(
         TE.Do,
         TE.chain(() => conditionalInitializeAndStartTE),
-        // TE.chainFirstEitherKW(() => tryTerminatePostmaster(databaseDir)),
-        // TE.chainFirst(() => TE.tryCatch(() => pg.start(), E.toError)),
+        TE.chainFirstEitherKW(() => tryTerminatePostmaster(databaseDir)),
+        TE.chainFirst(() => TE.tryCatch(() => pg.start(), E.toError)),
         TE.chainFirst(() => {
             const x = isPostmasterAlive(databaseDir)
                 ? TE.right(undefined)
@@ -258,7 +262,7 @@ function tryTerminatePostmaster(path: string) {
     return E.right(undefined);
 }
 
-export function initPgServerTE(options: Options & { postgresVersion: PostgresVersion }) {
+export function initPgServerTE(options: Options) {
     return pipe(
         createEmbeddedPostgresTE(options),
         TE.map((result) => {

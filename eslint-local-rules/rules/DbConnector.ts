@@ -57,15 +57,13 @@ import {
 import { resolveFromSourceMap } from "../../mfsqlchecker/source_maps";
 import { QualifiedSqlViewName, SqlCreateView } from "../../mfsqlchecker/views";
 import { InvalidQueryError } from "./sql-check.errors";
+import { customLog } from "../utils/log";
 
 type QueryRunnerConfig = {
     migrationsDir: string;
     client: postgres.Sql;
 };
 
-function runnerLog(...args: any[]) {
-    console.log(chalk.grey(`[${new Date().toISOString()}]`), chalk.green(`QueryRunner:`), ...args);
-}
 
 export class QueryRunner {
     private migrationsDir: string;
@@ -111,7 +109,7 @@ export class QueryRunner {
     initializeTE(params: {
         uniqueTableColumnTypes: UniqueTableColumnType[];
         strictDateTimeChecking: boolean;
-        viewLibrary: SqlCreateView[];
+        sqlViews: SqlCreateView[];
     }): TE.TaskEither<Error | InvalidQueryError, undefined> {
         return pipe(
             TE.Do,
@@ -127,7 +125,7 @@ export class QueryRunner {
         );
     }
 
-    async updateViews(params: { strictDateTimeChecking: boolean; viewLibrary: SqlCreateView[] }) {
+    async updateViews(params: { strictDateTimeChecking: boolean; sqlViews: SqlCreateView[] }) {
         if (params.strictDateTimeChecking !== this.prevStrictDateTimeChecking) {
             await this.dropViews();
         }
@@ -140,7 +138,7 @@ export class QueryRunner {
             this.client,
             params.strictDateTimeChecking,
             this.viewNames,
-            params.viewLibrary
+            params.sqlViews
         );
 
         if (updated) {
@@ -150,7 +148,7 @@ export class QueryRunner {
         this.viewNames = newViewNames;
 
         for (const [viewName, viewAnswer] of this.viewNames) {
-            const createView = params.viewLibrary.find((x) => x.viewName === viewName);
+            const createView = params.sqlViews.find((x) => x.viewName === viewName);
             invariant(createView !== undefined, `view ${viewName} not found (probably a bug).`);
             queryErrors = queryErrors.concat(viewAnswerToErrorDiagnostics(createView, viewAnswer));
         }
@@ -161,7 +159,7 @@ export class QueryRunner {
     async initialize(params: {
         uniqueTableColumnTypes: UniqueTableColumnType[];
         strictDateTimeChecking: boolean;
-        viewLibrary: SqlCreateView[];
+        sqlViews: SqlCreateView[];
     }) {
         this.queryCache = new QueryMap<SelectAnswer>();
         this.insertCache = new InsertMap<InsertAnswer>();
@@ -188,7 +186,7 @@ export class QueryRunner {
             const allFiles = await readdirAsync(this.migrationsDir);
             const matchingFiles = allFiles.filter(isMigrationFile).sort();
             for (const matchingFile of matchingFiles) {
-                runnerLog("running migration", matchingFile);
+                customLog.success("running migration", matchingFile);
                 const text = await readFileAsync(path.join(this.migrationsDir, matchingFile));
                 try {
                     await this.client.unsafe(text);
@@ -215,9 +213,9 @@ export class QueryRunner {
             this.prevUniqueTableColumnTypes = params.uniqueTableColumnTypes;
 
             this.uniqueColumnTypes = makeUniqueColumnTypes(this.prevUniqueTableColumnTypes);
-            runnerLog("start applying unique table column types...");
+            customLog.success("start applying unique table column types...");
             await applyUniqueTableColumnTypes(this.client, this.prevUniqueTableColumnTypes);
-            runnerLog("done applying unique table column types");
+            customLog.success("done applying unique table column types");
 
             await this.tableColsLibrary.refreshTables(this.client);
 
@@ -1793,6 +1791,7 @@ function sqlTypeToTypeScriptType(
         case "int2":
         case "int4":
         case "int8":
+        case "numeric":
             return TypeScriptType.wrap("number");
         case "text":
             return TypeScriptType.wrap("string");

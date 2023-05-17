@@ -4,12 +4,14 @@ import { assertNever } from "assert-never";
 import * as fs from "fs";
 import * as path from "path";
 import * as ts from "typescript";
-import { ColTypesFormat, Config, defaultColTypesFormat, loadConfigFile, sqlUniqueTypeName, UniqueTableColumnType } from "./ConfigFile";
+import { ColTypesFormat, defaultColTypesFormat, loadConfigFile, sqlUniqueTypeName, UniqueTableColumnType } from "./ConfigFile";
 import { DbConnector } from "./DbConnector";
 import { ErrorDiagnostic } from "./ErrorDiagnostic";
 import { findAllQueryCalls, ResolvedQuery, SqlType, TypeScriptType } from "./queries";
 import * as E from "fp-ts/Either";
 import { QualifiedSqlViewName, resolveAllViewDefinitions, sourceFileModuleName, SqlCreateView, SqlViewDefinition, sqlViewLibraryResetToInitialFragmentsIncludingDeps, sqlViewsLibraryAddFromSourceFile } from "./views";
+
+type FileName = string;
 
 export function getSqlViews(params: {
     projectDir: string;
@@ -18,7 +20,7 @@ export function getSqlViews(params: {
     sourceFiles: string[];
 }): E.Either<
     ErrorDiagnostic[],
-    { viewLibrary: Map<QualifiedSqlViewName, SqlViewDefinition>; sqlViews: SqlCreateView[] }
+    { viewLibrary: Map<QualifiedSqlViewName, SqlViewDefinition>; sqlViews: Map<FileName, SqlCreateView[]> }
 > {
     const { projectDir, program, checker, sourceFiles } = params;
     const viewLibrary: Map<QualifiedSqlViewName, SqlViewDefinition> = new Map();

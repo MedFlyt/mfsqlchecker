@@ -772,7 +772,7 @@ function testDatabaseName() {
 
 // eslint-local-rules/rules/DbConnector.ts
 var import_assert_never5 = require("assert-never");
-var import_chalk4 = __toESM(require("chalk"));
+var import_chalk5 = __toESM(require("chalk"));
 var import_cli_progress = require("cli-progress");
 var fs4 = __toESM(require("fs"));
 var path3 = __toESM(require("path"));
@@ -813,10 +813,22 @@ function resolveFromSourceMap(fileContents, position, sourceMap) {
   }
 }
 
+// eslint-local-rules/utils/log.ts
+var import_chalk4 = __toESM(require("chalk"));
+var now = () => (/* @__PURE__ */ new Date()).toISOString();
+var customLog = {
+  success: (...args) => {
+    console.log(import_chalk4.default.grey(`[${now()}]`), import_chalk4.default.green(`sql-checker`), ...args);
+  },
+  info: (...args) => {
+    console.log(import_chalk4.default.grey(`[${now()}]`), import_chalk4.default.blue(`sql-checker`), ...args);
+  },
+  error: (...args) => {
+    console.log(import_chalk4.default.grey(`[${now()}]`), import_chalk4.default.red(`sql-checker`), ...args);
+  }
+};
+
 // eslint-local-rules/rules/DbConnector.ts
-function runnerLog(...args) {
-  console.log(import_chalk4.default.grey(`[${(/* @__PURE__ */ new Date()).toISOString()}]`), import_chalk4.default.green(`QueryRunner:`), ...args);
-}
 var QueryRunner = class {
   migrationsDir;
   client;
@@ -865,14 +877,14 @@ var QueryRunner = class {
       this.client,
       params.strictDateTimeChecking,
       this.viewNames,
-      params.viewLibrary
+      params.sqlViews
     );
     if (updated) {
       await this.tableColsLibrary.refreshViews(this.client);
     }
     this.viewNames = newViewNames;
     for (const [viewName, viewAnswer] of this.viewNames) {
-      const createView = params.viewLibrary.find((x) => x.viewName === viewName);
+      const createView = params.sqlViews.find((x) => x.viewName === viewName);
       (0, import_tiny_invariant.default)(createView !== void 0, `view ${viewName} not found (probably a bug).`);
       queryErrors2 = queryErrors2.concat(viewAnswerToErrorDiagnostics(createView, viewAnswer));
     }
@@ -897,7 +909,7 @@ var QueryRunner = class {
       const allFiles = await readdirAsync(this.migrationsDir);
       const matchingFiles = allFiles.filter(isMigrationFile).sort();
       for (const matchingFile of matchingFiles) {
-        runnerLog("running migration", matchingFile);
+        customLog.success("running migration", matchingFile);
         const text = await readFileAsync(path3.join(this.migrationsDir, matchingFile));
         try {
           await this.client.unsafe(text);
@@ -918,9 +930,9 @@ var QueryRunner = class {
       }
       this.prevUniqueTableColumnTypes = params.uniqueTableColumnTypes;
       this.uniqueColumnTypes = makeUniqueColumnTypes(this.prevUniqueTableColumnTypes);
-      runnerLog("start applying unique table column types...");
+      customLog.success("start applying unique table column types...");
       await applyUniqueTableColumnTypes(this.client, this.prevUniqueTableColumnTypes);
-      runnerLog("done applying unique table column types");
+      customLog.success("done applying unique table column types");
       await this.tableColsLibrary.refreshTables(this.client);
       this.pgTypes = /* @__PURE__ */ new Map();
       const pgTypesResult = await this.client.unsafe(
@@ -1186,7 +1198,7 @@ function viewAnswerToErrorDiagnostics(createView, viewAnswer) {
     case "NoErrors":
       return [];
     case "CreateError": {
-      const message = 'Error in view "' + import_chalk4.default.bold(viewAnswer.viewName) + '"';
+      const message = 'Error in view "' + import_chalk5.default.bold(viewAnswer.viewName) + '"';
       if (viewAnswer.perr.position !== null) {
         const srcSpan = resolveFromSourceMap(
           createView.fileContents,
@@ -1226,7 +1238,7 @@ function viewAnswerToErrorDiagnostics(createView, viewAnswer) {
           fileContents: createView.fileContents,
           span: srcSpan,
           messages: [
-            import_chalk4.default.bold('Error in view "' + import_chalk4.default.bold(viewAnswer.viewName) + '"'),
+            import_chalk5.default.bold('Error in view "' + import_chalk5.default.bold(viewAnswer.viewName) + '"'),
             viewAnswer.message
           ],
           epilogue: null,
@@ -1333,7 +1345,7 @@ ${JSON.stringify(
               2
             )}`
           ],
-          epilogue: import_chalk4.default.bold("hint") + ': Specify a different name for the column using the Sql "AS" keyword',
+          epilogue: import_chalk5.default.bold("hint") + ': Specify a different name for the column using the Sql "AS" keyword',
           quickFix: null
         }
       ];
@@ -1374,7 +1386,7 @@ ${JSON.stringify(
           fileContents: query.fileContents,
           span: query.colTypeSpan,
           messages: ["Wrong Column Types"],
-          epilogue: import_chalk4.default.bold("Fix it to:") + "\n" + queryAnswer.renderedColTypes,
+          epilogue: import_chalk5.default.bold("Fix it to:") + "\n" + queryAnswer.renderedColTypes,
           quickFix: {
             name: "Fix Column Types",
             replacementText
@@ -1820,6 +1832,7 @@ function sqlTypeToTypeScriptType(uniqueColumnTypes, sqlType) {
     case "int2":
     case "int4":
     case "int8":
+    case "numeric":
       return TypeScriptType.wrap("number");
     case "text":
       return TypeScriptType.wrap("string");
@@ -2294,7 +2307,6 @@ function formatPgError(error) {
 }
 
 // eslint-local-rules/rules/sql-check.utils.ts
-var DEFAULT_POSTGRES_VERSION = "14.6.0";
 var QUERY_METHOD_NAMES = /* @__PURE__ */ new Set(["query", "queryOne", "queryOneOrNone"]);
 var INSERT_METHOD_NAMES = /* @__PURE__ */ new Set(["insert", "insertMaybe"]);
 var VALID_METHOD_NAMES = /* @__PURE__ */ new Set([...QUERY_METHOD_NAMES, ...INSERT_METHOD_NAMES]);
@@ -2302,19 +2314,20 @@ function initializeTE(params) {
   return (0, import_function3.pipe)(
     TE2.Do,
     TE2.bindW("options", () => {
-      console.log("Loading config file...");
+      customLog.success("loading config file");
       return initOptionsTE({
         projectDir: params.projectDir,
-        configFile: "demo/mfsqlchecker.json",
-        migrationsDir: "demo/migrations",
+        configFile: params.configFile,
+        migrationsDir: params.migrationsDir,
         postgresConnection: null
       });
     }),
     TE2.bindW("server", ({ options }) => {
+      customLog.success("initializing pg server");
       return initPgServerTE(options);
     }),
     TE2.bindW("runner", ({ server, options }) => {
-      console.log("Connecting to database...");
+      customLog.success("connecting to database");
       return QueryRunner.ConnectTE({
         sql: server.sql,
         adminUrl: server.adminUrl,
@@ -2323,11 +2336,11 @@ function initializeTE(params) {
       });
     }),
     TE2.chainFirstW(({ runner }) => {
-      console.log("Initializing database...");
+      customLog.success("initializing database");
       return runner.initializeTE({
         strictDateTimeChecking: params.strictDateTimeChecking,
         uniqueTableColumnTypes: params.uniqueTableColumnTypes,
-        viewLibrary: params.viewLibrary
+        sqlViews: params.sqlViews
       });
     }),
     TE2.mapLeft((x) => {
@@ -2354,7 +2367,6 @@ function initOptionsE(options) {
     );
   }
   let migrationsDir = null;
-  let postgresVersion = DEFAULT_POSTGRES_VERSION;
   if (options.configFile !== null) {
     const absoluteConfigFile = import_path.default.join(options.projectDir, options.configFile);
     const config = loadConfigFile(absoluteConfigFile);
@@ -2367,9 +2379,6 @@ function initOptionsE(options) {
         return E3.left(new Error(errors.join("\n")));
       }
       case "Right":
-        if (config.value.postgresVersion !== null) {
-          postgresVersion = config.value.postgresVersion;
-        }
         if (config.value.migrationsDir !== null) {
           if (import_path.default.isAbsolute(config.value.migrationsDir)) {
             migrationsDir = config.value.migrationsDir;
@@ -2395,16 +2404,20 @@ function initOptionsE(options) {
   }
   return E3.right({
     ...options,
-    migrationsDir,
-    postgresVersion
+    migrationsDir
   });
+}
+var MIN_PORT = 49152;
+var MAX_PORT = 65534;
+function randomPort() {
+  return MIN_PORT + Math.floor(Math.random() * (MAX_PORT - MIN_PORT));
 }
 function createEmbeddedPostgresTE(options) {
   const databaseDir = import_path.default.join(options.projectDir, "embedded-pg");
   const postgresOptions = {
     user: "postgres",
     password: "password",
-    port: 5431
+    port: randomPort()
   };
   const pg = new import_embedded_postgres.default({
     ...postgresOptions,
@@ -2431,8 +2444,8 @@ function createEmbeddedPostgresTE(options) {
   return (0, import_function3.pipe)(
     TE2.Do,
     TE2.chain(() => conditionalInitializeAndStartTE),
-    // TE.chainFirstEitherKW(() => tryTerminatePostmaster(databaseDir)),
-    // TE.chainFirst(() => TE.tryCatch(() => pg.start(), E.toError)),
+    TE2.chainFirstEitherKW(() => tryTerminatePostmaster(databaseDir)),
+    TE2.chainFirst(() => TE2.tryCatch(() => pg.start(), E3.toError)),
     TE2.chainFirst(() => {
       const x = isPostmasterAlive(databaseDir) ? TE2.right(void 0) : TE2.tryCatch(() => pg.start(), E3.toError);
       return x;
@@ -2456,6 +2469,16 @@ function isPostmasterAlive(path5) {
   } catch (e) {
     return false;
   }
+}
+function tryTerminatePostmaster(path5) {
+  console.log("Terminating postmaster");
+  const pid = getPostmasterPid(path5);
+  console.log("Terminating postmaster", pid);
+  if (pid !== void 0) {
+    console.log(`Terminating postmaster with pid: ${pid}`);
+    process.kill(pid, "SIGQUIT");
+  }
+  return E3.right(void 0);
 }
 function initPgServerTE(options) {
   return (0, import_function3.pipe)(
@@ -2505,13 +2528,15 @@ async function handler(params) {
   }
 }
 function runInitialize(params) {
-  console.log("initialize");
+  customLog.success("initialize");
   return (0, import_function4.pipe)(
     initializeTE({
       projectDir: params.projectDir,
+      configFile: params.configFile,
+      migrationsDir: params.migrationsDir,
       uniqueTableColumnTypes: params.uniqueTableColumnTypes,
       strictDateTimeChecking: params.strictDateTimeChecking,
-      viewLibrary: params.viewLibrary
+      sqlViews: params.sqlViews
     }),
     TE3.map((result) => {
       cache = result;
@@ -2544,6 +2569,7 @@ function runCheckInsert(params) {
   );
 }
 function runUpdateViews(params) {
+  customLog.success("update views", params.sqlViews.length);
   if (cache?.runner === void 0) {
     return TE3.left(new Error("runner is not initialized"));
   }
@@ -2552,11 +2578,11 @@ function runUpdateViews(params) {
     TE3.tryCatch(
       () => runner.updateViews({
         strictDateTimeChecking: params.strictDateTimeChecking,
-        viewLibrary: params.viewLibrary
+        sqlViews: params.sqlViews
       }),
       RunnerError.to
     ),
-    TE3.chain((diagnostics) => {
+    TE3.chainW((diagnostics) => {
       return diagnostics.length === 0 ? TE3.right(void 0) : TE3.left(new InvalidQueryError(diagnostics));
     })
   );

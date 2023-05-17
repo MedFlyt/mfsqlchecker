@@ -12,6 +12,7 @@ import { SqlCreateView } from "../../mfsqlchecker/views";
 import { QueryRunner } from "./DbConnector";
 import { InvalidQueryError, RunnerError } from "./sql-check.errors";
 import { initializeTE, Options, PostgresOptions } from "./sql-check.utils";
+import { customLog } from "../utils/log";
 
 export type WorkerParams =
     | InitializeParams
@@ -69,18 +70,22 @@ type InitializeParams = {
     projectDir: string;
     uniqueTableColumnTypes: UniqueTableColumnType[];
     strictDateTimeChecking: boolean;
-    viewLibrary: SqlCreateView[];
+    sqlViews: SqlCreateView[];
+    configFile: string;
+    migrationsDir: string;
     force: boolean;
 };
 
 function runInitialize(params: InitializeParams): TE.TaskEither<RunnerError, void> {
-    console.log("initialize");
+    customLog.success("initialize")
     return pipe(
         initializeTE({
             projectDir: params.projectDir,
+            configFile: params.configFile,
+            migrationsDir: params.migrationsDir,
             uniqueTableColumnTypes: params.uniqueTableColumnTypes,
             strictDateTimeChecking: params.strictDateTimeChecking,
-            viewLibrary: params.viewLibrary
+            sqlViews: params.sqlViews
         }),
         TE.map((result) => {
             cache = result;
@@ -133,10 +138,14 @@ function runCheckInsert(
 type UpdateViewsParams = {
     action: "UPDATE_VIEWS";
     strictDateTimeChecking: boolean;
-    viewLibrary: SqlCreateView[];
+    sqlViews: SqlCreateView[];
 };
 
-function runUpdateViews(params: UpdateViewsParams) {
+function runUpdateViews(
+    params: UpdateViewsParams
+): TE.TaskEither<Error | RunnerError | InvalidQueryError, undefined> {
+    customLog.success("update views", params.sqlViews.length)
+
     if (cache?.runner === undefined) {
         return TE.left(new Error("runner is not initialized"));
     }
@@ -148,11 +157,11 @@ function runUpdateViews(params: UpdateViewsParams) {
             () =>
                 runner.updateViews({
                     strictDateTimeChecking: params.strictDateTimeChecking,
-                    viewLibrary: params.viewLibrary
+                    sqlViews: params.sqlViews
                 }),
             RunnerError.to
         ),
-        TE.chain((diagnostics) => {
+        TE.chainW((diagnostics) => {
             return diagnostics.length === 0
                 ? TE.right(undefined)
                 : TE.left(new InvalidQueryError(diagnostics));

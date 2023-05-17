@@ -14,13 +14,13 @@ TODO:
  - [x] autofix
  - [x] inserts
  - [x] epilogue
+ - [x] fragments
+ - [x] load all views before initialization (or load on demand. feels buggy on cross-file reference).
+ - [x] test on medflyt_server2
+ - cleanup
  - tests
- - test on medflyt_server2
  - publish as separate package
  - publish as new repository
- - cleanup
- - load all views before initialization (or load on demand. feels buggy on cross-file reference).
- - fragments?
 
 
 

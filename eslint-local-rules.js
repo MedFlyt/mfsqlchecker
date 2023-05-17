@@ -1,1 +1,1 @@
-module.exports = require("./dist/eslint-local-rules").default;
+module.exports = require("./dist").rules
