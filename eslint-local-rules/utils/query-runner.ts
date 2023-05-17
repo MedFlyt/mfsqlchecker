@@ -1,13 +1,12 @@
 import { assertNever } from "assert-never";
 import chalk from "chalk";
-import { Bar, Presets } from "cli-progress";
+import * as E from "fp-ts/Either";
+import { pipe } from "fp-ts/function";
+import * as TE from "fp-ts/TaskEither";
 import * as fs from "fs";
 import * as path from "path";
 import * as postgres from "postgres";
 import invariant from "tiny-invariant";
-import * as TE from "fp-ts/TaskEither";
-import * as E from "fp-ts/Either";
-import { pipe } from "fp-ts/function";
 
 import {
     ColTypesFormat,
@@ -31,11 +30,9 @@ import {
     dropAllTables,
     dropAllTypes,
     escapeIdentifier,
-    newSavepoint,
     parsePostgreSqlError,
     pgDescribeQuery,
-    PostgreSqlError,
-    rollbackToAndReleaseSavepoint
+    PostgreSqlError
 } from "../../mfsqlchecker/pg_extra";
 import {
     calcDbMigrationsHash,
@@ -49,21 +46,19 @@ import {
 import {
     ColNullability,
     ResolvedInsert,
-    ResolvedQuery,
     ResolvedSelect,
     SqlType,
     TypeScriptType
 } from "../../mfsqlchecker/queries";
 import { resolveFromSourceMap } from "../../mfsqlchecker/source_maps";
 import { QualifiedSqlViewName, SqlCreateView } from "../../mfsqlchecker/views";
-import { InvalidQueryError } from "./sql-check.errors";
-import { customLog } from "../utils/log";
+import { InvalidQueryError } from "./errors";
+import { customLog } from "./log";
 
 type QueryRunnerConfig = {
     migrationsDir: string;
     client: postgres.Sql;
 };
-
 
 export class QueryRunner {
     private migrationsDir: string;
@@ -186,7 +181,7 @@ export class QueryRunner {
             const allFiles = await readdirAsync(this.migrationsDir);
             const matchingFiles = allFiles.filter(isMigrationFile).sort();
             for (const matchingFile of matchingFiles) {
-                customLog.success("running migration", matchingFile);
+                customLog.info("running migration", matchingFile);
                 const text = await readFileAsync(path.join(this.migrationsDir, matchingFile));
                 try {
                     await this.client.unsafe(text);
@@ -282,426 +277,12 @@ export class QueryRunner {
         await this.client.end();
     }
 
-    async x() {
-        const queriesProgressBar = new Bar(
-            {
-                clearOnComplete: true,
-                etaBuffer: 50
-            },
-            Presets.legacy
-        );
-        queriesProgressBar.start(manifest.queries.length, 0);
-        try {
-            let i = 0;
-            for (const query of manifest.queries) {
-                switch (query.type) {
-                    case "ResolvedSelect": {
-                        const cachedResult = this.queryCache.get(
-                            query.value.text,
-                            query.value.colTypes
-                        );
-                        if (cachedResult !== undefined) {
-                            queryErrors = queryErrors.concat(
-                                queryAnswerToErrorDiagnostics(
-                                    query.value,
-                                    cachedResult,
-                                    manifest.colTypesFormat
-                                )
-                            );
-                            newQueryCache.set(query.value.text, query.value.colTypes, cachedResult);
-                        } else {
-                            const result = await processQuery(
-                                this.client,
-                                manifest.colTypesFormat,
-                                this.pgTypes,
-                                this.tableColsLibrary,
-                                this.uniqueColumnTypes,
-                                query.value
-                            );
-                            newQueryCache.set(query.value.text, query.value.colTypes, result);
-                            queryErrors = queryErrors.concat(
-                                queryAnswerToErrorDiagnostics(
-                                    query.value,
-                                    result,
-                                    manifest.colTypesFormat
-                                )
-                            );
-                        }
-                        break;
-                    }
-                    case "ResolvedInsert": {
-                        const cachedResult = this.insertCache.get(
-                            query.value.text,
-                            query.value.colTypes,
-                            query.value.tableName,
-                            query.value.insertColumns
-                        );
-                        if (cachedResult !== undefined) {
-                            queryErrors = queryErrors.concat(
-                                insertAnswerToErrorDiagnostics(
-                                    query.value,
-                                    cachedResult,
-                                    manifest.colTypesFormat
-                                )
-                            );
-                            newInsertCache.set(
-                                query.value.text,
-                                query.value.colTypes,
-                                query.value.tableName,
-                                query.value.insertColumns,
-                                cachedResult
-                            );
-                        } else {
-                            const result = await processInsert(
-                                this.client,
-                                manifest.colTypesFormat,
-                                this.pgTypes,
-                                this.tableColsLibrary,
-                                this.uniqueColumnTypes,
-                                query.value
-                            );
-                            newInsertCache.set(
-                                query.value.text,
-                                query.value.colTypes,
-                                query.value.tableName,
-                                query.value.insertColumns,
-                                result
-                            );
-                            queryErrors = queryErrors.concat(
-                                insertAnswerToErrorDiagnostics(
-                                    query.value,
-                                    result,
-                                    manifest.colTypesFormat
-                                )
-                            );
-                        }
-                        break;
-                    }
-                    default:
-                        assertNever(query);
-                }
-                queriesProgressBar.update(++i);
-            }
-        } finally {
-            queriesProgressBar.stop();
-        }
-
-        await this.client.unsafe("ROLLBACK");
-
-        this.queryCache = newQueryCache;
-        this.insertCache = newInsertCache;
-
-        let finalErrors: ErrorDiagnostic[] = [];
-        for (const query of manifest.queries) {
-            switch (query.type) {
-                case "ResolvedSelect":
-                    finalErrors = finalErrors.concat(query.value.errors);
-                    break;
-                case "ResolvedInsert":
-                    finalErrors = finalErrors.concat(query.value.errors);
-                    break;
-                default:
-                    assertNever(query);
-            }
-        }
-        return finalErrors.concat(queryErrors);
-    }
-
     private async dropViews(): Promise<void> {
         for (let i = this.viewNames.length - 1; i >= 0; --i) {
             const viewName = this.viewNames[i];
             await dropView(this.client, viewName[0]);
         }
         this.viewNames = [];
-    }
-}
-
-export interface Manifest {
-    colTypesFormat: ColTypesFormat;
-    strictDateTimeChecking: boolean;
-    viewLibrary: SqlCreateView[];
-    queries: ResolvedQuery[];
-    uniqueTableColumnTypes: UniqueTableColumnType[];
-}
-
-export class DbConnector {
-    private constructor(migrationsDir: string, client: postgres.Sql) {
-        this.migrationsDir = migrationsDir;
-        this.client = client;
-    }
-
-    static async Connect(
-        migrationsDir: string,
-        adminUrl: string,
-        name?: string
-    ): Promise<DbConnector> {
-        const client = await newConnect(adminUrl, name);
-        return new DbConnector(migrationsDir, client);
-    }
-
-    async close(): Promise<void> {
-        await closePg(this.client);
-    }
-
-    private migrationsDir: string;
-    private prevStrictDateTimeChecking: boolean | null = null;
-    private prevUniqueTableColumnTypes: UniqueTableColumnType[] = [];
-    private client: postgres.Sql;
-
-    private viewNames: [string, ViewAnswer][] = [];
-
-    private dbMigrationsHash: string = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
-
-    private tableColsLibrary = new TableColsLibrary();
-    private pgTypes = new Map<number, SqlType>();
-    private uniqueColumnTypes = new Map<SqlType, TypeScriptType>();
-
-    private queryCache = new QueryMap<SelectAnswer>();
-    private insertCache = new InsertMap<InsertAnswer>();
-
-    private async dropViews(): Promise<void> {
-        for (let i = this.viewNames.length - 1; i >= 0; --i) {
-            const viewName = this.viewNames[i];
-            await dropView(this.client, viewName[0]);
-        }
-        this.viewNames = [];
-    }
-
-    async validateManifest(manifest: Manifest): Promise<ErrorDiagnostic[]> {
-        const hash = await calcDbMigrationsHash(this.migrationsDir);
-        if (
-            this.dbMigrationsHash !== hash ||
-            !equalsUniqueTableColumnTypes(
-                manifest.uniqueTableColumnTypes,
-                this.prevUniqueTableColumnTypes
-            )
-        ) {
-            this.dbMigrationsHash = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
-            this.queryCache.clear();
-            this.insertCache.clear();
-            await this.dropViews();
-
-            await dropAllTables(this.client);
-            await dropAllSequences(this.client);
-            await dropAllTypes(this.client);
-            await dropAllFunctions(this.client);
-
-            const allFiles = await readdirAsync(this.migrationsDir);
-            const matchingFiles = allFiles.filter(isMigrationFile).sort();
-            for (const matchingFile of matchingFiles) {
-                console.log("Migration file", matchingFile);
-                const text = await readFileAsync(path.join(this.migrationsDir, matchingFile));
-                try {
-                    await this.client.unsafe(text);
-                } catch (err) {
-                    const perr = parsePostgreSqlError(err);
-                    if (perr === null) {
-                        throw err;
-                    } else {
-                        const errorDiagnostic = postgresqlErrorDiagnostic(
-                            path.join(this.migrationsDir, matchingFile),
-                            text,
-                            perr,
-                            perr.position !== null
-                                ? toSrcSpan(text, perr.position)
-                                : { type: "File" },
-                            "Error in migration file"
-                        );
-                        return [errorDiagnostic];
-                    }
-                }
-            }
-
-            this.prevUniqueTableColumnTypes = manifest.uniqueTableColumnTypes;
-
-            this.uniqueColumnTypes = makeUniqueColumnTypes(this.prevUniqueTableColumnTypes);
-            console.log("applyUniqueTableColumnTypes...");
-            await applyUniqueTableColumnTypes(this.client, this.prevUniqueTableColumnTypes);
-            console.log("applyUniqueTableColumnTypes done");
-
-            await this.tableColsLibrary.refreshTables(this.client);
-
-            this.pgTypes = new Map<number, SqlType>();
-            const pgTypesResult = await this.client.unsafe(
-                `
-                SELECT
-                    oid,
-                    typname
-                FROM pg_type
-                ORDER BY oid
-                `
-            );
-            for (const row of pgTypesResult) {
-                const oid: number = row["oid"];
-                const typname: string = row["typname"];
-                this.pgTypes.set(oid, SqlType.wrap(typname));
-            }
-            this.dbMigrationsHash = hash;
-        }
-
-        if (manifest.strictDateTimeChecking !== this.prevStrictDateTimeChecking) {
-            await this.dropViews();
-        }
-        this.prevStrictDateTimeChecking = manifest.strictDateTimeChecking;
-
-        let queryErrors: ErrorDiagnostic[] = [];
-
-        const [updated, newViewNames] = await updateViews(
-            this.client,
-            manifest.strictDateTimeChecking,
-            this.viewNames,
-            manifest.viewLibrary
-        );
-
-        if (updated) {
-            await this.tableColsLibrary.refreshViews(this.client);
-        }
-
-        this.viewNames = newViewNames;
-
-        for (const [viewName, viewAnswer] of this.viewNames) {
-            const createView = manifest.viewLibrary.find((x) => x.viewName === viewName);
-            if (createView === undefined) {
-                throw new Error("The Impossible Happened");
-            }
-            queryErrors = queryErrors.concat(viewAnswerToErrorDiagnostics(createView, viewAnswer));
-        }
-
-        const newQueryCache = new QueryMap<SelectAnswer>();
-        const newInsertCache = new InsertMap<InsertAnswer>();
-
-        // We modify the system catalogs only inside a transaction, so that we
-        // can ROLLBACK the changes later. This is needed so that in the
-        // future if we need to run our migrations again, they can be run on
-        // the original system catalogs.
-        // await this.client.unsafe("BEGIN");
-
-        if (manifest.strictDateTimeChecking) {
-            await modifySystemCatalogs(this.client);
-        }
-
-        const queriesProgressBar = new Bar(
-            {
-                clearOnComplete: true,
-                etaBuffer: 50
-            },
-            Presets.legacy
-        );
-        queriesProgressBar.start(manifest.queries.length, 0);
-        try {
-            let i = 0;
-            for (const query of manifest.queries) {
-                switch (query.type) {
-                    case "ResolvedSelect": {
-                        const cachedResult = this.queryCache.get(
-                            query.value.text,
-                            query.value.colTypes
-                        );
-                        if (cachedResult !== undefined) {
-                            queryErrors = queryErrors.concat(
-                                queryAnswerToErrorDiagnostics(
-                                    query.value,
-                                    cachedResult,
-                                    manifest.colTypesFormat
-                                )
-                            );
-                            newQueryCache.set(query.value.text, query.value.colTypes, cachedResult);
-                        } else {
-                            const result = await processQuery(
-                                this.client,
-                                manifest.colTypesFormat,
-                                this.pgTypes,
-                                this.tableColsLibrary,
-                                this.uniqueColumnTypes,
-                                query.value
-                            );
-                            newQueryCache.set(query.value.text, query.value.colTypes, result);
-                            queryErrors = queryErrors.concat(
-                                queryAnswerToErrorDiagnostics(
-                                    query.value,
-                                    result,
-                                    manifest.colTypesFormat
-                                )
-                            );
-                        }
-                        break;
-                    }
-                    case "ResolvedInsert": {
-                        const cachedResult = this.insertCache.get(
-                            query.value.text,
-                            query.value.colTypes,
-                            query.value.tableName,
-                            query.value.insertColumns
-                        );
-                        if (cachedResult !== undefined) {
-                            queryErrors = queryErrors.concat(
-                                insertAnswerToErrorDiagnostics(
-                                    query.value,
-                                    cachedResult,
-                                    manifest.colTypesFormat
-                                )
-                            );
-                            newInsertCache.set(
-                                query.value.text,
-                                query.value.colTypes,
-                                query.value.tableName,
-                                query.value.insertColumns,
-                                cachedResult
-                            );
-                        } else {
-                            const result = await processInsert(
-                                this.client,
-                                manifest.colTypesFormat,
-                                this.pgTypes,
-                                this.tableColsLibrary,
-                                this.uniqueColumnTypes,
-                                query.value
-                            );
-                            newInsertCache.set(
-                                query.value.text,
-                                query.value.colTypes,
-                                query.value.tableName,
-                                query.value.insertColumns,
-                                result
-                            );
-                            queryErrors = queryErrors.concat(
-                                insertAnswerToErrorDiagnostics(
-                                    query.value,
-                                    result,
-                                    manifest.colTypesFormat
-                                )
-                            );
-                        }
-                        break;
-                    }
-                    default:
-                        assertNever(query);
-                }
-                queriesProgressBar.update(++i);
-            }
-        } finally {
-            queriesProgressBar.stop();
-        }
-
-        await this.client.unsafe("ROLLBACK");
-
-        this.queryCache = newQueryCache;
-        this.insertCache = newInsertCache;
-
-        let finalErrors: ErrorDiagnostic[] = [];
-        for (const query of manifest.queries) {
-            switch (query.type) {
-                case "ResolvedSelect":
-                    finalErrors = finalErrors.concat(query.value.errors);
-                    break;
-                case "ResolvedInsert":
-                    finalErrors = finalErrors.concat(query.value.errors);
-                    break;
-                default:
-                    assertNever(query);
-            }
-        }
-        return finalErrors.concat(queryErrors);
     }
 }
 
@@ -1091,7 +672,7 @@ function querySourceStart(fileContents: string, sourceMap: [number, number, numb
     );
 }
 
-export function queryAnswerToErrorDiagnostics(
+function queryAnswerToErrorDiagnostics(
     query: ResolvedSelect,
     queryAnswer: SelectAnswer,
     colTypesFormat: ColTypesFormat
@@ -1482,45 +1063,6 @@ function psqlOidSqlType(pgTypes: Map<number, SqlType>, oid: number): SqlType {
     return name;
 }
 
-// // class TableLibrary {
-// //     private tableColsLibrary: TableColsLibrary;
-
-// //     /**
-// //      * After calling this method, you should also call `refreshViews`
-// //      */
-// //     public async refreshTables(client: pg.Client): Promise<void> {
-// //         await this.tableColsLibrary.refreshTables(client);
-// //     }
-
-// //     public async refreshViews(client: pg.Client): Promise<void> {
-// //         await this.tableColsLibrary.refreshViews(client);
-// //     }
-
-// //     public isNotNull(tableID: number, columnID: number): boolean {
-// //         return this.tableColsLibrary.isNotNull(tableID, columnID);
-// //     }
-// // }
-
-// // class TableStructLibrary {
-// //     public async refreshTables(client: pg.Client): Promise<void> {
-// //     }
-
-// //     public async refreshViews(client: pg.Client): Promise<void> {
-// //     }
-// // }
-
-// class TableDefaultColsLibrary {
-//     public async refreshTables(client: pg.Client): Promise<void> {
-//         this.defaultCols.clear();
-
-//     }
-
-//     public getDefaultCols(tableName: string): Set<string> {
-//     }
-
-//     private defaultCols = new Map<string, Set<string>>();
-// }
-
 class TableColsLibrary {
     /**
      * After calling this method, you should also call `refreshViews`
@@ -1747,7 +1289,7 @@ class TableColsLibrary {
     private viewLookupTable = new Map<string, boolean>();
 }
 
-export function resolveFieldDefs(
+function resolveFieldDefs(
     tableColsLibrary: TableColsLibrary,
     pgTypes: Map<number, SqlType>,
     uniqueColumnTypes: Map<SqlType, TypeScriptType>,
@@ -2035,7 +1577,7 @@ async function dropTableIndexes(client: postgres.Sql) {
     }
 }
 
-export async function applyUniqueTableColumnTypes(
+async function applyUniqueTableColumnTypes(
     client: postgres.Sql,
     uniqueTableColumnTypes: UniqueTableColumnType[]
 ): Promise<void> {

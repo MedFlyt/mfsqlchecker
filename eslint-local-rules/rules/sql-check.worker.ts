@@ -9,8 +9,8 @@ import { UniqueTableColumnType } from "../../mfsqlchecker/ConfigFile";
 import { ErrorDiagnostic } from "../../mfsqlchecker/ErrorDiagnostic";
 import { ResolvedInsert, ResolvedSelect } from "../../mfsqlchecker/queries";
 import { SqlCreateView } from "../../mfsqlchecker/views";
-import { QueryRunner } from "./DbConnector";
-import { InvalidQueryError, RunnerError } from "./sql-check.errors";
+import { QueryRunner } from "../utils/query-runner";
+import { InvalidQueryError, RunnerError } from "../utils/errors";
 import { initializeTE, Options, PostgresOptions } from "./sql-check.utils";
 import { customLog } from "../utils/log";
 

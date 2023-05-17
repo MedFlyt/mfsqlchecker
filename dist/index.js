@@ -32120,7 +32120,7 @@ function memoize(params) {
   return result;
 }
 
-// eslint-local-rules/rules/sql-check.errors.ts
+// eslint-local-rules/utils/errors.ts
 var InvalidQueryError = class extends Error {
   _tag = "InvalidQueryError";
   diagnostics;
@@ -32149,14 +32149,13 @@ var import_path = __toESM(require("path"));
 // mfsqlchecker/pg_test_db.ts
 var import_pg_connection_string = require("pg-connection-string");
 
-// eslint-local-rules/rules/DbConnector.ts
+// eslint-local-rules/utils/query-runner.ts
 var import_assert_never6 = require("assert-never");
 var import_chalk5 = __toESM(require("chalk"));
-var import_cli_progress = require("cli-progress");
-var import_tiny_invariant = __toESM(require("tiny-invariant"));
-var TE = __toESM(require("fp-ts/TaskEither"));
 var E3 = __toESM(require("fp-ts/Either"));
 var import_function2 = require("fp-ts/function");
+var TE = __toESM(require("fp-ts/TaskEither"));
+var import_tiny_invariant = __toESM(require("tiny-invariant"));
 
 // eslint-local-rules/utils/log.ts
 var import_chalk4 = __toESM(require("chalk"));
@@ -32173,13 +32172,10 @@ var customLog = {
   }
 };
 
-// eslint-local-rules/rules/DbConnector.ts
+// eslint-local-rules/utils/query-runner.ts
 var SELECT_STAR_REGEX = new RegExp("(select|\\.|\\,)\\s*\\*", "i");
 
 // eslint-local-rules/rules/sql-check.utils.ts
-var QUERY_METHOD_NAMES = /* @__PURE__ */ new Set(["query", "queryOne", "queryOneOrNone"]);
-var INSERT_METHOD_NAMES = /* @__PURE__ */ new Set(["insert", "insertMaybe"]);
-var VALID_METHOD_NAMES = /* @__PURE__ */ new Set([...QUERY_METHOD_NAMES, ...INSERT_METHOD_NAMES]);
 function locateNearestPackageJsonDir(filePath) {
   const dir = import_path.default.dirname(filePath);
   const packageJsonFile = import_path.default.join(dir, "package.json");
@@ -32585,6 +32581,8 @@ function getTSUniqueColumnTypes(uniqueTableColumnTypes) {
 function toFpTsEither(either) {
   return either.type === "Left" ? E5.left(either.value) : E5.right(either.value);
 }
+var QUERY_METHOD_NAMES = /* @__PURE__ */ new Set(["query", "queryOne", "queryOneOrNone"]);
+var INSERT_METHOD_NAMES = /* @__PURE__ */ new Set(["insert", "insertMaybe"]);
 function getCallExpressionValidity(node) {
   if (node.callee.type !== import_typescript_estree.TSESTree.AST_NODE_TYPES.MemberExpression) {
     return E5.left("CALLEE_NOT_MEMBER_EXPRESSION");

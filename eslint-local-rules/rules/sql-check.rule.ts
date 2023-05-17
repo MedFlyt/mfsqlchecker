@@ -25,12 +25,8 @@ import { getSqlViews } from "../../mfsqlchecker/sqlchecker_engine";
 import { QualifiedSqlViewName, SqlCreateView, SqlViewDefinition } from "../../mfsqlchecker/views";
 import { createRule } from "../utils";
 import { memoize } from "../utils/memoize";
-import { InvalidQueryError, RunnerError } from "./sql-check.errors";
-import {
-    INSERT_METHOD_NAMES,
-    QUERY_METHOD_NAMES,
-    locateNearestPackageJsonDir
-} from "./sql-check.utils";
+import { InvalidQueryError, RunnerError } from "../utils/errors";
+import { locateNearestPackageJsonDir } from "./sql-check.utils";
 import { WorkerParams, WorkerResult } from "./sql-check.worker";
 import { z } from "zod";
 import { customLog } from "../utils/log";
@@ -554,6 +550,9 @@ function getTSUniqueColumnTypes(uniqueTableColumnTypes: Config["uniqueTableColum
 function toFpTsEither<T, E>(either: OldEither<E, T>): E.Either<E, T> {
     return either.type === "Left" ? E.left(either.value) : E.right(either.value);
 }
+
+const QUERY_METHOD_NAMES = new Set(["query", "queryOne", "queryOneOrNone"]);
+const INSERT_METHOD_NAMES = new Set(["insert", "insertMaybe"]);
 
 function getCallExpressionValidity(node: TSESTree.CallExpression) {
     if (node.callee.type !== TSESTree.AST_NODE_TYPES.MemberExpression) {

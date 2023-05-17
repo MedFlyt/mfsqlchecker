@@ -10,8 +10,8 @@ import { loadConfigFile, UniqueTableColumnType } from "../../mfsqlchecker/Config
 import { connectPg } from "../../mfsqlchecker/pg_extra";
 import { isTestDatabaseCluster } from "../../mfsqlchecker/pg_test_db";
 import { SqlCreateView } from "../../mfsqlchecker/views";
-import { QueryRunner } from "./DbConnector";
-import { RunnerError } from "./sql-check.errors";
+import { QueryRunner } from "../utils/query-runner";
+import { RunnerError } from "../utils/errors";
 import { customLog } from "../utils/log";
 
 export interface PostgresConnection {
@@ -26,10 +26,6 @@ export interface Options {
     readonly postgresConnection: PostgresConnection | null;
 }
 
-export const QUERY_METHOD_NAMES = new Set(["query", "queryOne", "queryOneOrNone"]);
-export const INSERT_METHOD_NAMES = new Set(["insert", "insertMaybe"]);
-export const VALID_METHOD_NAMES = new Set([...QUERY_METHOD_NAMES, ...INSERT_METHOD_NAMES]);
-
 export function initializeTE(params: {
     projectDir: string;
     configFile: string;
@@ -41,20 +37,22 @@ export function initializeTE(params: {
     return pipe(
         TE.Do,
         TE.bindW("options", () => {
-            customLog.success("loading config file")
-            return initOptionsTE({
-                projectDir: params.projectDir,
-                configFile: params.configFile,
-                migrationsDir: params.migrationsDir,
-                postgresConnection: null
-            });
+            customLog.success("loading config file");
+            return TE.fromEither(
+                initOptionsE({
+                    projectDir: params.projectDir,
+                    configFile: params.configFile,
+                    migrationsDir: params.migrationsDir,
+                    postgresConnection: null
+                })
+            );
         }),
         TE.bindW("server", ({ options }) => {
-            customLog.success("initializing pg server")
+            customLog.success("initializing pg server");
             return initPgServerTE(options);
         }),
         TE.bindW("runner", ({ server, options }) => {
-            customLog.success("connecting to database")
+            customLog.success("connecting to database");
             return QueryRunner.ConnectTE({
                 sql: server.sql,
                 adminUrl: server.adminUrl,
@@ -63,7 +61,7 @@ export function initializeTE(params: {
             });
         }),
         TE.chainFirstW(({ runner }) => {
-            customLog.success("initializing database")
+            customLog.success("initializing database");
             return runner.initializeTE({
                 strictDateTimeChecking: params.strictDateTimeChecking,
                 uniqueTableColumnTypes: params.uniqueTableColumnTypes,
@@ -74,10 +72,6 @@ export function initializeTE(params: {
             return x instanceof Error ? new RunnerError(x.message) : x;
         })
     );
-}
-
-export function initOptionsTE(options: Options) {
-    return TE.fromEither(initOptionsE(options));
 }
 
 export function initOptionsE(options: Options) {
@@ -144,10 +138,7 @@ export function initOptionsE(options: Options) {
         );
     }
 
-    return E.right({
-        ...options,
-        migrationsDir,
-    });
+    return E.right({ ...options, migrationsDir });
 }
 
 export interface PostgresOptions {
@@ -191,7 +182,7 @@ function createEmbeddedPostgresTE(options: { projectDir: string }) {
     });
 
     const adminUrl = `postgres://${postgresOptions.user}:${postgresOptions.password}@localhost:${postgresOptions.port}/postgres`;
-    const testDbName = "test_eliya";
+    const testDbName = "shadow_database";
     const shouldInitialize = !fs.existsSync(databaseDir);
 
     const conditionalInitializeAndStartTE = shouldInitialize
@@ -201,15 +192,15 @@ function createEmbeddedPostgresTE(options: { projectDir: string }) {
     const recreateDatabaseTE = (sql: Sql) =>
         pipe(
             TE.Do,
-            TE.bind("dbName", () => TE.right((sql(testDbName) as any).value)),
+            TE.bind("dbName", () => TE.right(sql(testDbName))),
             TE.chainFirst(({ dbName }) => {
                 return TE.tryCatch(
-                    () => sql.unsafe(`DROP DATABASE IF EXISTS ${dbName} WITH (FORCE)`),
+                    () => sql`DROP DATABASE IF EXISTS ${dbName} WITH (FORCE)`,
                     E.toError
                 );
             }),
             TE.chainFirst(({ dbName }) =>
-                TE.tryCatch(() => sql.unsafe(`CREATE DATABASE ${dbName}`), E.toError)
+                TE.tryCatch(() => sql`CREATE DATABASE ${dbName}`, E.toError)
             )
         );
 
@@ -226,7 +217,6 @@ function createEmbeddedPostgresTE(options: { projectDir: string }) {
             return x;
         }),
         TE.bind("sql", () => TE.right(connectPg(adminUrl))),
-        // TE.chainFirst(({ client }) => TE.tryCatch(() => client.connect(), E.toError)),
         TE.chainFirst(({ sql }) => {
             return recreateDatabaseTE(sql);
         }),
@@ -250,12 +240,10 @@ function isPostmasterAlive(path: string) {
 }
 
 function tryTerminatePostmaster(path: string) {
-    console.log("Terminating postmaster");
     const pid = getPostmasterPid(path);
-    console.log("Terminating postmaster", pid);
 
     if (pid !== undefined) {
-        console.log(`Terminating postmaster with pid: ${pid}`);
+        customLog.info("terminating postmaster", pid);
         process.kill(pid, "SIGQUIT");
     }
 

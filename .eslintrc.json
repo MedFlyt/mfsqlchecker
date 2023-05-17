@@ -22,7 +22,7 @@
     "rules": {
         "local-rules/sql-check": ["error", {
             "configFile": "demo/mfsqlchecker.json",
-            "migrationsDir": "../medflyt_server2/sql/migrations"
+            "migrationsDir": "demo/migrations"
         }],
         "@typescript-eslint/no-namespace": "off",
         "@typescript-eslint/no-inferrable-types": "off",

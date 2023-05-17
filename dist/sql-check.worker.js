@@ -251,7 +251,7 @@ function pad(str, width, z) {
   return str.length >= width ? str : new Array(width - str.length + 1).join(z) + str;
 }
 
-// eslint-local-rules/rules/sql-check.errors.ts
+// eslint-local-rules/utils/errors.ts
 var RunnerError = class extends Error {
   _tag = "RunnerError";
   constructor(message) {
@@ -770,16 +770,15 @@ function testDatabaseName() {
   });
 }
 
-// eslint-local-rules/rules/DbConnector.ts
+// eslint-local-rules/utils/query-runner.ts
 var import_assert_never5 = require("assert-never");
 var import_chalk5 = __toESM(require("chalk"));
-var import_cli_progress = require("cli-progress");
+var E2 = __toESM(require("fp-ts/Either"));
+var import_function2 = require("fp-ts/function");
+var TE = __toESM(require("fp-ts/TaskEither"));
 var fs4 = __toESM(require("fs"));
 var path3 = __toESM(require("path"));
 var import_tiny_invariant = __toESM(require("tiny-invariant"));
-var TE = __toESM(require("fp-ts/TaskEither"));
-var E2 = __toESM(require("fp-ts/Either"));
-var import_function2 = require("fp-ts/function");
 
 // mfsqlchecker/source_maps.ts
 function resolveFromSourceMap(fileContents, position, sourceMap) {
@@ -828,7 +827,7 @@ var customLog = {
   }
 };
 
-// eslint-local-rules/rules/DbConnector.ts
+// eslint-local-rules/utils/query-runner.ts
 var QueryRunner = class {
   migrationsDir;
   client;
@@ -872,7 +871,7 @@ var QueryRunner = class {
       await this.dropViews();
     }
     this.prevStrictDateTimeChecking = params.strictDateTimeChecking;
-    let queryErrors2 = [];
+    let queryErrors = [];
     const [updated, newViewNames] = await updateViews(
       this.client,
       params.strictDateTimeChecking,
@@ -886,9 +885,9 @@ var QueryRunner = class {
     for (const [viewName, viewAnswer] of this.viewNames) {
       const createView = params.sqlViews.find((x) => x.viewName === viewName);
       (0, import_tiny_invariant.default)(createView !== void 0, `view ${viewName} not found (probably a bug).`);
-      queryErrors2 = queryErrors2.concat(viewAnswerToErrorDiagnostics(createView, viewAnswer));
+      queryErrors = queryErrors.concat(viewAnswerToErrorDiagnostics(createView, viewAnswer));
     }
-    return queryErrors2;
+    return queryErrors;
   }
   async initialize(params) {
     this.queryCache = new QueryMap();
@@ -909,7 +908,7 @@ var QueryRunner = class {
       const allFiles = await readdirAsync(this.migrationsDir);
       const matchingFiles = allFiles.filter(isMigrationFile).sort();
       for (const matchingFile of matchingFiles) {
-        customLog.success("running migration", matchingFile);
+        customLog.info("running migration", matchingFile);
         const text = await readFileAsync(path3.join(this.migrationsDir, matchingFile));
         try {
           await this.client.unsafe(text);
@@ -981,127 +980,6 @@ var QueryRunner = class {
   }
   async end() {
     await this.client.end();
-  }
-  async x() {
-    const queriesProgressBar = new import_cli_progress.Bar(
-      {
-        clearOnComplete: true,
-        etaBuffer: 50
-      },
-      import_cli_progress.Presets.legacy
-    );
-    queriesProgressBar.start(manifest.queries.length, 0);
-    try {
-      let i = 0;
-      for (const query of manifest.queries) {
-        switch (query.type) {
-          case "ResolvedSelect": {
-            const cachedResult = this.queryCache.get(
-              query.value.text,
-              query.value.colTypes
-            );
-            if (cachedResult !== void 0) {
-              queryErrors = queryErrors.concat(
-                queryAnswerToErrorDiagnostics(
-                  query.value,
-                  cachedResult,
-                  manifest.colTypesFormat
-                )
-              );
-              newQueryCache.set(query.value.text, query.value.colTypes, cachedResult);
-            } else {
-              const result = await processQuery(
-                this.client,
-                manifest.colTypesFormat,
-                this.pgTypes,
-                this.tableColsLibrary,
-                this.uniqueColumnTypes,
-                query.value
-              );
-              newQueryCache.set(query.value.text, query.value.colTypes, result);
-              queryErrors = queryErrors.concat(
-                queryAnswerToErrorDiagnostics(
-                  query.value,
-                  result,
-                  manifest.colTypesFormat
-                )
-              );
-            }
-            break;
-          }
-          case "ResolvedInsert": {
-            const cachedResult = this.insertCache.get(
-              query.value.text,
-              query.value.colTypes,
-              query.value.tableName,
-              query.value.insertColumns
-            );
-            if (cachedResult !== void 0) {
-              queryErrors = queryErrors.concat(
-                insertAnswerToErrorDiagnostics(
-                  query.value,
-                  cachedResult,
-                  manifest.colTypesFormat
-                )
-              );
-              newInsertCache.set(
-                query.value.text,
-                query.value.colTypes,
-                query.value.tableName,
-                query.value.insertColumns,
-                cachedResult
-              );
-            } else {
-              const result = await processInsert(
-                this.client,
-                manifest.colTypesFormat,
-                this.pgTypes,
-                this.tableColsLibrary,
-                this.uniqueColumnTypes,
-                query.value
-              );
-              newInsertCache.set(
-                query.value.text,
-                query.value.colTypes,
-                query.value.tableName,
-                query.value.insertColumns,
-                result
-              );
-              queryErrors = queryErrors.concat(
-                insertAnswerToErrorDiagnostics(
-                  query.value,
-                  result,
-                  manifest.colTypesFormat
-                )
-              );
-            }
-            break;
-          }
-          default:
-            (0, import_assert_never5.assertNever)(query);
-        }
-        queriesProgressBar.update(++i);
-      }
-    } finally {
-      queriesProgressBar.stop();
-    }
-    await this.client.unsafe("ROLLBACK");
-    this.queryCache = newQueryCache;
-    this.insertCache = newInsertCache;
-    let finalErrors = [];
-    for (const query of manifest.queries) {
-      switch (query.type) {
-        case "ResolvedSelect":
-          finalErrors = finalErrors.concat(query.value.errors);
-          break;
-        case "ResolvedInsert":
-          finalErrors = finalErrors.concat(query.value.errors);
-          break;
-        default:
-          (0, import_assert_never5.assertNever)(query);
-      }
-    }
-    return finalErrors.concat(queryErrors);
   }
   async dropViews() {
     for (let i = this.viewNames.length - 1; i >= 0; --i) {
@@ -2307,20 +2185,19 @@ function formatPgError(error) {
 }
 
 // eslint-local-rules/rules/sql-check.utils.ts
-var QUERY_METHOD_NAMES = /* @__PURE__ */ new Set(["query", "queryOne", "queryOneOrNone"]);
-var INSERT_METHOD_NAMES = /* @__PURE__ */ new Set(["insert", "insertMaybe"]);
-var VALID_METHOD_NAMES = /* @__PURE__ */ new Set([...QUERY_METHOD_NAMES, ...INSERT_METHOD_NAMES]);
 function initializeTE(params) {
   return (0, import_function3.pipe)(
     TE2.Do,
     TE2.bindW("options", () => {
       customLog.success("loading config file");
-      return initOptionsTE({
-        projectDir: params.projectDir,
-        configFile: params.configFile,
-        migrationsDir: params.migrationsDir,
-        postgresConnection: null
-      });
+      return TE2.fromEither(
+        initOptionsE({
+          projectDir: params.projectDir,
+          configFile: params.configFile,
+          migrationsDir: params.migrationsDir,
+          postgresConnection: null
+        })
+      );
     }),
     TE2.bindW("server", ({ options }) => {
       customLog.success("initializing pg server");
@@ -2347,9 +2224,6 @@ function initializeTE(params) {
       return x instanceof Error ? new RunnerError(x.message) : x;
     })
   );
-}
-function initOptionsTE(options) {
-  return TE2.fromEither(initOptionsE(options));
 }
 function initOptionsE(options) {
   if (options.postgresConnection !== null && !isTestDatabaseCluster(options.postgresConnection.url)) {
@@ -2402,10 +2276,7 @@ function initOptionsE(options) {
       new Error("migrations-dir is missing. Must be set in config file or command line")
     );
   }
-  return E3.right({
-    ...options,
-    migrationsDir
-  });
+  return E3.right({ ...options, migrationsDir });
 }
 var MIN_PORT = 49152;
 var MAX_PORT = 65534;
@@ -2425,20 +2296,20 @@ function createEmbeddedPostgresTE(options) {
     persistent: false
   });
   const adminUrl = `postgres://${postgresOptions.user}:${postgresOptions.password}@localhost:${postgresOptions.port}/postgres`;
-  const testDbName = "test_eliya";
+  const testDbName = "shadow_database";
   const shouldInitialize = !import_fs2.default.existsSync(databaseDir);
   const conditionalInitializeAndStartTE = shouldInitialize ? TE2.tryCatch(() => pg.initialise(), E3.toError) : TE2.right(void 0);
   const recreateDatabaseTE = (sql) => (0, import_function3.pipe)(
     TE2.Do,
-    TE2.bind("dbName", () => TE2.right(sql(testDbName).value)),
+    TE2.bind("dbName", () => TE2.right(sql(testDbName))),
     TE2.chainFirst(({ dbName }) => {
       return TE2.tryCatch(
-        () => sql.unsafe(`DROP DATABASE IF EXISTS ${dbName} WITH (FORCE)`),
+        () => sql`DROP DATABASE IF EXISTS ${dbName} WITH (FORCE)`,
         E3.toError
       );
     }),
     TE2.chainFirst(
-      ({ dbName }) => TE2.tryCatch(() => sql.unsafe(`CREATE DATABASE ${dbName}`), E3.toError)
+      ({ dbName }) => TE2.tryCatch(() => sql`CREATE DATABASE ${dbName}`, E3.toError)
     )
   );
   return (0, import_function3.pipe)(
@@ -2451,7 +2322,6 @@ function createEmbeddedPostgresTE(options) {
       return x;
     }),
     TE2.bind("sql", () => TE2.right(connectPg(adminUrl))),
-    // TE.chainFirst(({ client }) => TE.tryCatch(() => client.connect(), E.toError)),
     TE2.chainFirst(({ sql }) => {
       return recreateDatabaseTE(sql);
     }),
@@ -2471,11 +2341,9 @@ function isPostmasterAlive(path5) {
   }
 }
 function tryTerminatePostmaster(path5) {
-  console.log("Terminating postmaster");
   const pid = getPostmasterPid(path5);
-  console.log("Terminating postmaster", pid);
   if (pid !== void 0) {
-    console.log(`Terminating postmaster with pid: ${pid}`);
+    customLog.info("terminating postmaster", pid);
     process.kill(pid, "SIGQUIT");
   }
   return E3.right(void 0);
