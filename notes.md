@@ -17,7 +17,12 @@ TODO:
  - [x] fragments
  - [x] load all views before initialization (or load on demand. feels buggy on cross-file reference).
  - [x] test on medflyt_server2
- - cleanup
+ - [x] cleanup
+    - [x] monorepo - split to multiple packages [core, client, eslint-plugin, demo]
+    - [x] setup dev mode
+    - [x] setup build mode
+    - [x] load config ones. no duplicate settings (e.g. migrationsDir)
+    - [x] postgresVersion?
  - tests
  - publish as separate package
  - publish as new repository

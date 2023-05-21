@@ -1,0 +1,1 @@
+// https://typescript-eslint.io/custom-rules#testing-typed-rules

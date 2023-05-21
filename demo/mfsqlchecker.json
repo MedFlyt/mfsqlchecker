@@ -1,6 +1,5 @@
 {
     "migrationsDir": "migrations",
-    "postgresVersion": "11.5",
     "uniqueTableColumnTypes": [
         {
             "typeScriptTypeName": "DepartmentId",

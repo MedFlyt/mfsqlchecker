@@ -1,7 +1,6 @@
 {
+    "extends" : "../tsconfig.base.json",
     "compilerOptions": {
-        "outDir": "../build/demo",
-
         "sourceMap": true,
         "inlineSources": true,
         

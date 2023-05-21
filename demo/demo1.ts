@@ -1,5 +1,5 @@
 import { LocalDate } from "@js-joda/core";
-import { Req, Opt } from "../lib/mfsqltool";
+import { Req, Opt } from "@mfsqlchecker/client";
 import { Conn, defineSqlView } from "./core";
 import { DepartmentId, EmployeeId } from "./types";
 

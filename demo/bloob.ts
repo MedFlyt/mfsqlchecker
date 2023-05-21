@@ -1,4 +1,4 @@
-import { Req, Opt } from "../lib/mfsqltool";
+import { Req, Opt } from "@mfsqlchecker/client";
 import { Conn } from "./core";
 import { EmployeeId, CarId, CustomerId } from "./types";
 

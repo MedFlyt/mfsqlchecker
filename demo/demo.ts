@@ -1,5 +1,5 @@
 import * as pg from "pg";
-import { Req, Opt, migrateDatabase, sqlFrag } from "../lib/mfsqltool";
+import { Req, Opt, migrateDatabase, sqlFrag } from "@mfsqlchecker/client";
 import { Conn, defineSqlView } from "./core";
 import { EmployeeId, CarId, CustomerId, DepartmentId } from "./types";
 

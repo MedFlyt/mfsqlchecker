@@ -1,0 +1,32 @@
+{
+  "name": "@mfsqlchecker/client",
+  "version": "0.0.1",
+  "description": "A compatible client library for mfsqlchecker",
+  "main": "lib/index.js",
+  "types": "src/index.ts",
+  "scripts": {
+    "typecheck": "tsc",
+    "build": "tsup",
+    "dev": "tsup --watch"
+  },
+  "author": "MedFlyt LLC.",
+  "license": "MIT",
+  "homepage": "https://github.com/MedFlyt/mfsqlchecker#readme",
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@types/pg": "8.6.6",
+    "@types/stack-trace": "0.0.29",
+    "pg": "8.11.0",
+    "stack-trace": "0.0.10"
+  },
+  "devDependencies": {
+    "@types/node": "18.11.13",
+    "@typescript-eslint/eslint-plugin": "^5.59.6",
+    "@typescript-eslint/parser": "^5.59.6",
+    "eslint": "^8.40.0",
+    "tsup": "^6.7.0",
+    "typescript": "5.0.4"
+  }
+}
