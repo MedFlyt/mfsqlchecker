@@ -1,13 +1,3 @@
-http://willbryant.net/software/mac_os_x/postgres_initdb_fatal_shared_memory_error_on_leopard
-
-➜  mfsqlchecker git:(feature-mfsqlchecker-eslint) ✗ sudo sysctl -w kern.sysv.shmall=65536
-
-kern.sysv.shmall: 1024 -> 65536
-➜  mfsqlchecker git:(feature-mfsqlchecker-eslint) ✗ sudo sysctl -w kern.sysv.shmmax=16777216
-
-kern.sysv.shmmax: 4194304 -> 16777216
-
-
 TODO:
  - [x] ...
  - [x] lookup views
@@ -23,27 +13,19 @@ TODO:
     - [x] setup build mode
     - [x] load config ones. no duplicate settings (e.g. migrationsDir)
     - [x] postgresVersion?
- - tests
- - publish as separate package
- - publish as new repository
+ - [x] tests
+ - [x] publish as separate package
+ - [x] publish as new repository
+ - [ ] ci
+ - [ ] cd
 
 
+## had to run in on mac (m1)
+http://willbryant.net/software/mac_os_x/postgres_initdb_fatal_shared_memory_error_on_leopard
 
-<!-- make sure to add it to the worker -->
-```
-const [updated, newViewNames] = await updateViews(this.client, manifest.strictDateTimeChecking, this.viewNames, manifest.viewLibrary);
+➜  ✗ sudo sysctl -w kern.sysv.shmall=65536
 
-if (updated) {
-    await this.tableColsLibrary.refreshViews(this.client);
-}
+kern.sysv.shmall: 1024 -> 65536
+➜  ✗ sudo sysctl -w kern.sysv.shmmax=16777216
 
-this.viewNames = newViewNames;
-
-for (const [viewName, viewAnswer] of this.viewNames) {
-    const createView = manifest.viewLibrary.find(x => x.viewName === viewName);
-    if (createView === undefined) {
-        throw new Error("The Impossible Happened");
-    }
-    queryErrors = queryErrors.concat(viewAnswerToErrorDiagnostics(createView, viewAnswer));
-}
-```
+kern.sysv.shmmax: 4194304 -> 16777216
