@@ -9,6 +9,7 @@ import {
     SrcSpan,
     TypeScriptType,
     buildInsertCallExpression,
+    buildInsertManyCallExpression,
     buildQueryCallExpression,
     codeFrameFormatter,
     getSqlViews,
@@ -23,7 +24,7 @@ import path from "path";
 import "source-map-support/register";
 import { TsRunner, createSyncFn } from "synckit";
 import invariant from "tiny-invariant";
-import { Program, SourceFile, TypeChecker } from "typescript";
+import { TypeChecker } from "typescript";
 import { z } from "zod";
 import zodToJsonSchema from "zod-to-json-schema";
 import { createRule } from "../utils/create-rule";
@@ -31,8 +32,8 @@ import { InvalidQueryError, RunnerError } from "../utils/errors";
 import { E, J, flow, pipe } from "../utils/fp-ts";
 import { customLog } from "../utils/log";
 import { memoize } from "../utils/memoize";
-import { locateNearestPackageJsonDir } from "./sql-check.utils";
 import { WorkerParams, WorkerResult } from "./sql-check.worker";
+import { locateNearestPackageJsonDir } from "../utils/locate-nearest-package-json-dir";
 
 const messages = {
     missing: "Missing: {{value}}",
@@ -67,7 +68,7 @@ export const sqlCheckRule = createRule({
     defaultOptions: [{ configFile: "mfsqlchecker.json" }],
     create(context) {
         const projectDir = memoize({
-            key: context.getFilename(),
+            key: context.getCwd?.() + "-package-json",
             value: () => locateNearestPackageJsonDir(context.getFilename())
         });
 
@@ -353,10 +354,11 @@ function checkQueryExpression(params: {
     );
 
     if (E.isLeft(resolvedE)) {
-        return context.report({
-            node: node,
-            messageId: "invalid",
-            data: { value: printError(resolvedE.left.message, context.options[0].colors) }
+        return reportDiagnostics({
+            context,
+            node,
+            diagnostics: resolvedE.left.diagnostics,
+            calleeProperty
         });
     }
 
@@ -442,7 +444,22 @@ function mapSrcSpanToLoc(
     }
 }
 
+const buildInsertCallExpressionE = flow(
+    buildInsertCallExpression,
+    toFpTsEither,
+    E.mapLeft(InvalidQueryError.to)
+);
+
+const buildInsertManyCallExpressionE = flow(
+    buildInsertManyCallExpression,
+    toFpTsEither,
+    E.mapLeft(InvalidQueryError.to)
+);
+
+const resolveInsertManyE = flow(resolveInsertMany, toFpTsEither, E.mapLeft(InvalidQueryError.to));
+
 function checkInsertExpression(params: {
+    type: "INSERT" | "INSERT_MANY";
     context: RuleContext;
     parser: ParserServices;
     checker: TypeChecker;
@@ -455,7 +472,7 @@ function checkInsertExpression(params: {
         return;
     }
 
-    const { context, parser, checker, node, calleeProperty, projectDir } = params;
+    const { type, context, parser, checker, node, calleeProperty, projectDir } = params;
     const tsNode = parser.esTreeNodeToTSNodeMap.get(node);
 
     const { tsUniqueTableColumnTypes, viewLibrary } = cache;
@@ -463,21 +480,16 @@ function checkInsertExpression(params: {
     invariant(tsUniqueTableColumnTypes !== undefined, "tsUniqueTableColumnTypes");
     invariant(viewLibrary !== undefined, "viewLibrary");
 
-    const buildInsertCallExpressionE = flow(
-        buildInsertCallExpression,
-        toFpTsEither,
-        E.mapLeft(InvalidQueryError.to)
-    );
-
-    const resolveInsertManyE = flow(
-        resolveInsertMany,
-        toFpTsEither,
-        E.mapLeft(InvalidQueryError.to)
-    );
-
     pipe(
         E.Do,
-        E.chain(() => buildInsertCallExpressionE(checker, calleeProperty.name, tsNode)),
+        E.chain(() => {
+            switch (type) {
+                case "INSERT":
+                    return buildInsertCallExpressionE(checker, calleeProperty.name, tsNode);
+                case "INSERT_MANY":
+                    return buildInsertManyCallExpressionE(checker, calleeProperty.name, tsNode);
+            }
+        }),
         E.chain((query) => {
             return resolveInsertManyE(
                 tsUniqueTableColumnTypes,
@@ -566,7 +578,9 @@ function checkCallExpression(params: {
                 calleeProperty: callExpression.calleeProperty
             });
         case "INSERT":
+        case "INSERT_MANY":
             return checkInsertExpression({
+                type: callExpression.type,
                 context,
                 parser,
                 checker,
@@ -639,36 +653,20 @@ function getCallExpressionValidity(node: TSESTree.CallExpression) {
             argument: argument
         });
     }
+
     if (INSERT_METHOD_NAMES.has(node.callee.property.name)) {
-        const tableNameArgument = node.arguments.at(0);
-        const valueArgument = node.arguments.at(1);
-        const epilogueArgument = node.arguments.at(2);
-
-        if (tableNameArgument?.type !== TSESTree.AST_NODE_TYPES.Literal) {
-            return E.left("TABLE_NAME_ARGUMENT_NOT_LITERAL");
-        }
-
-        if (valueArgument?.type !== TSESTree.AST_NODE_TYPES.ObjectExpression) {
-            return E.left("VALUE_ARGUMENT_NOT_OBJECT_EXPRESSION");
-        }
-
-        if (
-            epilogueArgument !== undefined &&
-            epilogueArgument?.type !== TSESTree.AST_NODE_TYPES.TaggedTemplateExpression
-        ) {
-            return E.left("EPILOGUE_ARGUMENT_NOT_TAGGED_TEMPLATE_EXPRESSION");
-        }
-
         return E.right({
             type: "INSERT" as const,
             callee: node.callee,
-            calleeProperty: node.callee.property,
-            // TODO @Newbie012 - do we really need this?
-            arguments: {
-                tableName: tableNameArgument,
-                value: valueArgument,
-                epilogue: epilogueArgument
-            }
+            calleeProperty: node.callee.property
+        });
+    }
+
+    if (node.callee.property.name === "insertMany") {
+        return E.right({
+            type: "INSERT_MANY" as const,
+            callee: node.callee,
+            calleeProperty: node.callee.property
         });
     }
 

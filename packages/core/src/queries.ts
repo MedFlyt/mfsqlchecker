@@ -267,9 +267,7 @@ export function buildQueryCallExpression(methodName: string, node: ts.CallExpres
     }
 
     const sourceFile = node.getSourceFile();
-
     const [typeArgument, typeArgumentSpan] = buildTypeArgumentData(sourceFile, node);
-
     const sqlExp: ts.Expression = node.arguments[0];
     const queryFragments = buildQueryFragments(sqlExp);
     switch (queryFragments.type) {
@@ -372,7 +370,7 @@ export function buildInsertCallExpression(checker: ts.TypeChecker, methodName: s
     }
 }
 
-function buildInsertManyCallExpression(checker: ts.TypeChecker, methodName: string, node: ts.CallExpression): Either<ErrorDiagnostic[], InsertManyExpression> {
+export function buildInsertManyCallExpression(checker: ts.TypeChecker, methodName: string, node: ts.CallExpression): Either<ErrorDiagnostic[], InsertManyExpression> {
     if (node.arguments.length < 2) {
         // The TypeScript typechecker will catch this error, so we don't need
         // to emit our own error message
@@ -452,113 +450,6 @@ function buildInsertManyCallExpression(checker: ts.TypeChecker, methodName: stri
                 }
             };
     }
-}
-
-export function findAllQueryCalls(typeScriptUniqueColumnTypes: Map<TypeScriptType, SqlType>, projectDir: string, checker: ts.TypeChecker, lookupViewName: (qualifiedSqlViewName: QualifiedSqlViewName) => string | undefined, sourceFile: ts.SourceFile): [ResolvedQuery[], ErrorDiagnostic[]] {
-    const resolvedQueries: ResolvedQuery[] = [];
-    const errorDiagnostics: ErrorDiagnostic[] = [];
-
-    function visit(node: ts.Node) {
-        if (ts.isCallExpression(node)) {
-            if (ts.isPropertyAccessExpression(node.expression)) {
-                if (ts.isIdentifier(node.expression.name)) {
-                    const queryMethodNames = ["query", "queryOne", "queryOneOrNone"];
-                    const insertMethodNames = ["insert", "insertMaybe"];
-                    if (queryMethodNames.indexOf(node.expression.name.text) >= 0) {
-                        const type = checker.getTypeAtLocation(node.expression.expression);
-                        if (type.getProperty("MfConnectionTypeTag") !== undefined) {
-                            const query = buildQueryCallExpression(node.expression.name.text, node);
-                            switch (query.type) {
-                                case "Left":
-                                    for (const e of query.value) {
-                                        errorDiagnostics.push(e);
-                                    }
-                                    break;
-                                case "Right":
-                                    const resolvedQuery = resolveQueryFragment(typeScriptUniqueColumnTypes, projectDir, checker, query.value, lookupViewName);
-                                    switch (resolvedQuery.type) {
-                                        case "Left":
-                                            for (const e of resolvedQuery.value) {
-                                                errorDiagnostics.push(e);
-                                            }
-                                            break;
-                                        case "Right":
-                                            resolvedQueries.push({
-                                                type: "ResolvedSelect",
-                                                value: resolvedQuery.value
-                                            });
-                                            break;
-                                    }
-                                    break;
-                            }
-                        }
-                    } else if (node.expression.name.text === "insertMany") {
-                        const type = checker.getTypeAtLocation(node.expression.expression);
-                        if (type.getProperty("MfConnectionTypeTag") !== undefined) {
-                            const query = buildInsertManyCallExpression(checker, node.expression.name.text, node);
-                            switch (query.type) {
-                                case "Left":
-                                    for (const e of query.value) {
-                                        errorDiagnostics.push(e);
-                                    }
-                                    break;
-                                case "Right":
-                                    const resolvedQuery = resolveInsertMany(typeScriptUniqueColumnTypes, projectDir, checker, query.value, lookupViewName);
-                                    switch (resolvedQuery.type) {
-                                        case "Left":
-                                            for (const e of resolvedQuery.value) {
-                                                errorDiagnostics.push(e);
-                                            }
-                                            break;
-                                        case "Right":
-                                            resolvedQueries.push({
-                                                type: "ResolvedInsert",
-                                                value: resolvedQuery.value
-                                            });
-                                            break;
-                                    }
-                                    break;
-                            }
-                        }
-                    } else if (insertMethodNames.indexOf(node.expression.name.text) >= 0) {
-                        const type = checker.getTypeAtLocation(node.expression.expression);
-                        if (type.getProperty("MfConnectionTypeTag") !== undefined) {
-                            const query = buildInsertCallExpression(checker, node.expression.name.text, node);
-                            switch (query.type) {
-                                case "Left":
-                                    for (const e of query.value) {
-                                        errorDiagnostics.push(e);
-                                    }
-                                    break;
-                                case "Right":
-                                    const resolvedQuery = resolveInsertMany(typeScriptUniqueColumnTypes, projectDir, checker, query.value, lookupViewName);
-                                    switch (resolvedQuery.type) {
-                                        case "Left":
-                                            for (const e of resolvedQuery.value) {
-                                                errorDiagnostics.push(e);
-                                            }
-                                            break;
-                                        case "Right":
-                                            resolvedQueries.push({
-                                                type: "ResolvedInsert",
-                                                value: resolvedQuery.value
-                                            });
-                                            break;
-                                    }
-                                    break;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        ts.forEachChild(node, visit);
-    }
-
-    ts.forEachChild(sourceFile, visit);
-
-    return [resolvedQueries, errorDiagnostics];
 }
 
 function isTypeSqlView(type: ts.Type): boolean {
@@ -949,6 +840,24 @@ function getTypeMemberColTypes(checker: ts.TypeChecker, node: ts.Node, propName:
     }
 }
 
+const DEFAULT_TYPE_CHECKING_SLOW_THRESHOLD_MS = 700;
+
+function getTypeCheckingSlowThresholdMs(): number {
+    const envVar = process.env.TYPE_CHECKING_SLOW_THRESHOLD_MS;
+
+    if (envVar === undefined) {
+        return DEFAULT_TYPE_CHECKING_SLOW_THRESHOLD_MS;
+    }
+
+    const val = parseInt(envVar);
+
+    if (isNaN(val)) {
+        return DEFAULT_TYPE_CHECKING_SLOW_THRESHOLD_MS;
+    }
+
+    return val;
+}
+
 export function resolveQueryFragment(typeScriptUniqueColumnTypes: Map<TypeScriptType, SqlType>, projectDir: string, checker: ts.TypeChecker, query: QueryCallExpression, lookupViewName: (qualifiedSqlViewName: QualifiedSqlViewName) => string | undefined): Either<ErrorDiagnostic[], ResolvedSelect> {
     const errors: ErrorDiagnostic[] = [];
 
@@ -962,7 +871,19 @@ export function resolveQueryFragment(typeScriptUniqueColumnTypes: Map<TypeScript
                 text += frag.text;
                 break;
             case "Expression":
+                const now = Date.now()
                 const type = checker.getTypeAtLocation(frag.exp);
+                const duration = Date.now() - now;
+
+                if (duration > getTypeCheckingSlowThresholdMs()) {
+                    errors.push(
+                        nodeErrorDiagnostic(
+                            frag.exp,
+                            `Type checking took ${duration}ms, this could be improved by moving the expression into a variable or manually specifying the type`
+                        )
+                    );
+                }
+
                 const maybeSqlFrag = tryTypeSqlFrag(type);
                 switch (maybeSqlFrag.type) {
                     case "Left":

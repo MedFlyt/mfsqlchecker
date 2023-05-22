@@ -1,18 +1,17 @@
 import {
-    calcDbMigrationsHash,
-    closePg,
     ColNullability,
+    ColTypesFormat,
     connectPg,
     connReplaceDbName,
-    createBlankDatabase,
+    defaultColTypesFormat,
     dropAllFunctions,
     dropAllSequences,
     dropAllTables,
     dropAllTypes,
-    dropDatabase,
     ErrorDiagnostic,
     escapeIdentifier,
     isMigrationFile,
+    makeUniqueColumnTypes,
     parsePostgreSqlError,
     pgDescribeQuery,
     PostgreSqlError,
@@ -24,27 +23,21 @@ import {
     resolveFromSourceMap,
     SqlCreateView,
     SqlType,
+    sqlUniqueTypeName,
     SrcSpan,
     testDatabaseName,
     toSrcSpan,
-    TypeScriptType
+    TypeScriptType,
+    UniqueTableColumnType
 } from "@mfsqlchecker/core";
 import chalk from "chalk";
 import fs from "fs";
 import path from "path";
 import postgres from "postgres";
 import invariant from "tiny-invariant";
-import {
-    ColTypesFormat,
-    defaultColTypesFormat,
-    equalsUniqueTableColumnTypes,
-    makeUniqueColumnTypes,
-    sqlUniqueTypeName,
-    UniqueTableColumnType
-} from "@mfsqlchecker/core";
 import { InvalidQueryError } from "./errors";
-import { customLog } from "./log";
 import { E, pipe, TE } from "./fp-ts";
+import { customLog } from "./log";
 
 type QueryRunnerConfig = {
     migrationsDir: string;
@@ -60,29 +53,18 @@ export class QueryRunner {
         this.client = config.client;
     }
 
-    static async Connect(params: {
-        sql: postgres.Sql;
-        adminUrl: string;
-        name?: string;
-        migrationsDir: string;
-    }) {
-        const client = await newConnect(params.sql, params.adminUrl, params.name);
+    static async Connect(params: { adminUrl: string; name?: string; migrationsDir: string }) {
+        const client = await newConnect(params.adminUrl, params.name);
         return new QueryRunner({ migrationsDir: params.migrationsDir, client });
     }
 
-    static ConnectTE(params: {
-        sql: postgres.Sql;
-        adminUrl: string;
-        name?: string;
-        migrationsDir: string;
-    }) {
+    static ConnectTE(params: { adminUrl: string; name?: string; migrationsDir: string }) {
         return pipe(
             TE.tryCatch(() => QueryRunner.Connect(params), E.toError),
             TE.mapLeft(formatPgError)
         );
     }
 
-    private dbMigrationsHash: string = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
     private prevUniqueTableColumnTypes: UniqueTableColumnType[] = [];
     private queryCache = new QueryMap<SelectAnswer>();
     private insertCache = new InsertMap<InsertAnswer>();
@@ -96,6 +78,7 @@ export class QueryRunner {
         uniqueTableColumnTypes: UniqueTableColumnType[];
         strictDateTimeChecking: boolean;
         sqlViews: SqlCreateView[];
+        reset: boolean;
     }): TE.TaskEither<Error | InvalidQueryError, undefined> {
         return pipe(
             TE.Do,
@@ -146,22 +129,17 @@ export class QueryRunner {
         uniqueTableColumnTypes: UniqueTableColumnType[];
         strictDateTimeChecking: boolean;
         sqlViews: SqlCreateView[];
+        reset: boolean;
     }) {
-        this.queryCache = new QueryMap<SelectAnswer>();
-        this.insertCache = new InsertMap<InsertAnswer>();
+        if (!params.reset) {
+            customLog.info("skipping database reset");
+        }
 
-        const hash = await calcDbMigrationsHash(this.migrationsDir);
+        this.prevUniqueTableColumnTypes = params.uniqueTableColumnTypes;
+        this.uniqueColumnTypes = makeUniqueColumnTypes(this.prevUniqueTableColumnTypes);
+        customLog.info("done make unique column types");
 
-        if (
-            this.dbMigrationsHash !== hash ||
-            !equalsUniqueTableColumnTypes(
-                params.uniqueTableColumnTypes,
-                this.prevUniqueTableColumnTypes
-            )
-        ) {
-            this.dbMigrationsHash = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
-            this.queryCache.clear();
-            this.insertCache.clear();
+        if (params.reset) {
             await this.dropViews();
 
             await dropAllTables(this.client);
@@ -195,35 +173,30 @@ export class QueryRunner {
                     return [errorDiagnostic];
                 }
             }
-
-            this.prevUniqueTableColumnTypes = params.uniqueTableColumnTypes;
-
-            this.uniqueColumnTypes = makeUniqueColumnTypes(this.prevUniqueTableColumnTypes);
             customLog.success("start applying unique table column types...");
             await applyUniqueTableColumnTypes(this.client, this.prevUniqueTableColumnTypes);
             customLog.success("done applying unique table column types");
+        }
 
-            await this.tableColsLibrary.refreshTables(this.client);
+        await this.tableColsLibrary.refreshTables(this.client);
+        customLog.info("done refresh tables");
 
-            this.pgTypes = new Map<number, SqlType>();
-            const pgTypesResult = await this.client.unsafe(
-                `
+        this.pgTypes = new Map<number, SqlType>();
+        const pgTypesResult = await this.client.unsafe(
+            `
                 SELECT
                     oid,
                     typname
                 FROM pg_type
                 ORDER BY oid
                 `
-            );
-            for (const row of pgTypesResult) {
-                const oid: number = row["oid"];
-                const typname: string = row["typname"];
-                this.pgTypes.set(oid, SqlType.wrap(typname));
-            }
-            this.dbMigrationsHash = hash;
+        );
+        for (const row of pgTypesResult) {
+            const oid: number = row["oid"];
+            const typname: string = row["typname"];
+            this.pgTypes.set(oid, SqlType.wrap(typname));
         }
-
-        const diagnostics = await this.updateViews(params);
+        customLog.info("done pg types");
 
         // We modify the system catalogs only inside a transaction, so that we
         // can ROLLBACK the changes later. This is needed so that in the
@@ -233,35 +206,97 @@ export class QueryRunner {
 
         if (params.strictDateTimeChecking) {
             await modifySystemCatalogs(this.client);
+            customLog.info("done modify system catalogs");
         }
+
+        const diagnostics = await this.updateViews(params);
+        customLog.info("done update views");
 
         return diagnostics;
     }
 
-    async runQuery(params: { resolved: ResolvedSelect }) {
-        const answer = await processQuery(
-            this.client,
-            defaultColTypesFormat,
-            this.pgTypes,
-            this.tableColsLibrary,
-            this.uniqueColumnTypes,
-            params.resolved
-        );
+    runQueryTE(params: { resolved: ResolvedSelect }) {
+        const { resolved } = params;
+        const cached = this.queryCache.get(resolved.text, resolved.colTypes);
 
-        return queryAnswerToErrorDiagnostics(params.resolved, answer, defaultColTypesFormat);
+        if (cached !== undefined) {
+            return TE.right(
+                queryAnswerToErrorDiagnostics(params.resolved, cached, defaultColTypesFormat)
+            );
+        }
+
+        return pipe(
+            TE.Do,
+            TE.chain(() =>
+                TE.tryCatch(() => {
+                    return processQuery(
+                        this.client,
+                        defaultColTypesFormat,
+                        this.pgTypes,
+                        this.tableColsLibrary,
+                        this.uniqueColumnTypes,
+                        params.resolved
+                    );
+                }, E.toError)
+            ),
+            TE.map((answer) => {
+                this.queryCache.set(resolved.text, resolved.colTypes, answer);
+
+                return queryAnswerToErrorDiagnostics(
+                    params.resolved,
+                    answer,
+                    defaultColTypesFormat
+                );
+            })
+        );
     }
 
-    async runInsert(params: { resolved: ResolvedInsert }) {
-        const answer = await processInsert(
-            this.client,
-            defaultColTypesFormat,
-            this.pgTypes,
-            this.tableColsLibrary,
-            this.uniqueColumnTypes,
-            params.resolved
+    runInsertTE(params: { resolved: ResolvedInsert }) {
+        const { resolved } = params;
+
+        const cached = this.insertCache.get(
+            resolved.text,
+            resolved.colTypes,
+            resolved.tableName,
+            resolved.insertColumns
         );
 
-        return insertAnswerToErrorDiagnostics(params.resolved, answer, defaultColTypesFormat);
+        if (cached !== undefined) {
+            return TE.right(
+                insertAnswerToErrorDiagnostics(params.resolved, cached, defaultColTypesFormat)
+            );
+        }
+
+        return pipe(
+            TE.Do,
+            TE.chain(() =>
+                TE.tryCatch(() => {
+                    return processInsert(
+                        this.client,
+                        defaultColTypesFormat,
+                        this.pgTypes,
+                        this.tableColsLibrary,
+                        this.uniqueColumnTypes,
+                        params.resolved
+                    );
+                }, E.toError)
+            ),
+            TE.map((answer) => {
+                this.insertCache.set(
+                    resolved.text,
+                    resolved.colTypes,
+                    resolved.tableName,
+                    resolved.insertColumns,
+                    answer
+                );
+
+                return insertAnswerToErrorDiagnostics(
+                    params.resolved,
+                    answer,
+                    defaultColTypesFormat
+                );
+            })
+        );
     }
 
     async end() {
@@ -1417,24 +1452,15 @@ function stringifyColTypes(colTypes: Map<string, [ColNullability, TypeScriptType
     return result;
 }
 
-async function newConnect(
-    sql: postgres.Sql,
-    adminUrl: string,
-    name?: string
-): Promise<postgres.Sql> {
+async function newConnect(adminUrl: string, name?: string): Promise<postgres.Sql> {
     const newDbName = name !== undefined ? name : await testDatabaseName();
 
-    try {
-        if (name !== undefined) {
-            await dropDatabase(sql, name);
-        }
-
-        await createBlankDatabase(sql, newDbName);
-    } finally {
-        await closePg(sql);
-    }
-
     const client = connectPg(connReplaceDbName(adminUrl, newDbName));
+
+    process.on("exit", () => {
+        client.end();
+    });
+
     return client;
 }
 

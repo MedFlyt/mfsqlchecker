@@ -56,7 +56,7 @@ async function handler(params: WorkerParams) {
         case "UPDATE_VIEWS":
             return await runUpdateViews(params)();
         case "END":
-            return await runEnd(params)();
+            return await runEnd()();
     }
 }
 
@@ -106,8 +106,8 @@ function runCheckQuery(
 
     return pipe(
         TE.Do,
-        TE.chain(() => TE.tryCatch(() => runner.runQuery(params), RunnerError.to)),
-        TE.chainEitherKW(mapDiagnosticsToError)
+        TE.chain(() => runner.runQueryTE(params)),
+        TE.chainEitherKW(mapDiagnosticsToError),
     );
 }
 
@@ -124,7 +124,7 @@ function runCheckInsert(
 
     return pipe(
         TE.Do,
-        TE.chain(() => TE.tryCatch(() => runner.runInsert(params), RunnerError.to)),
+        TE.chain(() => runner.runInsertTE(params)),
         TE.chainEitherKW(mapDiagnosticsToError)
     );
 }
@@ -165,7 +165,7 @@ function runUpdateViews(
 
 type EndParams = { action: "END" };
 
-function runEnd(_params: Extract<WorkerParams, { action: "END" }>) {
+function runEnd() {
     return pipe(
         TE.Do,
         TE.chain(() => TE.tryCatch(() => cache?.runner.end() ?? Promise.resolve(), E.toError)),

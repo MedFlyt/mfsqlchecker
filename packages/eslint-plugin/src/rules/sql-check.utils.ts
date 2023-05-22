@@ -5,6 +5,7 @@ import path from "path";
 import { Sql } from "postgres";
 import { Config, UniqueTableColumnType } from "@mfsqlchecker/core";
 import { connectPg, isTestDatabaseCluster, SqlCreateView } from "@mfsqlchecker/core";
+import crypto from "crypto";
 import { QueryRunner } from "../utils/query-runner";
 import { RunnerError } from "../utils/errors";
 import { customLog } from "../utils/log";
@@ -40,30 +41,116 @@ export function initializeTE(params: {
                 })
             );
         }),
-        TE.bindW("server", ({ options }) => {
-            customLog.success("initializing pg server");
-            return initPgServerTE(options);
+        TE.bindW("absMigrationsDir", ({ options }) => {
+            return TE.right(path.join(params.projectDir, options.config.migrationsDir));
         }),
-        TE.bindW("runner", ({ server, options }) => {
+        TE.bindW("embeddedDir", ({ options }) => {
+            return TE.right(path.join(options.projectDir, "embedded-pg"));
+        }),
+        TE.bind("hash", ({ absMigrationsDir }) => generateFolderHashTE(absMigrationsDir)),
+        TE.bind("cachedHash", ({ embeddedDir }) => getMigrationsHashTE(embeddedDir)),
+        TE.bind("loadFromCache", ({ cachedHash, hash }) => {
+            if (cachedHash === hash) {
+                customLog.success("migrations hash matches. loading from cache.");
+                return TE.right(true);
+            }
+
+            customLog.info("migrations hash does not match. loading from scratch.");
+            return TE.right(false);
+        }),
+        TE.bindW("server", ({ options, loadFromCache }) => {
+            customLog.success(`initializing pg server (load from cache: ${loadFromCache})`);
+            return createEmbeddedPostgresTE({
+                projectDir: options.projectDir,
+                shouldRecreateDatabase: !loadFromCache
+            });
+        }),
+        TE.bindW("runner", ({ server, absMigrationsDir }) => {
             customLog.success("connecting to database");
             return QueryRunner.ConnectTE({
-                sql: server.sql,
                 adminUrl: server.adminUrl,
                 name: server.dbName,
-                migrationsDir: path.join(params.projectDir, options.config.migrationsDir)
+                migrationsDir: absMigrationsDir
             });
         }),
-        TE.chainFirstW(({ runner }) => {
-            customLog.success("initializing database");
-            return runner.initializeTE({
-                strictDateTimeChecking: params.strictDateTimeChecking,
-                uniqueTableColumnTypes: params.uniqueTableColumnTypes,
-                sqlViews: params.sqlViews
-            });
+        TE.chainFirstW(({ runner, hash, loadFromCache, embeddedDir }) => {
+            return pipe(
+                TE.Do,
+                TE.chainFirst(() => {
+                    customLog.success(`initializing runner (reset: ${!loadFromCache})`);
+                    return runner.initializeTE({
+                        strictDateTimeChecking: params.strictDateTimeChecking,
+                        uniqueTableColumnTypes: params.uniqueTableColumnTypes,
+                        sqlViews: params.sqlViews,
+                        reset: !loadFromCache
+                    });
+                }),
+                TE.chainFirst(() => {
+                    if (loadFromCache) {
+                        return TE.right(null);
+                    }
+
+                    customLog.success(`storing migrations hash: ${hash}`);
+                    return writeMigrationsHashTE(embeddedDir, hash);
+                })
+            );
         }),
         TE.mapLeft((x) => {
             return x instanceof Error ? new RunnerError(x.message) : x;
         })
+    );
+}
+
+function writeMigrationsHashTE(embeddedDir: string, hash: string) {
+    return TE.tryCatch(
+        () => fs.promises.writeFile(path.join(embeddedDir, "migrations-hash.txt"), hash),
+        E.toError
+    );
+}
+
+function getMigrationsHashTE(embeddedPath: string) {
+    return pipe(
+        TE.Do,
+        TE.bind("exists", () =>
+            TE.tryCatch(
+                () =>
+                    fs.promises
+                        .access(path.join(embeddedPath, "migrations-hash.txt"))
+                        .then(() => true)
+                        .catch(() => false),
+                E.toError
+            )
+        ),
+        TE.chain(({ exists }) => {
+            if (!exists) {
+                return TE.right(null);
+            }
+
+            return TE.tryCatch(
+                () => fs.promises.readFile(path.join(embeddedPath, "migrations-hash.txt"), "utf-8"),
+                E.toError
+            );
+        })
+    );
+}
+
+function generateFolderHashTE(folderPath: string) {
+    const hash = crypto.createHash("sha256");
+
+    return pipe(
+        TE.Do,
+        TE.chain(() => TE.tryCatch(() => fs.promises.readdir(folderPath), E.toError)),
+        TE.chain((fileList) =>
+            TE.tryCatch(
+                () =>
+                    Promise.all(
+                        fileList.map((file) => fs.promises.readFile(path.join(folderPath, file)))
+                    ),
+                E.toError
+            )
+        ),
+        TE.map((fileBuffers) => fileBuffers.forEach((fileBuffer) => hash.update(fileBuffer))),
+        TE.map(() => hash.digest("hex"))
     );
 }
 
@@ -113,20 +200,15 @@ export interface PostgresOptions {
     persistent: boolean;
 }
 
-// See: <https://en.wikipedia.org/wiki/Ephemeral_port>
-const MIN_PORT = 49152;
-const MAX_PORT = 65534;
-
-function randomPort(): number {
-    return MIN_PORT + Math.floor(Math.random() * (MAX_PORT - MIN_PORT));
-}
-
-function createEmbeddedPostgresTE(options: { projectDir: string }) {
+function createEmbeddedPostgresTE(options: {
+    projectDir: string;
+    shouldRecreateDatabase: boolean;
+}) {
     const databaseDir = path.join(options.projectDir, "embedded-pg");
     const postgresOptions: Pick<PostgresOptions, "user" | "port" | "password"> = {
         user: "postgres",
         password: "password",
-        port: randomPort()
+        port: 5431
     };
 
     const pg = new EmbeddedPostgres({
@@ -153,28 +235,29 @@ function createEmbeddedPostgresTE(options: { projectDir: string }) {
                     E.toError
                 );
             }),
-            TE.chainFirst(({ dbName }) =>
-                TE.tryCatch(() => sql`CREATE DATABASE ${dbName}`, E.toError)
-            )
+            TE.chainFirst(({ dbName }) => {
+                return TE.tryCatch(() => sql`CREATE DATABASE ${dbName}`, E.toError);
+            }),
+            TE.chainFirst(() => TE.tryCatch(() => sql.end(), E.toError))
         );
 
     return pipe(
         TE.Do,
         TE.chain(() => conditionalInitializeAndStartTE),
-        TE.chainFirstEitherKW(() => tryTerminatePostmaster(databaseDir)),
-        TE.chainFirst(() => TE.tryCatch(() => pg.start(), E.toError)),
         TE.chainFirst(() => {
-            const x = isPostmasterAlive(databaseDir)
-                ? TE.right(undefined)
-                : TE.tryCatch(() => pg.start(), E.toError);
+            if (isPostmasterAlive(databaseDir)) {
+                return TE.right(undefined);
+            }
 
-            return x;
+            customLog.info("starting pg server");
+
+            return TE.tryCatch(() => pg.start(), E.toError);
         }),
         TE.bind("sql", () => TE.right(connectPg(adminUrl))),
         TE.chainFirst(({ sql }) => {
-            return recreateDatabaseTE(sql);
+            return options.shouldRecreateDatabase ? recreateDatabaseTE(sql) : TE.right(undefined);
         }),
-        TE.map(({ sql }) => ({ pg, options: postgresOptions, adminUrl, dbName: testDbName, sql }))
+        TE.map(() => ({ pg, options: postgresOptions, adminUrl, dbName: testDbName }))
     );
 }
 
@@ -191,44 +274,6 @@ function isPostmasterAlive(path: string) {
     } catch (e) {
         return false;
     }
-}
-
-function tryTerminatePostmaster(path: string) {
-    const pid = getPostmasterPid(path);
-
-    if (pid !== undefined) {
-        customLog.info("terminating postmaster", pid);
-        try {
-            process.kill(pid, "SIGQUIT");
-        } catch {
-            // do nothing
-        }
-    }
-
-    return E.right(undefined);
-}
-
-export function initPgServerTE(options: Options) {
-    return pipe(
-        createEmbeddedPostgresTE(options),
-        TE.map((result) => {
-            process.on("exit", () => {
-                result.sql.end();
-                result.pg.stop();
-            });
-
-            return result;
-        })
-    );
-}
-
-export function locateNearestPackageJsonDir(filePath: string): string {
-    const dir = path.dirname(filePath);
-    const packageJsonFile = path.join(dir, "package.json");
-    if (fs.existsSync(packageJsonFile)) {
-        return dir;
-    }
-    return locateNearestPackageJsonDir(dir);
 }
 
 function getPostmasterPid(filePath: string): number | undefined {
