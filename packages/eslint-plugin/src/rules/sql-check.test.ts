@@ -1,4 +1,4 @@
-import { describe, it } from "node:test";
+import { describe, it } from "mocha";
 import { ESLintUtils } from "@typescript-eslint/utils";
 import path from "path";
 import { RuleMessage, RuleOptions, sqlCheckRule } from "./sql-check.rule";
@@ -24,7 +24,7 @@ ESLintUtils.RuleTester.it = it;
 
 const config = {
     base: [
-        { configFile: "__tests_utils__/mfsqlchecker.json", colors: false, revalidateEachRun: true }
+        { configFile: "__tests_utils__/test_mfsqlchecker.json", colors: false, revalidateEachRun: true }
     ]
 } satisfies Record<string, RuleOptions>;
 

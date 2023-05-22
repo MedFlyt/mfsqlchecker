@@ -686,12 +686,13 @@ function runInitialize(params: {
 
     const program = parser.program;
     const sourceFiles = program.getSourceFiles().filter((s) => !s.isDeclarationFile);
+    const configFilePath = path.join(projectDir, configFile);
 
     return pipe(
         E.Do,
         E.bind("config", () => {
             customLog.success("loading config file");
-            return loadConfigFileE(path.join(projectDir, configFile));
+            return loadConfigFileE(configFilePath);
         }),
         E.mapLeft((diagnostic) => [diagnostic]),
         E.bindW("uniqueTableColumnTypes", ({ config }) => {
@@ -714,6 +715,7 @@ function runInitialize(params: {
             customLog.success(`got ${totalSqlViews.length} sql views. initializing worker.`);
             return runWorker({
                 action: "INITIALIZE",
+                configFilePath: configFilePath,
                 projectDir: projectDir,
                 config: config,
                 strictDateTimeChecking: config.strictDateTimeChecking ?? true,

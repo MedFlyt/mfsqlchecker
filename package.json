@@ -5,6 +5,7 @@
   "scripts": {
     "build": "pnpm run --parallel --filter './packages/**' build",
     "dev": "pnpm run --parallel --filter './packages/**' dev",
+    "test": "pnpm run --parallel --filter './packages/**' test",
     "typecheck": "pnpm run --parallel --filter './packages/**' typecheck"
   },
   "repository": {

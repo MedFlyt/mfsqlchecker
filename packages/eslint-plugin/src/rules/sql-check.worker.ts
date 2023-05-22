@@ -67,6 +67,7 @@ type InitializeParams = {
     strictDateTimeChecking: boolean;
     sqlViews: SqlCreateView[];
     config: Config;
+    configFilePath: string;
     force: boolean;
 };
 
@@ -76,6 +77,7 @@ function runInitialize(params: InitializeParams): TE.TaskEither<RunnerError, voi
         initializeTE({
             projectDir: params.projectDir,
             config: params.config,
+            configFilePath: params.configFilePath,
             migrationsDir: params.config.migrationsDir,
             uniqueTableColumnTypes: params.uniqueTableColumnTypes,
             strictDateTimeChecking: params.strictDateTimeChecking,

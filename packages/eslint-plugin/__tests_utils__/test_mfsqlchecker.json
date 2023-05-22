@@ -1,5 +1,5 @@
 {
-    "migrationsDir": "__tests_utils__/migrations",
+    "migrationsDir": "migrations",
     "uniqueTableColumnTypes": [
         {
             "typeScriptTypeName": "CustomerId",

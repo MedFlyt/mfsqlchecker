@@ -24,6 +24,7 @@ export interface Options {
 export function initializeTE(params: {
     projectDir: string;
     config: Config;
+    configFilePath: string;
     migrationsDir: string;
     uniqueTableColumnTypes: UniqueTableColumnType[];
     strictDateTimeChecking: boolean;
@@ -42,7 +43,7 @@ export function initializeTE(params: {
             );
         }),
         TE.bindW("absMigrationsDir", ({ options }) => {
-            return TE.right(path.join(params.projectDir, options.config.migrationsDir));
+            return TE.right(path.join(path.dirname(params.configFilePath), options.config.migrationsDir));
         }),
         TE.bindW("embeddedDir", ({ options }) => {
             return TE.right(path.join(options.projectDir, "embedded-pg"));
