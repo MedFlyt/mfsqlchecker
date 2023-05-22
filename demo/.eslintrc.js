@@ -9,6 +9,6 @@ module.exports = {
     },
     rules: {
         "@typescript-eslint/switch-exhaustiveness-check": "error",
-        "@mfsqlchecker/sql-check": ["error", { configFile: "mfsqlchecker.json" }]
+        "@mfsqlchecker/sql-check": ["error", { configFile: "mfsqlchecker.json", port: 5430 }]
     }
 };

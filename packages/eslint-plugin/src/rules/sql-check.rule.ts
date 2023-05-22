@@ -44,7 +44,8 @@ const messages = {
 const zOptions = z.object({
     configFile: z.string(),
     colors: z.boolean().optional(),
-    revalidateEachRun: z.boolean().optional()
+    revalidateEachRun: z.boolean().optional(),
+    port: z.number().optional(),
 });
 
 export const zRuleOptions = z.tuple([zOptions]);
@@ -682,7 +683,7 @@ function runInitialize(params: {
     force: boolean;
 }): E.Either<InvalidQueryError | RunnerError, undefined> {
     const { node, context, parser, checker, projectDir } = params;
-    const [{ configFile }] = context.options;
+    const [{ configFile, port }] = context.options;
 
     const program = parser.program;
     const sourceFiles = program.getSourceFiles().filter((s) => !s.isDeclarationFile);
@@ -718,6 +719,7 @@ function runInitialize(params: {
                 configFilePath: configFilePath,
                 projectDir: projectDir,
                 config: config,
+                port: port,
                 strictDateTimeChecking: config.strictDateTimeChecking ?? true,
                 uniqueTableColumnTypes: config.uniqueTableColumnTypes,
                 sqlViews: totalSqlViews,

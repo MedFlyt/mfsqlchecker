@@ -311,3 +311,11 @@ for all the SQL queries. It submits each one to a temporary PostgreSQL
 database, as a prepared statement. This allows it to check that the query is
 valid (correct syntax, valid table & column names, etc...), as well as query
 the type of each of the returned columns.
+
+## Run with logs
+
+use `DEBUG_SQL_CHECKER=true npm run eslint ...`
+
+## Look for slow type checking queries
+
+use `TYPE_CHECKING_SLOW_THRESHOLD_MS=1000 npm run eslint ...`

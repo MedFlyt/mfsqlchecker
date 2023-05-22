@@ -66,6 +66,7 @@ type InitializeParams = {
     uniqueTableColumnTypes: UniqueTableColumnType[];
     strictDateTimeChecking: boolean;
     sqlViews: SqlCreateView[];
+    port: number | undefined;
     config: Config;
     configFilePath: string;
     force: boolean;
@@ -77,6 +78,7 @@ function runInitialize(params: InitializeParams): TE.TaskEither<RunnerError, voi
         initializeTE({
             projectDir: params.projectDir,
             config: params.config,
+            port: params.port,
             configFilePath: params.configFilePath,
             migrationsDir: params.config.migrationsDir,
             uniqueTableColumnTypes: params.uniqueTableColumnTypes,

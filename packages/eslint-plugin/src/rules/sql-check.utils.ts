@@ -24,6 +24,7 @@ export interface Options {
 export function initializeTE(params: {
     projectDir: string;
     config: Config;
+    port: number | undefined;
     configFilePath: string;
     migrationsDir: string;
     uniqueTableColumnTypes: UniqueTableColumnType[];
@@ -63,7 +64,8 @@ export function initializeTE(params: {
             customLog.success(`initializing pg server (load from cache: ${loadFromCache})`);
             return createEmbeddedPostgresTE({
                 projectDir: options.projectDir,
-                shouldRecreateDatabase: !loadFromCache
+                shouldRecreateDatabase: !loadFromCache,
+                port: params.port
             });
         }),
         TE.bindW("runner", ({ server, absMigrationsDir }) => {
@@ -204,12 +206,13 @@ export interface PostgresOptions {
 function createEmbeddedPostgresTE(options: {
     projectDir: string;
     shouldRecreateDatabase: boolean;
+    port: number | undefined;
 }) {
     const databaseDir = path.join(options.projectDir, "embedded-pg");
     const postgresOptions: Pick<PostgresOptions, "user" | "port" | "password"> = {
         user: "postgres",
         password: "password",
-        port: 5431
+        port: options.port ?? 5431
     };
 
     const pg = new EmbeddedPostgres({
