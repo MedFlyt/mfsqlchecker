@@ -1,5 +1,5 @@
 {
-  "name": "@mfsqlchecker/eslint-plugin",
+  "name": "@medflyt/eslint-plugin-sql-checker",
   "version": "0.0.1",
   "description": "An ESLint plugin for validating the correctness of SQL queries",
   "main": "dist/index.js",
