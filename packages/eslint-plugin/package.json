@@ -1,6 +1,6 @@
 {
   "name": "@medflyt/eslint-plugin-sql-checker",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "private": false,
   "description": "An ESLint plugin for validating the correctness of SQL queries",
   "main": "dist/index.js",
