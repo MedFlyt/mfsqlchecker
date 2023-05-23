@@ -34,6 +34,7 @@ import { customLog } from "../utils/log";
 import { memoize } from "../utils/memoize";
 import { WorkerParams, WorkerResult } from "./sql-check.worker";
 import { locateNearestPackageJsonDir } from "../utils/locate-nearest-package-json-dir";
+import { metrics, withMetrics } from "../utils/metrics";
 
 const messages = {
     missing: "Missing: {{value}}",
@@ -45,7 +46,7 @@ const zOptions = z.object({
     configFile: z.string(),
     colors: z.boolean().optional(),
     revalidateEachRun: z.boolean().optional(),
-    port: z.number().optional(),
+    port: z.number().optional()
 });
 
 export const zRuleOptions = z.tuple([zOptions]);
@@ -74,9 +75,12 @@ export const sqlCheckRule = createRule({
         });
 
         return {
-            CallExpression: (node) => checkCallExpression({ node, context, projectDir }),
-            TaggedTemplateExpression: (node) =>
-                checkTaggedTemplateExpression({ node, context, projectDir })
+            CallExpression: (node) => {
+                withMetrics(() => checkCallExpression({ node, context, projectDir }));
+            },
+            TaggedTemplateExpression: (node) => {
+                withMetrics(() => checkTaggedTemplateExpression({ node, context, projectDir }));
+            }
         };
     }
 });
@@ -138,10 +142,12 @@ function checkTaggedTemplateExpression(params: {
         node.tag.type !== TSESTree.AST_NODE_TYPES.Identifier ||
         node.tag.name !== "defineSqlView"
     ) {
+        metrics.no++;
         return;
     }
 
     if (scopeManager === null || viewDeclaration === undefined) {
+        metrics.no++;
         return;
     }
 
@@ -270,6 +276,8 @@ function checkTaggedTemplateExpression(params: {
             continue;
         }
     }
+
+    metrics.ok++;
 }
 
 function lookupViewName(params: {
@@ -535,6 +543,7 @@ function checkCallExpression(params: {
     const callExpressionValidityE = getCallExpressionValidity(node);
 
     if (E.isLeft(callExpressionValidityE) || context.parserServices === undefined) {
+        metrics.no++;
         return;
     }
 
@@ -545,6 +554,7 @@ function checkCallExpression(params: {
     const tsObjectType = checker.getTypeAtLocation(tsObject);
 
     if (tsObjectType.getProperty("MfConnectionTypeTag") === undefined) {
+        metrics.no++;
         return;
     }
 
@@ -570,7 +580,7 @@ function checkCallExpression(params: {
 
     switch (callExpression.type) {
         case "QUERY":
-            return checkQueryExpression({
+            checkQueryExpression({
                 context,
                 parser,
                 checker,
@@ -578,9 +588,10 @@ function checkCallExpression(params: {
                 projectDir,
                 calleeProperty: callExpression.calleeProperty
             });
+            break;
         case "INSERT":
         case "INSERT_MANY":
-            return checkInsertExpression({
+            checkInsertExpression({
                 type: callExpression.type,
                 context,
                 parser,
@@ -591,6 +602,8 @@ function checkCallExpression(params: {
                 calleeProperty: callExpression.calleeProperty
             });
     }
+
+    metrics.ok++;
 }
 
 const resolveQueryFragmentE = flow(

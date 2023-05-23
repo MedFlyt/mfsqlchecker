@@ -1,4 +1,5 @@
 import chalk from "chalk";
+import readline from "readline";
 
 const isDebug = process.env.DEBUG_SQL_CHECKER === "true";
 
@@ -8,6 +9,15 @@ export const customLog = {
     success: (...args: any[]) => {
         if (isDebug) {
             console.log(chalk.grey(`[${now()}]`), chalk.green(`sql-checker`), ...args);
+        }
+    },
+    stream: (...args: any[]) => {
+        if (isDebug) {
+            readline.clearLine(process.stdout, 0)
+            readline.cursorTo(process.stdout, 0)
+            process.stdout.write(
+                `${chalk.grey(`[${now()}]`)} ${chalk.green(`sql-checker`)} ${args.join(" ")}`
+            );
         }
     },
     info: (...args: any[]) => {
@@ -20,4 +30,4 @@ export const customLog = {
             console.log(chalk.grey(`[${now()}]`), chalk.red(`sql-checker`), ...args);
         }
     }
-}
+};
