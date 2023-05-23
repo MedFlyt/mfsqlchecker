@@ -27,8 +27,8 @@ export class InvalidQueryError extends Error {
         this.diagnostics = diagnostics;
     }
 
-    static to(error: unknown): InvalidQueryError | Error {
-        return error instanceof InvalidQueryError ? error : new Error(`${error}`);
+    static to(diagnostics: ErrorDiagnostic[]): InvalidQueryError {
+        return new InvalidQueryError(diagnostics);
     }
 
     toJSON() {

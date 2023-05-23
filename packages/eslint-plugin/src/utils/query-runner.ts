@@ -35,7 +35,7 @@ import fs from "fs";
 import path from "path";
 import postgres from "postgres";
 import invariant from "tiny-invariant";
-import { InvalidQueryError } from "./errors";
+import { InvalidQueryError, RunnerError } from "./errors";
 import { E, pipe, TE } from "./fp-ts";
 import { customLog } from "./log";
 
@@ -79,10 +79,10 @@ export class QueryRunner {
         strictDateTimeChecking: boolean;
         sqlViews: SqlCreateView[];
         reset: boolean;
-    }): TE.TaskEither<Error | InvalidQueryError, undefined> {
+    }): TE.TaskEither<RunnerError | InvalidQueryError, undefined> {
         return pipe(
             TE.Do,
-            TE.chain(() => TE.tryCatch(() => this.initialize(params), E.toError)),
+            TE.chain(() => TE.tryCatch(() => this.initialize(params), RunnerError.to)),
             TE.match(
                 (error) => E.left(error),
                 (result) => {
@@ -237,7 +237,7 @@ export class QueryRunner {
                         this.uniqueColumnTypes,
                         params.resolved
                     );
-                }, E.toError)
+                }, RunnerError.to)
             ),
             TE.map((answer) => {
                 this.queryCache.set(resolved.text, resolved.colTypes, answer);
@@ -279,7 +279,7 @@ export class QueryRunner {
                         this.uniqueColumnTypes,
                         params.resolved
                     );
-                }, E.toError)
+                }, RunnerError.to)
             ),
             TE.map((answer) => {
                 this.insertCache.set(

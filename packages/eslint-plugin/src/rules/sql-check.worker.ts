@@ -1,4 +1,10 @@
-import { Config, ErrorDiagnostic, ResolvedInsert, ResolvedSelect, SqlCreateView } from "@mfsqlchecker/core";
+import {
+    Config,
+    ErrorDiagnostic,
+    ResolvedInsert,
+    ResolvedSelect,
+    SqlCreateView
+} from "@mfsqlchecker/core";
 import type EmbeddedPostgres from "embedded-postgres";
 import "source-map-support/register";
 import { runAsWorker } from "synckit";
@@ -72,7 +78,9 @@ type InitializeParams = {
     force: boolean;
 };
 
-function runInitialize(params: InitializeParams): TE.TaskEither<RunnerError, void> {
+function runInitialize(
+    params: InitializeParams
+): TE.TaskEither<InvalidQueryError | RunnerError, void> {
     customLog.success("initialize");
     return pipe(
         initializeTE({
@@ -101,9 +109,9 @@ function mapDiagnosticsToError(diagnostics: ErrorDiagnostic[]) {
 
 function runCheckQuery(
     params: CheckQueryParams
-): TE.TaskEither<InvalidQueryError | RunnerError | Error, undefined> {
+): TE.TaskEither<InvalidQueryError | RunnerError, undefined> {
     if (cache?.runner === undefined) {
-        return TE.left(new Error("runner is not initialized"));
+        return TE.left(new RunnerError("runner is not initialized"));
     }
 
     const runner = cache.runner;
@@ -111,7 +119,7 @@ function runCheckQuery(
     return pipe(
         TE.Do,
         TE.chain(() => runner.runQueryTE(params)),
-        TE.chainEitherKW(mapDiagnosticsToError),
+        TE.chainEitherKW(mapDiagnosticsToError)
     );
 }
 
@@ -119,9 +127,9 @@ type CheckInsertParams = { action: "CHECK_INSERT"; resolved: ResolvedInsert };
 
 function runCheckInsert(
     params: CheckInsertParams
-): TE.TaskEither<InvalidQueryError | RunnerError | Error, undefined> {
+): TE.TaskEither<InvalidQueryError | RunnerError, undefined> {
     if (cache?.runner === undefined) {
-        return TE.left(new Error("runner is not initialized"));
+        return TE.left(new RunnerError("runner is not initialized"));
     }
 
     const runner = cache.runner;
@@ -141,11 +149,9 @@ type UpdateViewsParams = {
 
 function runUpdateViews(
     params: UpdateViewsParams
-): TE.TaskEither<Error | RunnerError | InvalidQueryError, undefined> {
-    customLog.success("update views", params.sqlViews.length);
-
+): TE.TaskEither<RunnerError | InvalidQueryError, undefined> {
     if (cache?.runner === undefined) {
-        return TE.left(new Error("runner is not initialized"));
+        return TE.left(new RunnerError("runner is not initialized"));
     }
 
     const runner = cache.runner;

@@ -76,6 +76,7 @@ export function initializeTE(params: {
                 migrationsDir: absMigrationsDir
             });
         }),
+        TE.mapLeft((x) => new RunnerError(x.message)),
         TE.chainFirstW(({ runner, hash, loadFromCache, embeddedDir }) => {
             return pipe(
                 TE.Do,
@@ -98,16 +99,13 @@ export function initializeTE(params: {
                 })
             );
         }),
-        TE.mapLeft((x) => {
-            return x instanceof Error ? new RunnerError(x.message) : x;
-        })
     );
 }
 
 function writeMigrationsHashTE(embeddedDir: string, hash: string) {
     return TE.tryCatch(
         () => fs.promises.writeFile(path.join(embeddedDir, "migrations-hash.txt"), hash),
-        E.toError
+        RunnerError.to
     );
 }
 

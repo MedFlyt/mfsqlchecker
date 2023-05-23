@@ -104,7 +104,6 @@ const runWorker = flow(
 type FileName = string;
 
 const cache: Partial<{
-    retries: boolean;
     isInitial: boolean;
     isInitialView: boolean;
     config: Config;
@@ -112,7 +111,6 @@ const cache: Partial<{
     viewLibrary: Map<QualifiedSqlViewName, SqlViewDefinition>;
     sqlViews: Map<FileName, SqlCreateView[]>;
 }> = {
-    retries: false,
     isInitial: true,
     isInitialView: true,
     viewLibrary: new Map(),
@@ -135,7 +133,6 @@ function checkTaggedTemplateExpression(params: {
     const viewDeclaration = node.parent;
 
     if (
-        cache.retries === true ||
         program === undefined ||
         checker === undefined ||
         parser === undefined ||
@@ -174,8 +171,6 @@ function checkTaggedTemplateExpression(params: {
         customLog.success("initial load done");
     }
 
-    const wasInitialView = cache.isInitialView;
-
     if (cache.isInitialView) {
         cache.isInitialView = false;
     }
@@ -199,7 +194,7 @@ function checkTaggedTemplateExpression(params: {
             })
         ),
         E.mapLeft((diagnostics) => InvalidQueryError.to(diagnostics)),
-        E.chain((newSqlViews) => {
+        E.map((newSqlViews) => {
             invariant(cache.sqlViews !== undefined);
             invariant(cache.viewLibrary !== undefined);
 
@@ -214,38 +209,20 @@ function checkTaggedTemplateExpression(params: {
                 cache.viewLibrary?.set(name, view);
             });
 
-            return E.right({
+            return {
                 sqlViews: cache.sqlViews,
                 viewLibrary: cache.viewLibrary
-            });
+            };
         }),
-        E.chainFirst(({ sqlViews }) =>
-            runWorker({
+        E.chainFirst(({ sqlViews }) => {
+            return runWorker({
                 action: "UPDATE_VIEWS",
                 sqlViews: [...sqlViews.values()].flat(),
                 strictDateTimeChecking: true
-            })
-        ),
-        E.mapLeft((error) => {
-            if (!error.message.includes(nodeId) && !wasInitialView) {
-                // this is really awkward check. should be more robust
-                return;
-            }
-
-            if ("_tag" in error && error._tag === "InvalidQueryError") {
-                return reportDiagnostics({
-                    node,
-                    context,
-                    diagnostics: error.diagnostics,
-                    calleeProperty: null
-                });
-            }
-
-            context.report({
-                node: node,
-                messageId: "invalid",
-                data: { value: printError(error.message, context.options[0].colors) }
             });
+        }),
+        E.mapLeft((error) => {
+            return reportError({ context, error, node, calleeProperty: null });
         })
     );
 
@@ -376,23 +353,65 @@ function checkQueryExpression(params: {
     pipe(
         E.Do,
         E.chain(() => runWorker({ action: "CHECK_QUERY", resolved })),
-        E.mapLeft((error) => {
-            if ("_tag" in error && error._tag === "InvalidQueryError") {
-                return reportDiagnostics({
-                    context,
-                    node,
-                    calleeProperty,
-                    diagnostics: error.diagnostics
-                });
-            }
+        E.mapLeft((error) => reportError({ context, error, node, calleeProperty }))
+    );
+}
 
+function isDiagnosticInTaggedTemplateExpression(params: {
+    context: RuleContext;
+    node: TSESTree.TaggedTemplateExpression;
+    diagnostic: ErrorDiagnostic;
+}) {
+    const { context, node, diagnostic } = params;
+
+    if (context.getFilename() !== diagnostic.fileName) {
+        return false;
+    }
+
+    switch (diagnostic.span.type) {
+        case "File":
+            return true;
+        case "LineAndCol":
+            return diagnostic.span.line === node.loc.start.line;
+        case "LineAndColRange":
+            return diagnostic.span.startLine === node.loc.start.line;
+    }
+}
+
+function reportError(params: {
+    context: RuleContext;
+    node: TSESTree.CallExpression | TSESTree.TaggedTemplateExpression;
+    error: InvalidQueryError | RunnerError;
+    calleeProperty: TSESTree.Identifier | null;
+}) {
+    const { error, context, node, calleeProperty } = params;
+
+    switch (error._tag) {
+        case "InvalidQueryError":
+            const diagnostics =
+                node.type === TSESTree.AST_NODE_TYPES.TaggedTemplateExpression
+                    ? error.diagnostics.filter((diagnostic) =>
+                          isDiagnosticInTaggedTemplateExpression({
+                              node,
+                              context,
+                              diagnostic
+                          })
+                      )
+                    : error.diagnostics;
+
+            return reportDiagnostics({
+                node,
+                context,
+                diagnostics: diagnostics,
+                calleeProperty: calleeProperty
+            });
+        case "RunnerError":
             return context.report({
                 node: node,
                 messageId: "internal",
                 data: { value: printError(error.message, context.options[0].colors) }
             });
-        })
-    );
+    }
 }
 
 function reportDiagnostics(params: {
@@ -477,10 +496,6 @@ function checkInsertExpression(params: {
     calleeProperty: TSESTree.Identifier;
     projectDir: string;
 }) {
-    if (cache.retries === true) {
-        return;
-    }
-
     const { type, context, parser, checker, node, calleeProperty, projectDir } = params;
     const tsNode = parser.esTreeNodeToTSNodeMap.get(node);
 
@@ -511,22 +526,7 @@ function checkInsertExpression(params: {
         E.chain((resolved) => {
             return runWorker({ action: "CHECK_INSERT", resolved });
         }),
-        E.mapLeft((error) => {
-            if ("_tag" in error && error._tag === "InvalidQueryError") {
-                return reportDiagnostics({
-                    context,
-                    node,
-                    calleeProperty,
-                    diagnostics: error.diagnostics
-                });
-            }
-
-            return context.report({
-                node: node,
-                messageId: "invalid",
-                data: { value: printError(error.message, context.options[0].colors) }
-            });
-        })
+        E.mapLeft((error) => reportError({ context, error, node, calleeProperty }))
     );
 }
 
@@ -535,10 +535,6 @@ function checkCallExpression(params: {
     context: RuleContext;
     projectDir: string;
 }) {
-    if (cache.retries === true) {
-        return;
-    }
-
     const { node, context, projectDir } = params;
     const callExpressionValidityE = getCallExpressionValidity(node);
 
@@ -688,7 +684,7 @@ function getCallExpressionValidity(node: TSESTree.CallExpression) {
 }
 
 function runInitialize(params: {
-    node: TSESTree.Node;
+    node: TSESTree.CallExpression | TSESTree.TaggedTemplateExpression;
     context: RuleContext;
     parser: ParserServices;
     checker: TypeChecker;
@@ -741,19 +737,12 @@ function runInitialize(params: {
         }),
         E.fold(
             (error) => {
-                cache.retries = true;
-
-                context.report({
-                    node: node,
-                    messageId: "internal",
-                    data: { value: printError(error.message, context.options[0].colors) }
-                });
+                reportError({ context, error, node, calleeProperty: null });
 
                 return E.left(error);
             },
             ({ config, uniqueTableColumnTypes, views }) => {
                 cache.isInitial = false;
-                cache.retries = false;
                 cache.config = config;
                 cache.tsUniqueTableColumnTypes = uniqueTableColumnTypes;
                 cache.sqlViews = views.sqlViews;
