@@ -19,6 +19,11 @@ TODO:
  - [ ] ci
  - [ ] cd
 
+ views are not working properly:
+  - initial with error, should throw both on terminal and ide
+  - on fix error in ide, should be fixed fast
+
+
 
 ## had to run in on mac (m1)
 http://willbryant.net/software/mac_os_x/postgres_initdb_fatal_shared_memory_error_on_leopard
