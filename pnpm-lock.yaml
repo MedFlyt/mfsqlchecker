@@ -29,7 +29,7 @@ importers:
         specifier: 8.11.0
         version: 8.11.0
     devDependencies:
-      '@mfsqlchecker/eslint-plugin':
+      '@medflyt/eslint-plugin-sql-checker':
         specifier: workspace:*
         version: link:../packages/eslint-plugin
       '@types/pg':
@@ -246,7 +246,7 @@ importers:
         specifier: workspace:*
         version: link:../core
       '@mfsqlchecker/shared':
-        specifier: workspace:^
+        specifier: workspace:*
         version: link:../shared
       '@types/eslint':
         specifier: ^8.37.0

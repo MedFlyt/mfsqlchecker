@@ -1,6 +1,6 @@
 module.exports = {
     extends: "../.eslintrc.json",
-    plugins: ["@mfsqlchecker/eslint-plugin"],
+    plugins: ["@medflyt/sql-checker"],
     parserOptions: {
         ecmaVersion: "latest",
         sourceType: "module",
@@ -9,6 +9,6 @@ module.exports = {
     },
     rules: {
         "@typescript-eslint/switch-exhaustiveness-check": "error",
-        "@mfsqlchecker/sql-check": ["error", { configFile: "mfsqlchecker.json", port: 5430 }]
+        "@medflyt/sql-checker/sql-check": ["error", { configFile: "mfsqlchecker.json", port: 5430 }]
     }
 };
