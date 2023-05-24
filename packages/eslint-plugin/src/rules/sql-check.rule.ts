@@ -77,12 +77,10 @@ export const sqlCheckRule = createRule({
         });
 
         if (context.options[0].debug) {
-            console.log("sql-checker: debug mode");
             process.env.DEBUG_SQL_CHECKER = "true";
         }
         
         if (context.options[0].slowThresholdMs) {
-            console.log("sql-checker: slow threshold", context.options[0].slowThresholdMs);
             process.env.TYPE_CHECKING_SLOW_THRESHOLD_MS = context.options[0].slowThresholdMs.toString();
         }
 
