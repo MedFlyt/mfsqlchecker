@@ -46,7 +46,9 @@ const zOptions = z.object({
     configFile: z.string(),
     colors: z.boolean().optional(),
     revalidateEachRun: z.boolean().optional(),
-    port: z.number().optional()
+    port: z.number().optional(),
+    debug: z.boolean().optional(),
+    slowThresholdMs: z.number().optional(),
 });
 
 export const zRuleOptions = z.tuple([zOptions]);
@@ -73,6 +75,16 @@ export const sqlCheckRule = createRule({
             key: context.getCwd?.() + "-package-json",
             value: () => locateNearestPackageJsonDir(context.getFilename())
         });
+
+        if (context.options[0].debug) {
+            console.log("sql-checker: debug mode");
+            process.env.DEBUG_SQL_CHECKER = "true";
+        }
+        
+        if (context.options[0].slowThresholdMs) {
+            console.log("sql-checker: slow threshold", context.options[0].slowThresholdMs);
+            process.env.TYPE_CHECKING_SLOW_THRESHOLD_MS = context.options[0].slowThresholdMs.toString();
+        }
 
         return {
             CallExpression: (node) => {
