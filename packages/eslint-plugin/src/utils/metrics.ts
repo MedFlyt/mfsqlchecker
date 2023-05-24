@@ -1,19 +1,20 @@
 import { customLog } from "./log";
 
 export const metrics: {
-    ok: number;
-    no: number;
+    checked: number;
+    skipped: number;
+    fatal: number;
     duration: number;
-} = { ok: 0, no: 0, duration: 0 };
+} = { checked: 0, skipped: 0, fatal: 0, duration: 0 };
 
 export function withMetrics<T>(fn: () => T) {
     const now = Date.now();
     const result = fn();
     metrics.duration += Date.now() - now;
 
-    if (metrics.ok > 0 || metrics.duration > 1000) {
+    if (metrics.checked > 0 || metrics.duration > 1000) {
         customLog.stream(
-            `qualified: ${metrics.ok}\tnon-qualified: ${metrics.no}\tduration: ${metrics.duration}ms`
+            `checked: ${metrics.checked}\tskipped: ${metrics.skipped}\tfatal: ${metrics.fatal}\tduration: ${metrics.duration}ms`
         );
     }
 

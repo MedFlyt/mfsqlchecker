@@ -274,9 +274,7 @@ function fullyResolveSqlViewDefinition(v: SqlViewDefinition, myName: QualifiedSq
     return [];
 }
 
-type FileName = string;
-
-export function resolveAllViewDefinitions(library: Map<QualifiedSqlViewName, SqlViewDefinition>): [Map<FileName, SqlCreateView[]>, ErrorDiagnostic[]] {
+export function resolveAllViewDefinitions(library: Map<QualifiedSqlViewName, SqlViewDefinition>): [SqlCreateView[], ErrorDiagnostic[]] {
     let errorDiagnostics: ErrorDiagnostic[] = [];
 
     // Fully resolve all of the views (using the above recursive algorithm)
@@ -290,7 +288,7 @@ export function resolveAllViewDefinitions(library: Map<QualifiedSqlViewName, Sql
     // reverse-dependency order (otherwise we will get an error if we try to
     // create a view before its dependencies have been created)
 
-    const result: Map<string, SqlCreateView[]> = new Map();
+    const result: SqlCreateView[] = [];
     const added = new Set<QualifiedSqlViewName>();
 
     function addView(name: QualifiedSqlViewName, view: SqlViewDefinition) {
@@ -309,11 +307,7 @@ export function resolveAllViewDefinitions(library: Map<QualifiedSqlViewName, Sql
             addView(depName, dep);
         }
 
-        if (!result.has(view.getFileName())) {
-            result.set(view.getFileName(), []);
-        }
-        
-        result.get(view.getFileName())?.push({
+        result.push({
             qualifiedViewname: name,
             viewName: view.getName(),
             createQuery: view.fullyResolvedQuery(),

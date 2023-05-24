@@ -12,7 +12,7 @@ import {
     buildInsertManyCallExpression,
     buildQueryCallExpression,
     codeFrameFormatter,
-    getSqlViews,
+    getSqlViewsE,
     loadConfigFileE,
     resolveInsertMany,
     resolveQueryFragment,
@@ -101,23 +101,39 @@ const runWorker = flow(
     params: TWorkerParams
 ) => WorkerResult<TWorkerParams["action"]>;
 
-type FileName = string;
-
-const cache: Partial<{
+const cache: {
     isInitial: boolean;
-    isInitialView: boolean;
+    isFatal: boolean;
+    viewLibrary: Map<QualifiedSqlViewName, SqlViewDefinition>;
+    sqlViews: SqlCreateView[];
+    viewDiagnostics: Map<string, ErrorDiagnostic[]>;
+    checkedViews: Set<string>;
+} & Partial<{
     config: Config;
     tsUniqueTableColumnTypes: Map<TypeScriptType, SqlType>;
-    viewLibrary: Map<QualifiedSqlViewName, SqlViewDefinition>;
-    sqlViews: Map<FileName, SqlCreateView[]>;
 }> = {
     isInitial: true,
-    isInitialView: true,
+    isFatal: false,
     viewLibrary: new Map(),
-    sqlViews: new Map()
+    sqlViews: [],
+    viewDiagnostics: new Map(),
+    checkedViews: new Set()
 };
 
-const checkedViews: Map<string, true> = new Map();
+const checkedNodes = new Set<string>();
+const checkedFiles = new Map<string, number>();
+
+function wasFileCheckedRecently(fileName: string) {
+    const lastChecked = checkedFiles.get(fileName) ?? 0;
+    const now = Date.now();
+
+    if (now - lastChecked < 100) {
+        return true;
+    }
+
+    checkedFiles.set(fileName, now);
+    return false;
+}
 
 function checkTaggedTemplateExpression(params: {
     node: TSESTree.TaggedTemplateExpression;
@@ -139,18 +155,45 @@ function checkTaggedTemplateExpression(params: {
         node.tag.type !== TSESTree.AST_NODE_TYPES.Identifier ||
         node.tag.name !== "defineSqlView"
     ) {
-        metrics.no++;
+        metrics.skipped++;
         return;
     }
 
     if (scopeManager === null || viewDeclaration === undefined) {
-        metrics.no++;
+        metrics.skipped++;
         return;
     }
 
     const tsNode = parser.esTreeNodeToTSNodeMap.get(node);
     const fileName = tsNode.getSourceFile().fileName;
-    const nodeId = `${fileName}:${node.loc.start.line}`;
+
+    const reportViewDiagnostics = () => {
+        const fileDiagnostics = cache.viewDiagnostics.get(fileName) ?? [];
+        const viewDiagnostics = getRelevantDiagnostics({
+            node,
+            fileName,
+            diagnostics: fileDiagnostics
+        });
+
+        return reportDiagnostics({
+            context,
+            node,
+            diagnostics: viewDiagnostics,
+            calleeProperty: null
+        });
+    };
+
+    if (isFatal()) {
+        reportViewDiagnostics();
+
+        metrics.fatal++;
+
+        return;
+    }
+
+    if (wasFileCheckedRecently(fileName)) {
+        return;
+    }
 
     if (cache.isInitial) {
         customLog.success("initial load from tagged template expression");
@@ -159,102 +202,92 @@ function checkTaggedTemplateExpression(params: {
             node,
             parser,
             checker,
-            projectDir,
-            force: cache.isInitial === true
+            projectDir
         });
 
         if (E.isLeft(initE)) {
-            customLog.error(`initial load failed: ${initE.left.message}`);
+            checkedFiles.set(fileName, Date.now());
             return;
         }
 
         customLog.success("initial load done");
     }
 
-    if (cache.isInitialView) {
-        cache.isInitialView = false;
-    }
+    if (!isTerminal()) {
+        pipe(
+            E.Do,
+            E.chain(() =>
+                getSqlViewsE({
+                    projectDir,
+                    checker,
+                    program,
+                    sourceFiles: [fileName],
+                    viewLibrary: cache.viewLibrary
+                })
+            ),
+            E.mapLeft((diagnostics) => InvalidQueryError.to(diagnostics)),
+            E.map(({ sqlViews, viewLibrary }) => {
+                cache.sqlViews = sqlViews;
+                cache.viewLibrary = viewLibrary;
 
-    if (!checkedViews.has(nodeId)) {
-        checkedViews.set(nodeId, true);
+                return {
+                    sqlViews: cache.sqlViews,
+                    viewLibrary: cache.viewLibrary
+                };
+            }),
+            E.chainFirst(({ sqlViews }) => {
+                customLog.info(`updating views (initiator: ${fileName})`);
 
-        if (!cache.isInitialView) {
-            return;
-        }
-    }
-
-    pipe(
-        E.Do,
-        E.chain(() =>
-            getSqlViews({
-                projectDir,
-                checker,
-                program,
-                sourceFiles: [fileName]
-            })
-        ),
-        E.mapLeft((diagnostics) => InvalidQueryError.to(diagnostics)),
-        E.map((newSqlViews) => {
-            invariant(cache.sqlViews !== undefined);
-            invariant(cache.viewLibrary !== undefined);
-
-            cache.sqlViews.set(fileName, newSqlViews.sqlViews.get(fileName) ?? []);
-            cache.viewLibrary.forEach((view, name) => {
-                if (view.getFileName() === fileName) {
-                    cache.viewLibrary?.delete(name);
+                return runWorker({
+                    action: "UPDATE_VIEWS",
+                    sqlViews: sqlViews,
+                    strictDateTimeChecking: true
+                });
+            }),
+            E.map(() => {
+                cache.viewDiagnostics = new Map();
+            }),
+            E.mapLeft((error) => {
+                customLog.info("setting new view diagnostics");
+                if (error._tag === "InvalidQueryError") {
+                    setViewsDiagnostic(error);
+                    reportViewDiagnostics();
                 }
-            });
 
-            newSqlViews.viewLibrary.forEach((view, name) => {
-                cache.viewLibrary?.set(name, view);
-            });
+                return reportError({ context, error, node, calleeProperty: null });
+            })
+        );
 
-            return {
-                sqlViews: cache.sqlViews,
-                viewLibrary: cache.viewLibrary
-            };
-        }),
-        E.chainFirst(({ sqlViews }) => {
-            return runWorker({
-                action: "UPDATE_VIEWS",
-                sqlViews: [...sqlViews.values()].flat(),
-                strictDateTimeChecking: true
-            });
-        }),
-        E.mapLeft((error) => {
-            return reportError({ context, error, node, calleeProperty: null });
-        })
-    );
+        const viewVariable = scopeManager.getDeclaredVariables(viewDeclaration)[0];
 
-    const viewVariable = scopeManager.getDeclaredVariables(viewDeclaration)[0];
+        for (const reference of viewVariable.references) {
+            const ancestor = reference.identifier.parent?.parent;
 
-    for (const reference of viewVariable.references) {
-        const ancestor = reference.identifier.parent?.parent;
+            if (ancestor === undefined) {
+                continue;
+            }
 
-        if (ancestor === undefined) {
-            continue;
-        }
+            if (ancestor.type === TSESTree.AST_NODE_TYPES.CallExpression) {
+                checkCallExpression({
+                    node: ancestor,
+                    context,
+                    projectDir
+                });
+                continue;
+            }
 
-        if (ancestor.type === TSESTree.AST_NODE_TYPES.CallExpression) {
-            checkCallExpression({
-                node: ancestor,
-                context,
-                projectDir
-            });
-            continue;
-        }
-
-        if (ancestor.type === TSESTree.AST_NODE_TYPES.TaggedTemplateExpression) {
-            checkTaggedTemplateExpression({
-                node: ancestor,
-                context,
-                projectDir
-            });
-            continue;
+            if (ancestor.type === TSESTree.AST_NODE_TYPES.TaggedTemplateExpression) {
+                checkTaggedTemplateExpression({
+                    node: ancestor,
+                    context,
+                    projectDir
+                });
+                continue;
+            }
         }
     }
 
-    metrics.ok++;
+    metrics.checked++;
 }
 
 function lookupViewName(params: {
@@ -281,10 +314,11 @@ function lookupViewName(params: {
         const checker = program.getTypeChecker();
         const sourceFiles = program.getSourceFiles().filter((s) => !s.isDeclarationFile);
 
-        const sqlViewsE = getSqlViews({
+        const sqlViewsE = getSqlViewsE({
             projectDir,
             checker,
             program,
+            viewLibrary: cache.viewLibrary,
             sourceFiles: sourceFiles.map((x) => x.fileName)
         });
 
@@ -295,7 +329,7 @@ function lookupViewName(params: {
 
             runWorker({
                 action: "UPDATE_VIEWS",
-                sqlViews: [...sqlViews.values()].flat(),
+                sqlViews: sqlViews,
                 strictDateTimeChecking: cache.config?.strictDateTimeChecking ?? true
             });
 
@@ -357,14 +391,26 @@ function checkQueryExpression(params: {
     );
 }
 
+function getRelevantDiagnostics(params: {
+    fileName: string;
+    node: TSESTree.TaggedTemplateExpression;
+    diagnostics: ErrorDiagnostic[];
+}) {
+    const { fileName, node, diagnostics } = params;
+
+    return diagnostics.filter((diagnostic) =>
+        isDiagnosticInTaggedTemplateExpression({ fileName, node, diagnostic })
+    );
+}
+
 function isDiagnosticInTaggedTemplateExpression(params: {
-    context: RuleContext;
+    fileName: string;
     node: TSESTree.TaggedTemplateExpression;
     diagnostic: ErrorDiagnostic;
 }) {
-    const { context, node, diagnostic } = params;
+    const { fileName, node, diagnostic } = params;
 
-    if (context.getFilename() !== diagnostic.fileName) {
+    if (fileName !== diagnostic.fileName) {
         return false;
     }
 
@@ -372,9 +418,15 @@ function isDiagnosticInTaggedTemplateExpression(params: {
         case "File":
             return true;
         case "LineAndCol":
-            return diagnostic.span.line === node.loc.start.line;
+            return (
+                diagnostic.span.line >= node.loc.start.line &&
+                diagnostic.span.line <= node.loc.end.line
+            );
         case "LineAndColRange":
-            return diagnostic.span.startLine === node.loc.start.line;
+            return (
+                diagnostic.span.startLine >= node.loc.start.line &&
+                diagnostic.span.endLine <= node.loc.end.line
+            );
     }
 }
 
@@ -388,22 +440,11 @@ function reportError(params: {
 
     switch (error._tag) {
         case "InvalidQueryError":
-            const diagnostics =
-                node.type === TSESTree.AST_NODE_TYPES.TaggedTemplateExpression
-                    ? error.diagnostics.filter((diagnostic) =>
-                          isDiagnosticInTaggedTemplateExpression({
-                              node,
-                              context,
-                              diagnostic
-                          })
-                      )
-                    : error.diagnostics;
-
             return reportDiagnostics({
                 node,
                 context,
-                diagnostics: diagnostics,
-                calleeProperty: calleeProperty
+                diagnostics: error.diagnostics,
+                calleeProperty
             });
         case "RunnerError":
             return context.report({
@@ -539,7 +580,7 @@ function checkCallExpression(params: {
     const callExpressionValidityE = getCallExpressionValidity(node);
 
     if (E.isLeft(callExpressionValidityE) || context.parserServices === undefined) {
-        metrics.no++;
+        metrics.skipped++;
         return;
     }
 
@@ -550,24 +591,33 @@ function checkCallExpression(params: {
     const tsObjectType = checker.getTypeAtLocation(tsObject);
 
     if (tsObjectType.getProperty("MfConnectionTypeTag") === undefined) {
-        metrics.no++;
+        metrics.skipped++;
+        return;
+    }
+
+    if (isFatal()) {
+        metrics.fatal++;
+        return;
+    }
+
+    const nodeLocation = `${tsObject.getSourceFile().fileName}:${node.loc.start.line}`;
+
+    if (cache.viewDiagnostics.size > 0 && !checkedNodes.has(nodeLocation)) {
+        checkedNodes.add(nodeLocation);
         return;
     }
 
     if (cache.isInitial) {
         customLog.success("initial load from call expression");
-        // print tsconfig path
         const initE = runInitialize({
             context,
             node,
             parser,
             checker,
-            projectDir,
-            force: cache.isInitial === true
+            projectDir
         });
 
         if (E.isLeft(initE)) {
-            customLog.error(`initial load failed: ${initE.left.message}`);
             return;
         }
 
@@ -599,7 +649,7 @@ function checkCallExpression(params: {
             });
     }
 
-    metrics.ok++;
+    metrics.checked++;
 }
 
 const resolveQueryFragmentE = flow(
@@ -689,7 +739,6 @@ function runInitialize(params: {
     parser: ParserServices;
     checker: TypeChecker;
     projectDir: string;
-    force: boolean;
 }): E.Either<InvalidQueryError | RunnerError, undefined> {
     const { node, context, parser, checker, projectDir } = params;
     const [{ configFile, port }] = context.options;
@@ -701,28 +750,56 @@ function runInitialize(params: {
     return pipe(
         E.Do,
         E.bind("config", () => {
-            customLog.success("loading config file");
-            return loadConfigFileE(configFilePath);
+            if (cache.config !== undefined) {
+                return E.right(cache.config);
+            }
+
+            return pipe(
+                loadConfigFileE(configFilePath),
+                E.map((config) => {
+                    cache.config = config;
+                    customLog.success("loaded configutation file");
+                    return config;
+                }),
+                E.mapLeft((diagnostic) => [diagnostic])
+            );
         }),
-        E.mapLeft((diagnostic) => [diagnostic]),
         E.bindW("uniqueTableColumnTypes", ({ config }) => {
-            customLog.success("getting unique table column types");
-            return E.right(getTSUniqueColumnTypes(config.uniqueTableColumnTypes));
+            if (cache.tsUniqueTableColumnTypes !== undefined) {
+                return E.right(cache.tsUniqueTableColumnTypes);
+            }
+
+            const uniqueColumnTypes = getTSUniqueColumnTypes(config.uniqueTableColumnTypes);
+            cache.tsUniqueTableColumnTypes = uniqueColumnTypes;
+
+            customLog.success("loaded unique table column types");
+            return E.right(uniqueColumnTypes);
         }),
         E.bindW("views", () => {
             customLog.success("getting sql views");
 
-            return getSqlViews({
-                projectDir,
-                checker,
-                program,
-                sourceFiles: sourceFiles.map((x) => x.fileName)
-            });
+            return pipe(
+                E.Do,
+                E.chain(() =>
+                    getSqlViewsE({
+                        projectDir,
+                        checker,
+                        program,
+                        viewLibrary: cache.viewLibrary,
+                        sourceFiles: sourceFiles.map((x) => x.fileName)
+                    })
+                ),
+                E.map((views) => {
+                    cache.sqlViews = views.sqlViews;
+                    cache.viewLibrary = views.viewLibrary;
+                    customLog.success(`loaded ${views.sqlViews.length} sql views`);
+                    return views;
+                })
+            );
         }),
         E.mapLeft((diagnostics) => new InvalidQueryError(diagnostics)),
         E.chainFirstW(({ views, config }) => {
-            const totalSqlViews = [...views.sqlViews.values()].flat();
-            customLog.success(`got ${totalSqlViews.length} sql views. initializing worker.`);
+            customLog.success(`initializing worker`);
             return runWorker({
                 action: "INITIALIZE",
                 configFilePath: configFilePath,
@@ -731,27 +808,52 @@ function runInitialize(params: {
                 port: port,
                 strictDateTimeChecking: config.strictDateTimeChecking ?? true,
                 uniqueTableColumnTypes: config.uniqueTableColumnTypes,
-                sqlViews: totalSqlViews,
-                force: params.force
+                sqlViews: views.sqlViews,
+                force: true
             });
         }),
         E.fold(
             (error) => {
+                if (error._tag === "InvalidQueryError") {
+                    setViewsDiagnostic(error);
+                }
+
+                customLog.error(`initial load failed: ${error.message}`);
                 reportError({ context, error, node, calleeProperty: null });
 
                 return E.left(error);
             },
-            ({ config, uniqueTableColumnTypes, views }) => {
+            () => {
+                cache.viewDiagnostics = new Map();
                 cache.isInitial = false;
-                cache.config = config;
-                cache.tsUniqueTableColumnTypes = uniqueTableColumnTypes;
-                cache.sqlViews = views.sqlViews;
-                cache.viewLibrary = views.viewLibrary;
 
                 return E.right(undefined);
             }
         )
     );
+}
+
+/**
+ * While IDEs can recover from errors, the terminal cannot.
+ * This prevents the terminal from being spammed with attempts to reinitialize on each node.
+ * As of writing this workaround, only VSCode will be able to recover from errors (on edit).
+ */
+function isFatal() {
+    return isTerminal() && cache.viewDiagnostics.size !== 0;
+}
+
+function isTerminal() {
+    return process.env.VSCODE_PID === undefined;
+}
+
+function setViewsDiagnostic(error: InvalidQueryError) {
+    cache.viewDiagnostics = new Map();
+
+    for (const diagnostic of error.diagnostics) {
+        cache.viewDiagnostics.has(diagnostic.fileName)
+            ? cache.viewDiagnostics.get(diagnostic.fileName)?.push(diagnostic)
+            : cache.viewDiagnostics.set(diagnostic.fileName, [diagnostic]);
+    }
 }
 
 function printError(message: string, colors: boolean | undefined) {

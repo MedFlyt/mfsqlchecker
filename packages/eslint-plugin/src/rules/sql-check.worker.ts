@@ -45,16 +45,10 @@ let cache: {
     readonly runner: QueryRunner;
 } | null = null;
 
-let initializePromiseInstance: Promise<WorkerResult<"INITIALIZE">> | null = null;
-
 async function handler(params: WorkerParams) {
     switch (params.action) {
-        case "INITIALIZE": {
-            if (initializePromiseInstance === null || params.force) {
-                initializePromiseInstance = runInitialize(params)();
-            }
-            return await initializePromiseInstance;
-        }
+        case "INITIALIZE":
+            return await runInitialize(params)();
         case "CHECK_QUERY":
             return await runCheckQuery(params)();
         case "CHECK_INSERT":
@@ -75,7 +69,6 @@ type InitializeParams = {
     port: number | undefined;
     config: Config;
     configFilePath: string;
-    force: boolean;
 };
 
 function runInitialize(
@@ -111,7 +104,7 @@ function runCheckQuery(
     params: CheckQueryParams
 ): TE.TaskEither<InvalidQueryError | RunnerError, undefined> {
     if (cache?.runner === undefined) {
-        return TE.left(new RunnerError("runner is not initialized"));
+        return TE.left(new RunnerError("check-query: runner is not initialized"));
     }
 
     const runner = cache.runner;
@@ -129,7 +122,7 @@ function runCheckInsert(
     params: CheckInsertParams
 ): TE.TaskEither<InvalidQueryError | RunnerError, undefined> {
     if (cache?.runner === undefined) {
-        return TE.left(new RunnerError("runner is not initialized"));
+        return TE.left(new RunnerError("check-insert: runner is not initialized"));
     }
 
     const runner = cache.runner;
@@ -151,7 +144,7 @@ function runUpdateViews(
     params: UpdateViewsParams
 ): TE.TaskEither<RunnerError | InvalidQueryError, undefined> {
     if (cache?.runner === undefined) {
-        return TE.left(new RunnerError("runner is not initialized"));
+        return TE.left(new RunnerError("update-views: runner is not initialized"));
     }
 
     const runner = cache.runner;

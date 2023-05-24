@@ -44,6 +44,8 @@ type QueryRunnerConfig = {
     client: postgres.Sql;
 };
 
+let cachedClient: postgres.Sql | null = null; 
+
 export class QueryRunner {
     private migrationsDir: string;
     private client: postgres.Sql;
@@ -54,8 +56,8 @@ export class QueryRunner {
     }
 
     static async Connect(params: { adminUrl: string; name?: string; migrationsDir: string }) {
-        const client = await newConnect(params.adminUrl, params.name);
-        return new QueryRunner({ migrationsDir: params.migrationsDir, client });
+        cachedClient = cachedClient ?? await newConnect(params.adminUrl, params.name);
+        return new QueryRunner({ migrationsDir: params.migrationsDir, client: cachedClient });
     }
 
     static ConnectTE(params: { adminUrl: string; name?: string; migrationsDir: string }) {

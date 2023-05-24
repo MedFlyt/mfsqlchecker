@@ -12,22 +12,20 @@ import {
     sqlViewsLibraryAddFromSourceFile
 } from "./views";
 
-type FileName = string;
-
-export function getSqlViews(params: {
+export function getSqlViewsE(params: {
     projectDir: string;
     program: ts.Program;
     checker: ts.TypeChecker;
     sourceFiles: string[];
+    viewLibrary: Map<QualifiedSqlViewName, SqlViewDefinition>,
 }): E.Either<
     ErrorDiagnostic[],
     {
         viewLibrary: Map<QualifiedSqlViewName, SqlViewDefinition>;
-        sqlViews: Map<FileName, SqlCreateView[]>;
+        sqlViews: SqlCreateView[];
     }
 > {
-    const { projectDir, program, checker, sourceFiles } = params;
-    const viewLibrary: Map<QualifiedSqlViewName, SqlViewDefinition> = new Map();
+    const { projectDir, program, checker, sourceFiles, viewLibrary } = params;
     const progSourceFiles = program.getSourceFiles().filter((s) => !s.isDeclarationFile);
 
     let errorDiagnostics: ErrorDiagnostic[] = [];
