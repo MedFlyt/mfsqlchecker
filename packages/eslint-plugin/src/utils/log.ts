@@ -13,11 +13,15 @@ export const customLog = {
     },
     stream: (...args: any[]) => {
         if (isVerbose()) {
-            readline.clearLine(process.stdout, 0)
-            readline.cursorTo(process.stdout, 0)
-            process.stdout.write(
-                `${chalk.grey(`[${now()}]`)} ${chalk.green(`sql-checker`)} ${args.join(" ")}`
-            );
+            const text = `${chalk.grey(`[${now()}]`)} ${chalk.green(`sql-checker`)} ${args.join(
+                " "
+            )}`;
+
+            if (process.stdout.isTTY) {
+                readline.clearLine(process.stdout, 0);
+                readline.cursorTo(process.stdout, 0);
+                process.stdout.write(text);
+            }
         }
     },
     info: (...args: any[]) => {
