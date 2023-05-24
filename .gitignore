@@ -6,4 +6,3 @@
 /package-lock.json
 /.vscode/
 !/.vscode/tasks.json
-embedded-pg
