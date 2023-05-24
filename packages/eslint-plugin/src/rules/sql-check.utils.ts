@@ -21,6 +21,10 @@ export interface Options {
     readonly postgresConnection: PostgresConnection | null;
 }
 
+function getEmbeddedPgDir(projectDir: string) {
+    return path.join(projectDir, "node_modules", "@medflyt", "embedded-pg");
+}
+
 export function initializeTE(params: {
     projectDir: string;
     config: Config;
@@ -47,7 +51,7 @@ export function initializeTE(params: {
             return TE.right(path.join(path.dirname(params.configFilePath), options.config.migrationsDir));
         }),
         TE.bindW("embeddedDir", ({ options }) => {
-            return TE.right(path.join(options.projectDir, "embedded-pg"));
+            return TE.right(getEmbeddedPgDir(options.projectDir));
         }),
         TE.bind("hash", ({ absMigrationsDir }) => generateFolderHashTE(absMigrationsDir)),
         TE.bind("cachedHash", ({ embeddedDir }) => getMigrationsHashTE(embeddedDir)),
@@ -206,7 +210,7 @@ function createEmbeddedPostgresTE(options: {
     shouldRecreateDatabase: boolean;
     port: number | undefined;
 }) {
-    const databaseDir = path.join(options.projectDir, "embedded-pg");
+    const postgresDir = getEmbeddedPgDir(options.projectDir);
     const postgresOptions: Pick<PostgresOptions, "user" | "port" | "password"> = {
         user: "postgres",
         password: "password",
@@ -215,13 +219,13 @@ function createEmbeddedPostgresTE(options: {
 
     const pg = new EmbeddedPostgres({
         ...postgresOptions,
-        database_dir: databaseDir,
+        database_dir: postgresDir,
         persistent: false
     });
 
     const adminUrl = `postgres://${postgresOptions.user}:${postgresOptions.password}@localhost:${postgresOptions.port}/postgres`;
     const testDbName = "shadow_database";
-    const shouldInitialize = !fs.existsSync(databaseDir);
+    const shouldInitialize = !fs.existsSync(postgresDir);
 
     const conditionalInitializeAndStartTE = shouldInitialize
         ? TE.tryCatch(() => pg.initialise(), E.toError)
@@ -247,7 +251,7 @@ function createEmbeddedPostgresTE(options: {
         TE.Do,
         TE.chain(() => conditionalInitializeAndStartTE),
         TE.chainFirst(() => {
-            if (isPostmasterAlive(databaseDir)) {
+            if (isPostmasterAlive(postgresDir)) {
                 return TE.right(undefined);
             }
 
