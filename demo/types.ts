@@ -1,13 +1,13 @@
 export class DepartmentId {
-    static wrap(val: number): CarId {
+    static wrap(val: number): DepartmentId {
         return val as any;
     }
 
-    static unwrap(val: CarId): number {
+    static unwrap(val: DepartmentId): number {
         return val as any;
     }
 
-    protected _dummy: CarId[];
+    protected _dummy: DepartmentId[];
 }
 
 export class CarId {

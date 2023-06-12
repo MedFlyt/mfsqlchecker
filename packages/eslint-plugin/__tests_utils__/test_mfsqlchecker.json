@@ -1,0 +1,10 @@
+{
+    "migrationsDir": "migrations",
+    "uniqueTableColumnTypes": [
+        {
+            "typeScriptTypeName": "CustomerId",
+            "tableName": "customer",
+            "columnName": "id"
+        }
+    ]
+}

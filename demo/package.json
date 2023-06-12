@@ -1,0 +1,24 @@
+{
+  "name": "demo",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "lint": "eslint . --ext .ts"
+  },
+  "dependencies": {
+    "@js-joda/core": "5.5.3",
+    "@mfsqlchecker/client": "workspace:*",
+    "pg": "8.11.0"
+  },
+  "devDependencies": {
+    "@medflyt/eslint-plugin-sql-checker": "workspace:*",
+    "@types/pg": "8.6.6",
+    "@typescript-eslint/eslint-plugin": "^5.59.6",
+    "@typescript-eslint/parser": "^5.59.6",
+    "eslint": "^8.40.0",
+    "typescript": "5.0.4"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}

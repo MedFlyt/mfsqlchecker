@@ -1,0 +1,12 @@
+{
+    "root": true,
+    "extends": "../../.eslintrc.json",
+    "parserOptions": {
+        "ecmaVersion": "latest",
+        "sourceType": "module",
+        "project": "./tsconfig.json"
+    },
+    "rules": {
+        "@typescript-eslint/switch-exhaustiveness-check": "error"
+    }
+}

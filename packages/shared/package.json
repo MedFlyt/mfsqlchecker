@@ -1,0 +1,11 @@
+{
+  "name": "@mfsqlchecker/shared",
+  "version": "0.0.1",
+  "description": "shared package for mfsqlchecker",
+  "scripts": {
+    "typecheck": "tsc"
+  },
+  "devDependencies": {
+    "typescript": "5.0.4"
+  }
+}

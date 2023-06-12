@@ -1,16 +1,12 @@
 {
-  "name": "mfsqlchecker",
-  "version": "0.1.17",
+  "name": "@mfsqlchecker/monorepo",
+  "version": "0.0.1",
   "description": "Statically validate correctness of all your SQL queries. TypeScript, PostgreSQL",
-  "main": "index.js",
-  "bin": "./mfsqlchecker.js",
   "scripts": {
-    "build": "rm -rf build && tsc --project mfsqlchecker",
-    "ts-watch": "tsc --project mfsqlchecker --watch",
-    "check-demo": "node ./mfsqlchecker.js -p demo -c demo/mfsqlchecker.json",
-    "lint": "tslint --project ./mfsqlchecker/tsconfig.json --format stylish",
-    "lint-fix": "tslint --project ./mfsqlchecker/tsconfig.json --format stylish --fix",
-    "test": "node tests/run_tests.js"
+    "build": "pnpm run --parallel --filter './packages/**' build",
+    "dev": "pnpm run --parallel --filter './packages/**' dev",
+    "test": "pnpm run --parallel --filter './packages/**' test",
+    "typecheck": "pnpm run --parallel --filter './packages/**' typecheck"
   },
   "repository": {
     "type": "git",
@@ -28,42 +24,14 @@
     "url": "https://github.com/MedFlyt/mfsqlchecker/issues"
   },
   "homepage": "https://github.com/MedFlyt/mfsqlchecker#readme",
-  "files": [
-    "employees_demo.gif",
-    "build",
-    "TODO"
+  "workspaces": [
+    "packages/*",
+    "demo"
   ],
-  "dependencies": {
-    "@types/adm-zip": "0.4.32",
-    "@types/cli-progress": "1.8.1",
-    "@types/node": "18.11.13",
-    "@types/pg": "7.11.0",
-    "@types/request": "2.48.2",
-    "@types/rimraf": "2.0.2",
-    "@types/stack-trace": "0.0.29",
-    "@types/tar": "4.0.3",
-    "adm-zip": "0.4.13",
-    "ajv": "6.12.6",
-    "assert-never": "1.2.0",
-    "chalk": "2.4.2",
-    "cli-progress": "3.0.0",
-    "commander": "3.0.0",
-    "env-paths": "2.2.0",
-    "make-dir": "3.0.0",
-    "npm-check-updates": "3.1.21",
-    "pg": "7.12.1",
-    "pg-connection-string": "2.1.0",
-    "postgres": "^3.3.1",
-    "promisify-child-process": "3.1.1",
-    "request": "2.88.0",
-    "rimraf": "3.0.0",
-    "source-map-support": "0.5.13",
-    "stack-trace": "0.0.10",
-    "tar": "^4.4.19",
-    "tslint": "5.18.0",
-    "typescript": "4.9.4"
-  },
   "devDependencies": {
-    "glob": "7.1.6"
+    "@tsconfig/node18": "2.0.1",
+    "@types/node": "18.11.13",
+    "tsx": "^3.12.7",
+    "typescript": "5.0.4"
   }
 }

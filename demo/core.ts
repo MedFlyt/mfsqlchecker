@@ -1,4 +1,4 @@
-import { Connection, defineSqlViewPrimitive, SqlFrag, SqlFragAuth, SqlView } from "../lib/mfsqltool";
+import { Connection, defineSqlViewPrimitive, SqlFrag, SqlFragAuth, SqlView } from "@mfsqlchecker/client";
 
 export class Conn<T> extends Connection<SqlFragAuth<string, T> | T, {}> {
     // Empty
