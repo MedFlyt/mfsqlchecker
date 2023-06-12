@@ -10,6 +10,11 @@ export const metrics: {
 export function withMetrics<T>(fn: () => T) {
     const now = Date.now();
     const result = fn();
+
+    if (process.env.CI) {
+        return result;
+    }
+
     metrics.duration += Date.now() - now;
 
     if (metrics.checked > 0 || metrics.duration > 1000) {
