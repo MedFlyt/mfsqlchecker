@@ -54,7 +54,7 @@
     "pg": "7.12.1",
     "pg-connection-string": "2.1.0",
     "postgres": "^3.3.1",
-    "promisify-child-process": "3.1.1",
+    "promisify-child-process": "4.1.1",
     "request": "2.88.0",
     "rimraf": "3.0.0",
     "source-map-support": "0.5.13",
