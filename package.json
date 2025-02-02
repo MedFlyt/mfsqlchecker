@@ -1,5 +1,5 @@
 {
-  "name": "mfsqlchecker",
+  "name": "@medflyt/mfsqlchecker",
   "version": "0.1.18",
   "description": "Statically validate correctness of all your SQL queries. TypeScript, PostgreSQL",
   "main": "index.js",
