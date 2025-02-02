@@ -56,8 +56,6 @@ async function withTempExtractPostgresTo(
 
         await makeDir(extractDir);
 
-        console.log("extracting to", extractDir);
-
         const jarFile = new AdmZip(jarFilePath);
         const txzFile = jarFile
             .getEntries()
