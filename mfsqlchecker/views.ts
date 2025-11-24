@@ -425,7 +425,7 @@ export function tryTypeSqlFrag(type: ts.Type): Either<string, string | null> {
 }
 
 function isSqlViewDefinition(checker: ts.TypeChecker, decl: ts.VariableDeclaration): boolean {
-    const name = checker.getTypeAtLocation(decl).symbol.name;
+    const name = checker.getTypeAtLocation(decl).symbol?.name ?? "";
 
     // TODO This should be more robust: make sure that it is the "SqlView" type
     // defined in the sql library (and not some other user-defined type that
