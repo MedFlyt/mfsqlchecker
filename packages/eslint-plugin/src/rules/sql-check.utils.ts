@@ -1,6 +1,7 @@
 import EmbeddedPostgres from "embedded-postgres";
 import { E, TE, pipe } from "../utils/fp-ts";
 import fs from "fs";
+import net from "net";
 import path from "path";
 import { Sql } from "postgres";
 import { Config, UniqueTableColumnType } from "@mfsqlchecker/core";
@@ -205,31 +206,71 @@ export interface PostgresOptions {
     persistent: boolean;
 }
 
+function getAvailablePort(): Promise<number> {
+    return new Promise((resolve, reject) => {
+        const server = net.createServer();
+        server.listen(0, "127.0.0.1", () => {
+            const address = server.address();
+            if (address && typeof address !== "string") {
+                const port = address.port;
+                server.close(() => resolve(port));
+            } else {
+                server.close(() => reject(new Error("Failed to get available port")));
+            }
+        });
+        server.on("error", reject);
+    });
+}
+
+function getPostmasterPort(postgresDir: string): number | undefined {
+    const pidFile = path.join(postgresDir, "postmaster.pid");
+
+    if (!fs.existsSync(pidFile)) {
+        return undefined;
+    }
+
+    const fileContents = fs.readFileSync(pidFile, "utf8");
+    const lines = fileContents.split("\n");
+
+    if (lines.length < 4) {
+        return undefined;
+    }
+
+    const port = parseInt(lines[3]);
+    return isNaN(port) ? undefined : port;
+}
+
+function resolvePortTE(postgresDir: string, explicitPort: number | undefined) {
+    if (explicitPort !== undefined) {
+        return TE.right(explicitPort);
+    }
+
+    if (isPostmasterAlive(postgresDir)) {
+        const existingPort = getPostmasterPort(postgresDir);
+        if (existingPort !== undefined) {
+            customLog.info(`reusing existing pg server on port ${existingPort}`);
+            return TE.right(existingPort);
+        }
+    }
+
+    return TE.tryCatch(
+        async () => {
+            const port = await getAvailablePort();
+            customLog.info(`using available port ${port}`);
+            return port;
+        },
+        E.toError
+    );
+}
+
 function createEmbeddedPostgresTE(options: {
     projectDir: string;
     shouldRecreateDatabase: boolean;
     port: number | undefined;
 }) {
     const postgresDir = getEmbeddedPgDir(options.projectDir);
-    const postgresOptions: Pick<PostgresOptions, "user" | "port" | "password"> = {
-        user: "postgres",
-        password: "password",
-        port: options.port ?? 5431
-    };
-
-    const pg = new EmbeddedPostgres({
-        ...postgresOptions,
-        database_dir: postgresDir,
-        persistent: false
-    });
-
-    const adminUrl = `postgres://${postgresOptions.user}:${postgresOptions.password}@localhost:${postgresOptions.port}/postgres`;
     const testDbName = "shadow_database";
     const shouldInitialize = !fs.existsSync(postgresDir);
-
-    const conditionalInitializeAndStartTE = shouldInitialize
-        ? TE.tryCatch(() => pg.initialise(), E.toError)
-        : TE.right(undefined);
 
     const recreateDatabaseTE = (sql: Sql) =>
         pipe(
@@ -249,21 +290,49 @@ function createEmbeddedPostgresTE(options: {
 
     return pipe(
         TE.Do,
-        TE.chain(() => conditionalInitializeAndStartTE),
-        TE.chainFirst(() => {
+        TE.bind("port", () => resolvePortTE(postgresDir, options.port)),
+        TE.bind("pgSetup", ({ port }) => {
+            const postgresOptions: Pick<PostgresOptions, "user" | "port" | "password"> = {
+                user: "postgres",
+                password: "password",
+                port
+            };
+
+            const pg = new EmbeddedPostgres({
+                ...postgresOptions,
+                database_dir: postgresDir,
+                persistent: false
+            });
+
+            const adminUrl = `postgres://${postgresOptions.user}:${postgresOptions.password}@localhost:${postgresOptions.port}/postgres`;
+
+            return TE.right({ pg, postgresOptions, adminUrl });
+        }),
+        TE.chainFirst(({ pgSetup }) => {
+            if (shouldInitialize) {
+                return TE.tryCatch(() => pgSetup.pg.initialise(), E.toError);
+            }
+            return TE.right(undefined);
+        }),
+        TE.chainFirst(({ pgSetup }) => {
             if (isPostmasterAlive(postgresDir)) {
                 return TE.right(undefined);
             }
 
             customLog.info("starting pg server");
 
-            return TE.tryCatch(() => pg.start(), E.toError);
+            return TE.tryCatch(() => pgSetup.pg.start(), E.toError);
         }),
-        TE.bind("sql", () => TE.right(connectPg(adminUrl))),
+        TE.bind("sql", ({ pgSetup }) => TE.right(connectPg(pgSetup.adminUrl))),
         TE.chainFirst(({ sql }) => {
             return options.shouldRecreateDatabase ? recreateDatabaseTE(sql) : TE.right(undefined);
         }),
-        TE.map(() => ({ pg, options: postgresOptions, adminUrl, dbName: testDbName }))
+        TE.map(({ pgSetup }) => ({
+            pg: pgSetup.pg,
+            options: pgSetup.postgresOptions,
+            adminUrl: pgSetup.adminUrl,
+            dbName: testDbName
+        }))
     );
 }
 
